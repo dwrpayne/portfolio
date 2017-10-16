@@ -74,10 +74,9 @@ class DataProvider:
             try:
                 print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date), end='')
                 df = pdr.DataReader(symbol, 'yahoo', start_date, end_date)
-                StockPrice.objects.bulk_create([
-                    StockPrice(symbol=symbol, date=date, value=price) 
-                    for date, price in zip(df.index, df['Close'])
-                    ])
+                StockPrice.objects.bulk_create(
+                    [StockPrice(symbol=symbol, date=date, value=price) 
+                    for date, price in zip(df.index, df['Close']) if date > str(start_date)])
                 print('DONE!')
                 break
             except Exception as e:
@@ -101,10 +100,9 @@ class DataProvider:
             try:
                 print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date), end='')
                 df = pdr.DataReader(symbol, 'fred', start_date, end_date)                
-                ExchangeRate.objects.bulk_create([
-                    ExchangeRate(basecurrency=self.base_currency, currency=currency, date=date, value=price) 
-                    for date, price in zip(df.index, df[symbol])
-                    ])
+                ExchangeRate.objects.bulk_create(
+                    [ExchangeRate(basecurrency=self.base_currency, currency=currency, date=date, value=price) 
+                    for date, price in zip(df.index, df[symbol]) if date > str(start_date)])
                 print('DONE!')
                 break
             except Exception as e:
@@ -183,35 +181,48 @@ class Position:
         return self.GetMarketValue() - self.GetBookValue()
 
 class Activity(models.Model):
+    account = models.ForeignKey('Account', on_delete=models.CASCADE)
     tradeDate = models.DateField()
     transactionDate = models.DateField()
     action = models.CharField(max_length=100)
     symbol = models.CharField(max_length=100)
     currency = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
-    value = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
-    commission = models.DecimalField(max_digits=16, decimal_places=6)
-    netAmount = models.DecimalField(max_digits=16, decimal_places=6)
+    commission = models.DecimalField(max_digits=16, decimal_places=2)
+    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
     type = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
+    
+    class Meta:
+        unique_together = ('account', 'tradeDate', 'action', 'symbol', 'currency', 'qty', 'price', 'netAmount', 'type', 'description')
+        verbose_name_plural = 'Activities'
 
     @classmethod
-    def CreateFromJson(cls, json):
-        activity = Activity(
-            tradeDate = arrow.get(json['tradeDate'])
-            ,transactionDate = arrow.get(json['transactionDate'])
+    def CreateFromJson(cls, json, account):
+        price = json['price']
+        symbol = json['symbol']
+        tradeDate = arrow.get(json['tradeDate']).date()
+        if price == 0 and symbol:   
+            price = data_provider.GetPrice(symbol, strdate(tradeDate))
+
+        obj, created = Activity.objects.get_or_create(
+            account = account
+            ,tradeDate = tradeDate
+            ,transactionDate = arrow.get(json['transactionDate']).date()
             ,action = json['action'] # "Buy" or "Sell" or "    "
-            ,symbol = json['symbol']
+            ,symbol = symbol
             ,currency = json['currency']
             ,qty = Decimal(str(json['quantity'])) # 0 if a dividend
-            ,price = Decimal(str(json['price'])) # price if trade, div/share amt
+            ,price = Decimal(str(price)) # price if trade, div/share amt
             ,commission = Decimal(str(json['commission'])) # Always negative
             ,netAmount = Decimal(str(json['netAmount']))
             ,type = json['type'] # "Trades", "Dividends", "Deposits"
             ,description = json['description']
             )
-        return activity
+
+        #if not created:
+        #    print("Warning: tried to create duplicate activity from json {}\nThere was already a DB entry: {}".format(json, obj))
 
         # Type          Action
         # Trades                ["Buy", "Sell"]
@@ -224,7 +235,7 @@ class Activity(models.Model):
         # 
 
     def __str__(self):
-        return "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}".format(self.tradeDate.format(), self.action, self.symbol, self.currency,self.qty, self.price, self.commission, self.netAmount, self.type, self.description)
+        return "{} - {} - {}\t{}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.symbol, self.action, self.qty, self.price, self.type, self.description)
 
     def __repr__(self):
         return "Activity({},{},{},{},{},{},{},{},{},{})".format(self.tradeDate, self.action, self.symbol, self.currency,self.qty, self.price, self.commission, self.netAmount, self.type, self.description)
@@ -299,46 +310,36 @@ class Account(models.Model):
     @classmethod 
     def CreateAccountFromJson(cls, json, client):
         account = Account(type=json['type'], account_id=json['number'], client=client)
-        account.activityHistory = []
+        account.LoadHistoryFromDB()
         account.holdings = {}
         account.currentHoldings = Holdings()
         account.taxData = TaxData()        
-        account.DATA_FILE = os.path.join(os.path.dirname(__file__), 'private', '{}.pkl'.format(account.account_id))
         account.save()
         return account
 
     @classmethod
     def from_db(cls, db, field_name, values):
         instance = super().from_db(db, field_name, values)
-        instance.activityHistory = []
+        instance.LoadHistoryFromDB()
         instance.holdings = {}
         instance.currentHoldings = Holdings()
         instance.taxData = TaxData()        
-        instance.DATA_FILE = os.path.join(os.path.dirname(__file__), 'private', '{}.pkl'.format(instance.account_id))
         return instance
         
     def __repr__(self):
         return "Account({},{},{})".format(self.client, self.account_id, self.type)
 
     def __str__(self):
-        if not hasattr(self, 'currentHoldings'):
-            return "Account {} {} - {}".format(self.client, self.account_id, self.type)
+        return "{} {} {}".format(self.client, self.account_id, self.type)
+
+    def PrettyPrint(self):
         return "Account {} - {}".format(self.account_id, self.type) + "\n======================================\n" + \
                '\n'.join(map(str, self.GetPositions())) + '\n' + \
                '\n'.join(["{} cash: {}".format(cur, as_currency(cash)) for cur,cash in self.currentHoldings.cashByCurrency.items()]) + '\n' + \
                 str(self.taxData) + '\n'
-
-    def Save(self):
-        with open(self.DATA_FILE, 'wb') as f:
-            pickle.dump(self.activityHistory, f)
-
-    def Load(self):
-        try:
-            if os.path.exists(self.DATA_FILE):
-                with open(self.DATA_FILE, 'rb') as f:
-                    self.activityHistory = pickle.load(f)
-        except:
-            pass
+    
+    def LoadHistoryFromDB(self):
+        self.activityHistory = list(Activity.objects.filter(account=self))
 
     def GetMostRecentActivityDate(self):
         return max([a.tradeDate for a in self.activityHistory], default=None)
@@ -371,10 +372,7 @@ class Account(models.Model):
 
     def AddCash(self, currency, amt):
         self.currentHoldings.cashByCurrency[currency] += amt
-
-    def AddActivity(self, activity):
-        self.activityHistory.append(activity)
-
+        
     def ProcessActivityHistory(self):
         for a in sorted(self.activityHistory, key=operator.attrgetter('tradeDate')):
             logger.debug("Adding... {}".format(a))
@@ -584,34 +582,25 @@ class Client(models.Model):
 
         json = self._GetRequest('accounts/%s/activities'%(account_id), {'startTime': startTime.isoformat(), 'endTime': endTime.isoformat()})
         logger.debug(json)
-        return [Activity.CreateFromJson(a) for a in json['activities']]
+        return json['activities']
 
     def SyncAllActivitiesSlow(self, startDate):
         print ('Syncing all activities for {}...'.format(self.username))
         for account in self.GetAccounts():
-            account.Load()
-
             start = account.GetMostRecentActivityDate()
-            if start: start = start.shift(days=+1)
+            if start: start = arrow.get(start).shift(days=+1)
             else: start = arrow.get(startDate)
             
             date_range = arrow.Arrow.interval('day', start, arrow.now(), 30)
             num_requests = len(date_range)
             
-            activities = []
             for start, end in date_range:
-                activities += self._GetActivities(account.account_id, start, end.replace(hour=0, minute=0, second=0)) 
+                print (account.account_id, start, end)
+                for a_json in self._GetActivities(account.account_id, start, end.replace(hour=0, minute=0, second=0)):
+                    #print("Creating " + str(a_json))
+                    a = Activity.CreateFromJson(a_json, account)
 
-            for symbol in {activity.symbol for activity in activities}:
-                if symbol:
-                    data_provider.SyncStockPrices(symbol)
-            for activity in activities:
-                activity.UpdatePriceData()
-                account.AddActivity(activity)
-
-            account.Save()
-
-            account.ProcessActivityHistory()
+            account.LoadHistoryFromDB()
 
     def GenerateHoldingsHistory(self):        
         for account in self.GetAccounts():
@@ -655,39 +644,3 @@ def HackInitMyAccount(account):
         account.currentHoldings.positions.append(Position('XIN.TO', 'CAD', 140, marketprice=19.1, bookprice=18.482))
         account.currentHoldings.cashByCurrency['CAD'] = Decimal('147.25')
         account.currentHoldings.cashByCurrency['USD'] = Decimal('97.15')
-
-# Create your models here.
-
-#class Client(models.Model):
-#    username = models.CharField(max_length=100, primary_key=True)
-#    refresh_token = models.CharField(max_length=100)
-
-#    def _GetTokenFile(self):
-#        return os.path.join(os.path.dirname(__file__), 'private', self.username+'.token')
-    
-#    def _LoadToken(self):
-#        if os.path.exists(self._GetTokenFile()):
-#            with open(self._GetTokenFile()) as f:
-#                token = f.read()
-#                if len(token) > 10: return token
-#        return None
-
-#    def Authorize(self, refresh_token):		
-#        # Either we init with a token, or we load the previously stored good one.
-#        refresh_token = refresh_token or self._LoadToken()
-#        assert refresh_token, "We don't have a refresh_token! The backing file must have been deleted. You need to regenerate a new refresh token."
-#        _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
-#        r = requests.get(_URL_LOGIN+refresh_token)
-#        r.raise_for_status()
-#        j = r.json()
-#        self.api_server = j['api_server'] + 'v1/'
-#        self.refresh_token = j['refresh_token']
-        
-#        # Save out the new token we just got.
-#        with open(self._GetTokenFile(), 'w') as f:
-#            f.write(refresh_token)
-
-#class Account(models.Model):
-#    client = models.ForeignKey(Client, on_delete=models.CASCADE)
-#    type = models.CharField(max_length=100, primary_key = True)
-#    id = models.IntegerField(default=0)
