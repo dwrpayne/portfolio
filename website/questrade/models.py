@@ -13,6 +13,7 @@ import pickle
 import copy
 import datetime
 from decimal import Decimal
+import traceback
 
 from pandas_datareader import data as pdr
 from fix_yahoo_finance import pdr_override
@@ -34,6 +35,9 @@ class StockPrice(models.Model):
 
     class Meta:
         unique_together = ('symbol', 'date')
+        indexes = [
+            models.Index(fields=['symbol', 'date'])
+        ]
 
     def __str__(self):
         return "{} {} {}".format(self.symbol, self.date, self.value)
@@ -45,6 +49,9 @@ class ExchangeRate(models.Model):
     value = models.DecimalField(max_digits=16, decimal_places=6)
     class Meta:
         unique_together = ('basecurrency', 'currency', 'date')
+        indexes = [
+            models.Index(fields=['basecurrency', 'currency', 'date'])
+        ]
 
     def __str__(self):
         return "{}->{} {} {}".format(self.basecurrency, self.currency,  self.date, self.value)
@@ -76,11 +83,11 @@ class DataProvider:
                 df = pdr.DataReader(symbol, 'yahoo', start_date, end_date)
                 StockPrice.objects.bulk_create(
                     [StockPrice(symbol=symbol, date=date, value=price) 
-                    for date, price in zip(df.index, df['Close']) if date > str(start_date)])
+                    for date, price in zip(df.index, df['Close']) if date.date() > start_date and price > 0])
                 print('DONE!')
                 break
             except Exception as e:
-                print (e)
+                traceback.print_exc()
                 print ('Failed, retrying!')
                 pass              
 
@@ -102,7 +109,7 @@ class DataProvider:
                 df = pdr.DataReader(symbol, 'fred', start_date, end_date)                
                 ExchangeRate.objects.bulk_create(
                     [ExchangeRate(basecurrency=self.base_currency, currency=currency, date=date, value=price) 
-                    for date, price in zip(df.index, df[symbol]) if date > str(start_date)])
+                    for date, price in zip(df.index, df[symbol]) if date.date() > start_date and price > 0])
                 print('DONE!')
                 break
             except Exception as e:
@@ -111,8 +118,13 @@ class DataProvider:
                 pass    
 
     def GetPrice(self, symbol, date):
-        if symbol == 'DLR.U.TO': return 10       
-        return StockPrice.objects.filter(symbol=symbol, date__lte=date, value__gt=0).order_by('-date')[0].value
+        if symbol == 'DLR.U.TO': return 10    
+        try:
+            return StockPrice.objects.filter(symbol=symbol, date__lte=date, value__gt=0).order_by('-date')[0].value
+        except Exception as e:
+            print ("Couldn't get stock price for {} on {}".format(symbol, date))
+            traceback.print_exc()
+            return 0
     
     def GetExchangeRate(self, currency, date):
         if currency == self.base_currency: return 1
@@ -180,8 +192,65 @@ class Position:
     def GetPNL(self):
         return self.GetMarketValue() - self.GetBookValue()
 
+class Holdings:
+    def __init__(self, date=arrow.now(), positions=[], cashByCurrency = defaultdict(Decimal)):
+        self.strdate = strdate(date)
+        self.positions = copy.deepcopy(positions)
+        self.cashByCurrency = copy.deepcopy(cashByCurrency)
+        pass
+                
+    def __repr__(self):
+        return "Holdings({},{},{})".format(self.strdate, self.positions, self.cashByCurrency)
+
+    def __str__(self):
+        return "Total value as of as of {}: {}".format(self.strdate, as_currency(self.GetTotalValue()))
+    
+    def GetTotalValue(self):
+        total = sum([p.GetMarketValue() * data_provider.GetExchangeRate(p.currency, self.strdate) for p in self.positions])
+        total += sum([val * data_provider.GetExchangeRate(currency, self.strdate) for currency, val in self.cashByCurrency.items()])
+        return total
+
+    def UpdateMarketPrices(self):
+        for p in self.positions:
+            p.marketprice = data_provider.GetPrice(p.symbol, self.strdate)
+
+class TaxData:
+    def __init__(self):
+        self.capgains = defaultdict(Decimal)
+        self.income = defaultdict(Decimal)
+        self.dividends = defaultdict(Decimal)
+
+    def __str__(self):
+        s = "Year\tCapGains\tIncome\tDividends\n"
+        years = list(self.capgains) + list(self.income) + list(self.dividends)
+        if not years: return ""
+        for year in range(min(years), max(years)+1):
+            s += "{}\t{}\t\t{}\t{}\n".format(year, as_currency(self.capgains[year]), as_currency(self.income[year]), as_currency(self.dividends[year]))
+        return s
+
+    def GatherTaxData(self, position, activity):
+        if not position: return
+
+        if activity.action == 'Sell' or activity.type == 'Withdrawals':
+            capgains = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * (activity.price - position.bookprice) * -activity.qty
+            self.capgains[activity.tradeDate.year] += capgains
+            logging.info("{} - Sold {} {} at {}. Cost basis was {}. Capital gain of {}".format(
+                strdate(activity.tradeDate),
+                -activity.qty,
+                activity.symbol,
+                as_currency(activity.price),
+                as_currency(position.bookprice),
+                as_currency(capgains)
+                ))
+
+        if activity.type == 'Dividends':
+            div_amt = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * activity.netAmount
+            logging.info("{} - Dividend of {}".format(strdate(activity.tradeDate), div_amt))
+            self.dividends[activity.tradeDate.year] += div_amt
+            
+
 class Activity(models.Model):
-    account = models.ForeignKey('Account', on_delete=models.CASCADE)
+    account = models.ForeignKey('Account', on_delete=models.CASCADE, db_index=True)
     tradeDate = models.DateField()
     transactionDate = models.DateField()
     action = models.CharField(max_length=100)
@@ -197,6 +266,8 @@ class Activity(models.Model):
     class Meta:
         unique_together = ('account', 'tradeDate', 'action', 'symbol', 'currency', 'qty', 'price', 'netAmount', 'type', 'description')
         verbose_name_plural = 'Activities'
+        get_latest_by = ['tradeDate']
+        ordering = ['tradeDate']
 
     @classmethod
     def CreateFromJson(cls, json, account):
@@ -244,63 +315,6 @@ class Activity(models.Model):
         if self.price == 0 and self.symbol:   
             self.price = data_provider.GetPrice(self.symbol, strdate(self.tradeDate))
 
-class Holdings:
-    def __init__(self, date=arrow.now(), positions=[], cashByCurrency = defaultdict(Decimal)):
-        self.strdate = strdate(date)
-        self.positions = copy.deepcopy(positions)
-        self.cashByCurrency = copy.deepcopy(cashByCurrency)
-        pass
-                
-    def __repr__(self):
-        return "Holdings({},{},{})".format(self.strdate, self.positions, self.cashByCurrency)
-
-    def __str__(self):
-        return "Total value as of as of {}: {}".format(self.strdate, as_currency(self.GetTotalValue()))
-    
-    def GetTotalValue(self):
-        total = sum([p.GetMarketValue() * data_provider.GetExchangeRate(p.currency, self.strdate) for p in self.positions])
-        total += sum([val * data_provider.GetExchangeRate(currency, self.strdate) for currency, val in self.cashByCurrency.items()])
-        return total
-
-    def UpdateMarketPrices(self):
-        for p in self.positions:
-            price = data_provider.GetPrice(p.symbol, self.strdate)
-            p.marketprice = price
-
-class TaxData:
-    def __init__(self):
-        self.capgains = defaultdict(Decimal)
-        self.income = defaultdict(Decimal)
-        self.dividends = defaultdict(Decimal)
-
-    def __str__(self):
-        s = "Year\tCapGains\tIncome\tDividends\n"
-        years = list(self.capgains) + list(self.income) + list(self.dividends)
-        if not years: return ""
-        for year in range(min(years), max(years)+1):
-            s += "{}\t{}\t\t{}\t{}\n".format(year, as_currency(self.capgains[year]), as_currency(self.income[year]), as_currency(self.dividends[year]))
-        return s
-
-    def GatherTaxData(self, position, activity):
-        if not position: return
-
-        if activity.action == 'Sell' or activity.type == 'Withdrawals':
-            capgains = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * (activity.price - position.bookprice) * -activity.qty
-            self.capgains[activity.tradeDate.year] += capgains
-            logging.info("{} - Sold {} {} at {}. Cost basis was {}. Capital gain of {}".format(
-                strdate(activity.tradeDate),
-                -activity.qty,
-                activity.symbol,
-                as_currency(activity.price),
-                as_currency(position.bookprice),
-                as_currency(capgains)
-                ))
-
-        if activity.type == 'Dividends':
-            div_amt = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * activity.netAmount
-            logging.info("{} - Dividend of {}".format(strdate(activity.tradeDate), div_amt))
-            self.dividends[activity.tradeDate.year] += div_amt
-            
 
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE)
@@ -310,7 +324,7 @@ class Account(models.Model):
     @classmethod 
     def CreateAccountFromJson(cls, json, client):
         account = Account(type=json['type'], account_id=json['number'], client=client)
-        account.LoadHistoryFromDB()
+        account.activityHistory=Activity.objects.filter(account=self)
         account.holdings = {}
         account.currentHoldings = Holdings()
         account.taxData = TaxData()        
@@ -320,7 +334,7 @@ class Account(models.Model):
     @classmethod
     def from_db(cls, db, field_name, values):
         instance = super().from_db(db, field_name, values)
-        instance.LoadHistoryFromDB()
+        instance.activityHistory=Activity.objects.filter(account=instance)
         instance.holdings = {}
         instance.currentHoldings = Holdings()
         instance.taxData = TaxData()        
@@ -338,11 +352,8 @@ class Account(models.Model):
                '\n'.join(["{} cash: {}".format(cur, as_currency(cash)) for cur,cash in self.currentHoldings.cashByCurrency.items()]) + '\n' + \
                 str(self.taxData) + '\n'
     
-    def LoadHistoryFromDB(self):
-        self.activityHistory = list(Activity.objects.filter(account=self))
-
     def GetMostRecentActivityDate(self):
-        return max([a.tradeDate for a in self.activityHistory], default=None)
+        self.activityHistory.latest().tradeDate
 
     def SetBalance(self, json):
         for currency in json['perCurrencyBalances']:
@@ -366,23 +377,39 @@ class Account(models.Model):
 
     def GetPositions(self, include_closed=False):
         return sorted([p for p in self.currentHoldings.positions if include_closed or p.qty > 0], key=operator.attrgetter('symbol'))
-
-    def GetAllHoldings(self):
-        return self.holdings
-
+    
     def AddCash(self, currency, amt):
         self.currentHoldings.cashByCurrency[currency] += amt
         
     def ProcessActivityHistory(self):
-        for a in sorted(self.activityHistory, key=operator.attrgetter('tradeDate')):
-            logger.debug("Adding... {}".format(a))
+        for a in self.activityHistory:
+            #logger.debug("Adding... {}".format(a))
             self.ProcessActivity(a)
-            logger.debug(repr(self))
+            #logger.debug(repr(self))
 
             holdings = Holdings(a.tradeDate, self.currentHoldings.positions, self.currentHoldings.cashByCurrency)
             self.holdings[holdings.strdate] = holdings
            
-            logger.debug(repr(holdings))
+            #logger.debug(repr(holdings))
+
+    def GetAllHoldings(self):
+        return self.holdings
+            
+    def GenerateHoldingsHistory(self):        
+        for day in arrow.Arrow.range('day', arrow.get(min(self.holdings)), arrow.now()):
+            if strdate(day) in self.holdings:
+                last_holding = self.holdings[strdate(day)]
+                last_holding.UpdateMarketPrices()
+            else: 
+                new_holding = Holdings(day, last_holding.positions, last_holding.cashByCurrency)
+                new_holding.UpdateMarketPrices()
+                self.holdings[strdate(day)] = new_holding
+
+    def GetHistoricalValueAtDate(self, date):
+        if date in self.GetAllHoldings():
+            val = self.GetAllHoldings()[date].GetTotalValue()
+            if val: return val
+        return 0
 
     def ProcessActivity(self, activity):
         assert_msg = 'Unhandled type: Account is {} and activity is {}'.format(self, activity)
@@ -602,19 +629,6 @@ class Client(models.Model):
 
             account.LoadHistoryFromDB()
 
-    def GenerateHoldingsHistory(self):        
-        for account in self.GetAccounts():
-            for p in account.GetPositions(include_closed=True):
-                holdings = account.GetAllHoldings()
-                for day in arrow.Arrow.range('day', arrow.get(min(holdings)), arrow.now()):
-                    if strdate(day) in holdings:
-                        last_holding = holdings[strdate(day)]
-                        last_holding.UpdateMarketPrices()
-                    else: 
-                        new_holding = Holdings(day, last_holding.positions, last_holding.cashByCurrency)
-                        new_holding.UpdateMarketPrices()
-                        holdings[strdate(day)] = new_holding
-
     def SyncPrices(self, start):
         for p in self.GetPositions():
             data_provider.SyncStockPrices(p.symbol)
@@ -644,3 +658,6 @@ def HackInitMyAccount(account):
         account.currentHoldings.positions.append(Position('XIN.TO', 'CAD', 140, marketprice=19.1, bookprice=18.482))
         account.currentHoldings.cashByCurrency['CAD'] = Decimal('147.25')
         account.currentHoldings.cashByCurrency['USD'] = Decimal('97.15')
+    
+    if len(account.GetPositions()) > 0: 
+        account.holdings['2011-02-01'] = Holdings(arrow.get('2011-02-01'), a.GetPositions(), a.currentHoldings.cashByCurrency)

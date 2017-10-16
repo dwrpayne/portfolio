@@ -15,7 +15,7 @@ class ActivityAdmin(admin.ModelAdmin):
     display_price.admin_order_field = 'price'
 
     list_display = ['account', 'tradeDate', 'type', 'action', 'symbol', 'display_qty', 'display_price', 'netAmount', 'description']
-    list_filter = ['tradeDate', 'symbol', 'type']        
+    list_filter = ['account', 'tradeDate', 'symbol', 'type']        
     search_fields = ['description']
 admin.site.register(Activity, ActivityAdmin)
 
