@@ -6,10 +6,12 @@ sys.path.append(os.path.join(__file__,'..'))
 from utils import strdate
 import arrow
 import pickle
+import datetime
 
 from pandas_datareader import data as pdr
-import fix_yahoo_finance as fyf
-fyf.pdr_override()
+import fix_yahoo_finance
+
+from django.db import models
 
 class Prices:
     def __init__(self):
@@ -19,13 +21,22 @@ class Prices:
 
     def Update(self, prices, start_date, end_date):
         self.dateToPriceMap.update(prices)
-        self.startDate = start_date
-        self.endDate = end_date
+        if not self.startDate or start_date < self.startDate: self.startDate = start_date
+        if not self.endDate or end_date > self.endDate: self.endDate = end_date
 
     def IsSynced(self, start_date, end_date):
-        if arrow.get(start_date) < arrow.get(self.startDate): return False
-        if arrow.get(end_date) > arrow.get(self.endDate): return False
+        if start_date < self.startDate: return False
+        if end_date > self.endDate: return False
         return True
+
+    def GetSyncRange(self, start_date, end_date):
+        # If I want data earlier than previously synced, get that first
+        if start_date < self.startDate:
+            return (start_date, self.startDate)
+        # If I want data later than I had previously, get that
+        if end_date > self.endDate:
+            return (self.endDate, end_date)
+        return (start_date, end_date)
 
     def GetPrice(self, date):
         for tries in range(10):
@@ -38,7 +49,8 @@ class DataProvider:
     DATA_FILE = os.path.join(os.path.dirname(__file__), 'private', 'datastore.pkl')
     EXCH_RATES_SYMBOL = {'USD' : 'DEXCAUS'}
 
-    def __init__(self):
+    def __init__(self):       
+        fix_yahoo_finance.pdr_override()
         self.prices = defaultdict(Prices)
 
     @classmethod
@@ -57,13 +69,15 @@ class DataProvider:
 
     def SyncData(self, symbol, data_source, col_index, start_date, end_date):
         if self.prices[symbol].IsSynced(start_date, end_date):
+            print("{} is already synced, skipping...".format(symbol))
             return
         for retry in range(5):
             try:
-                print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date), end='')
-                df = pdr.DataReader(symbol, data_source, start_date, end_date)
+                start, end = self.prices[symbol].GetSyncRange(start_date, end_date)
+                print('Syncing prices for {} from {} to {}...'.format(symbol, start, end), end='')
+                df = pdr.DataReader(symbol, data_source, start, end)
                 values = {strdate(time) : price for time, price in zip(df.index, df[col_index])}
-                self.prices[symbol].Update(values, start_date, end_date)
+                self.prices[symbol].Update(values, start, end)
                 print('DONE!')
                 self.SaveToFile()
                 break
@@ -72,7 +86,7 @@ class DataProvider:
                 print ('Failed, retrying!')
                 pass    
             
-    def SyncPrices(self, symbol, start_date, end_date = strdate(arrow.now())):
+    def SyncPrices(self, symbol, start_date, end_date = strdate(arrow.now().shift(days=-1))):
         # Hack to remap
         if symbol == 'DLR.U.TO': symbol = 'DLR-U.TO'
         self.SyncData(symbol, 'yahoo', 'Close', start_date, end_date)

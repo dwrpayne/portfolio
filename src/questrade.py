@@ -11,6 +11,7 @@ import pickle
 import copy
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from utils import as_currency, strdate
 from dataprovider import DataProvider
@@ -61,10 +62,13 @@ class Position:
         return "Position({},{},{},{})".format(self.symbol, self.qty, self.marketprice, self.bookprice)
 
     def __str__(self):
-        return "{}, {}: {} -> {} ({}) {}".format(self.symbol, self.qty, as_currency(self.GetBookValue()), as_currency(self.GetMarketValue()), as_currency(self.GetPNL()), self.currency)
+        return "{}, {} @ {}: {} -> {} ({}) {}".format(self.symbol, self.qty, self.marketprice, as_currency(self.GetBookValue()), as_currency(self.GetMarketValue()), as_currency(self.GetPNL()), self.currency)
 
     def GetMarketValue(self):
         return self.marketprice * self.qty
+
+    def GetMarketValueCAD(self):
+        return self.marketprice * self.qty * data_provider.GetExchangeRate(self.currency, strdate(arrow.now()))
 
     def GetBookValue(self):
         return self.bookprice * self.qty
@@ -421,7 +425,7 @@ class Client:
     def PrintPositions(self, collapse=False):
         if collapse:
             positions = self.GetPositions()
-            for symbol in set([p.symbol for p in positions]):
+            for symbol in {p.symbol for p in positions}:
                 print(sum([p for p in positions if p.symbol==symbol]))
         else:
             for account in self.accounts:      
@@ -447,7 +451,6 @@ class Client:
             
             date_range = arrow.Arrow.interval('day', start, arrow.now(), 30)
             num_requests = len(date_range)
-            bar = progressbar.ProgressBar(widgets=["Syncing account {} [".format(account.id), progressbar.Percentage(), progressbar.Bar()], maxval=num_requests).start()
             
             activities = []
             for start, end in date_range:
@@ -464,23 +467,18 @@ class Client:
 
             account.ProcessActivityHistory()
 
-    def GenerateHoldingsHistory(self):
-        
-        data_provider.SyncExchangeRates('USD', start)
-
+    def GenerateHoldingsHistory(self):        
         for account in self.accounts:
             for p in account.GetPositions(include_closed=True):
-                data_provider.SyncPrices(p.symbol, start)
-
-            holdings = account.GetAllHoldings()
-            for day in arrow.Arrow.range('day', arrow.get(min(holdings)), arrow.now()):
-                if strdate(day) in holdings:
-                    last_holding = holdings[strdate(day)]
-                    last_holding.UpdateMarketPrices()
-                else: 
-                    new_holding = Holdings(day, last_holding.positions, last_holding.cashByCurrency)
-                    new_holding.UpdateMarketPrices()
-                    holdings[strdate(day)] = new_holding
+                holdings = account.GetAllHoldings()
+                for day in arrow.Arrow.range('day', arrow.get(min(holdings)), arrow.now()):
+                    if strdate(day) in holdings:
+                        last_holding = holdings[strdate(day)]
+                        last_holding.UpdateMarketPrices()
+                    else: 
+                        new_holding = Holdings(day, last_holding.positions, last_holding.cashByCurrency)
+                        new_holding.UpdateMarketPrices()
+                        holdings[strdate(day)] = new_holding
 
 
 def HackInitMyAccount(account):
@@ -508,7 +506,6 @@ def HackInitMyAccount(account):
 
 
 
-start = '2011-02-01'
 
 def GetFullClientData(client_name):
     c = Client(client_name)
@@ -518,22 +515,43 @@ def GetFullClientData(client_name):
             a.holdings[start] = Holdings(arrow.get(start), a.GetPositions(), a.currentHoldings.cashByCurrency)
 
     c.SyncAllActivitiesSlow(start)
-    c.GenerateHoldingsHistory()
+
+    #c.GenerateHoldingsHistory()
+    c.UpdateMarketPrices()
     
-    for a in c.accounts: 
-        print (a)
+#for a in c.accounts: 
+   #     print (a)
     return c
 
-sarah = GetFullClientData('Sarah')
+start = '2011-02-01'
+
 david = GetFullClientData('David')
+sarah = GetFullClientData('Sarah')
 all_accounts = david.accounts + sarah.accounts
+
 #raw_data = [d + "," + ','.join([str(a.GetAllHoldings()[d].GetTotalValue() if d in a.GetAllHoldings() else 0) for a in all_accounts]) for d in sorted(list(all_accounts[0].GetAllHoldings().keys()))]
 #print ('date, ' + ','.join([a.type for a in all_accounts]))
 #print ('\n'.join(raw_data))
 
+positions = david.GetPositions() + sarah.GetPositions()
+for p in positions: data_provider.SyncPrices(p.symbol, start)
+
+print ('\nSymbol\tPrice\t\t   Change\t\tShares\tGain')
+total_gain = 0
+total_value = 0
+for symbol in ['VBR', 'VTI', 'VUN.TO', 'VXUS', 'VCN.TO', 'VAB.TO', 'VDU.TO', 'TSLA']:
+    total_pos = sum([p for p in positions if p.symbol==symbol])
+    yesterday_price = data_provider.GetPrice(symbol, strdate(arrow.now().shift(days=-1)))
+    price_delta = total_pos.marketprice-yesterday_price
+    this_gain = price_delta * total_pos.qty * data_provider.GetExchangeRate(total_pos.currency, strdate(arrow.now()))
+    total_gain += this_gain
+    total_value += total_pos.GetMarketValueCAD()
+    print("{} \t{:.2f}\t\t{:+.2f} ({:+.2%})\t\t{}  \t{}".format(symbol.split('.')[0], total_pos.marketprice, price_delta, price_delta / yesterday_price, total_pos.qty, as_currency(this_gain)))
+print('-------------------------------------')
+print('Total: \t\t\t{:+,.2f}({:+.2%})\t{}'.format(total_gain, total_gain / total_value, as_currency(total_value)))
+print('\nCurrent USD exchange: {:.4f}'.format( 1/data_provider.GetExchangeRate('USD', strdate(arrow.now()))))
     
 #c.SyncAllActivitiesSlow(start)
-#c.UpdateMarketPrices()
 #c.PrintPositions()
 
 #c = Client('Sarah')
