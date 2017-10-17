@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse, StreamingHttpResponse
 
 # Create your views here.
-from .models import Client, Account, Holdings, Position, HackInitMyAccount, DataProvider
+from .models import Client, Account, Holdings, Position, HackInitMyAccount2, DataProvider
 import arrow
 import datetime
 from utils import as_currency,  strdate
@@ -20,8 +20,8 @@ def GetFullClientData(client_name):
     c = Client.objects.get(username=client_name)
     print('{}: Authorizing'.format(client_name))
     c.Authorize()
-    for a in c.GetAccounts(): 
-        HackInitMyAccount(a)    
+    for a in c.account_set.all(): 
+        HackInitMyAccount2()
         print('{}: Processing {}'.format(client_name, a))
         a.ProcessActivityHistory()
     print('{}: Updating market prices'.format(client_name))
@@ -30,7 +30,7 @@ def GetFullClientData(client_name):
     return c
 
 def GetProcessedAccounts(client_name):    
-    return GetFullClientData(client_name).GetAccounts()
+    return GetFullClientData(client_name).account_set.all()
 
 def GetAllPositions(client_name):
     return GetFullClientData(client_name).GetPositions()
@@ -47,6 +47,7 @@ def DoWork():
     try:
         positions = GetAllPositions('David') + GetAllPositions('Sarah')
     except Exception as e:
+        print (e)
         yield "<br>Error processing, please try again later."
         return
 
@@ -127,7 +128,7 @@ def AccountBalances():
     yield "<br>Account\tSOD in CAD\tCurrent CAD"
     for c in Client.objects.all():
         c.Authorize()
-        for a in c.GetAccounts():
+        for a in c.account_set.all():
             json = c._GetRequest('accounts/%s/balances'%(a.account_id))            
             combinedCAD = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             sodCombinedCAD = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')

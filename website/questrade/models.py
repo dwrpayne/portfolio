@@ -1,5 +1,7 @@
 from django.db import models
 from django.utils import timezone
+from djchoices import DjangoChoices, ChoiceItem
+
 import requests
 import pickle
 import os
@@ -26,6 +28,28 @@ from utils import as_currency, strdate
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class Security(models.Model):
+    class SecurityType(DjangoChoices):
+        Stock = ChoiceItem()
+        Option = ChoiceItem()
+        Bond = ChoiceItem()
+        Right = ChoiceItem()
+        Gold = ChoiceItem()
+        MutualFund = ChoiceItem()
+        Index = ChoiceItem()
+
+    symbolid = models.BigIntegerField(primary_key=True)
+    symbol = models.CharField(max_length=100)
+    description = models.CharField(max_length=500)
+    type = models.CharField(max_length=12, choices=SecurityType.choices)
+    exchange = models.CharField(max_length=20)
+    currency = models.CharField(max_length=3)
+    isQuotable = models.BooleanField()
+    isTradable = models.BooleanField()
+      
+    class Meta:
+        verbose_name_plural = 'Securities'
+    
 
 class StockPrice(models.Model):
     symbol = models.CharField(max_length=100, unique_for_date="date")
@@ -251,7 +275,7 @@ class TaxData:
            
 class Holding(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE, db_index=True)
-    symbol = models.CharField(max_length=100)
+    symbol = models.CharField(max_length=20) #models.ForeignKey(Security, on_delete=models.CASCADE)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     startdate = models.DateField()
     enddate = models.DateField(null=True)
@@ -332,7 +356,7 @@ class Activity(models.Model):
             self.price = data_provider.GetPrice(self.symbol, strdate(self.tradeDate))
 
     def Validate(self):
-        assert_msg = 'Unhandled type: {}'.format(self.account, self)
+        assert_msg = 'Unhandled type: {}'.format(self.__dict__)
         if self.type == 'Deposits':
             if self.account.type in ['TFSA', 'RRSP']:      
                 assert self.action == 'CON', assert_msg
@@ -345,10 +369,17 @@ class Activity(models.Model):
         elif self.type == 'FX conversion':
             assert self.action=='FXT', assert_msg            
         elif self.type == 'Other':
+            # Expired option
+            if self.action == 'EXP': 
+                pass
             # BRW means a journalled trade
-            assert self.action == 'BRW' and self.symbol, assert_msg
+            elif self.action == 'BRW':
+               assert self.symbol, assert_msg
+            else:
+                assert False, assert_msg
         elif self.type == 'Trades':
-            if not self.symbol:
+            # TODO: Hack to handle options
+            if not self.symbol and not 'CALL ' in self.description and not 'PUT ' in self.description: 
                 print('Trade but no position: {}'.format(self))
             assert self.action in ['Buy', 'Sell']        
         elif self.type == 'Corporate actions':
@@ -366,6 +397,7 @@ class Activity(models.Model):
         elif 'SMALLCAP GROWTH ETF' in self.description: self.symbol = 'VBK'
         elif 'SMALL-CAP VALUE ETF' in self.description: self.symbol = 'VBR'
         elif 'ISHARES MSCI EAFE INDEX' in self.description: self.symbol = 'XIN.TO'
+        elif 'AMERICAN CAPITAL AGENCY CORP' in self.description: self.symbol = 'AGNC'
         elif 'AMERICAN CAPITAL AGENCY CORP' in self.description: self.symbol = 'AGNC'
         elif 'MSCI JAPAN INDEX FD' in self.description: self.symbol = 'EWJ'
         elif 'VANGUARD EMERGING' in self.description: self.symbol = 'VWO'
@@ -628,7 +660,6 @@ class Client(models.Model):
     @classmethod 
     def CreateClient(cls, username, refresh_token):
         client = Client(username = username, refresh_token = refresh_token)
-        client.accounts = list(Account.objects.filter(client=self))
         client.Authorize()
         client.SyncAccounts()
         return client
@@ -639,7 +670,6 @@ class Client(models.Model):
     @classmethod
     def from_db(cls, db, field_name, values):
         instance = super().from_db(db, field_name, values)
-        instance.accounts = list(Account.objects.filter(client=instance))
         return instance
 
     def Authorize(self):		
@@ -662,23 +692,19 @@ class Client(models.Model):
         r.raise_for_status()
         return r.json()
 
-    def GetAccounts(self):
-        return self.accounts
-
     def SyncAccounts(self):
         json = self._GetRequest('accounts')
         for a in json['accounts']:
             Account.CreateAccountFromJson(a, self)
-        self.accounts = list(Account.objects.filter(client=self))
 
     def PrintCombinedBalances(self):
-        for account in self.GetAccounts():
+        for account in self.account_set.all():
             delta = account.combinedCAD - account.sodCombinedCAD
             print("{} {}: {} -> {} ({})".format(self.username, account.type, as_currency(account.sodCombinedCAD), as_currency(account.combinedCAD), as_currency(delta)))
 
     def SyncAccountPositions(self):
         print('Syncing account positions for {}...'.format(self.username))
-        for account in self.GetAccounts():
+        for account in self.account_set.all():
             json = self._GetRequest('accounts/%s/positions'%(account.account_id))
             account.SetPositions([Position.FromJson(j) for j in json['positions']])
 
@@ -691,17 +717,17 @@ class Client(models.Model):
         return ''          
 
     def UpdateMarketPrices(self):
-        symbols = {p.symbol for p in self.GetPositions()}
+        symbols = Holding.objects.filter(account__in=self.account_set.all()).values_list('symbol', flat=True)
         json = self._GetRequest('markets/quotes', 'ids=' + ','.join(map(self._FindSymbolId, symbols)))
         for q in json['quotes']:
             price = q['lastTradePriceTrHrs']
             if not price: price = q['lastTradePrice']            
-            for account in self.GetAccounts():
-                position = account.GetPosition(q['symbol'])
-                if position: position.marketprice = Decimal(str(price))
+            for account in self.account_set.all():
+                pass
+                #TODO: Implement this correctly.... how is this going to work? Temp flag or "closed" flag in the stockprices table?
 
     def GetPositions(self):
-        return [p for a in self.GetAccounts() for p in a.GetPositions()]
+        return [p for a in self.account_set.all() for p in a.GetPositions()]
 
     def PrintPositions(self, collapse=False):
         if collapse:
@@ -709,7 +735,7 @@ class Client(models.Model):
             for symbol in {p.symbol for p in positions}:
                 print(sum([p for p in positions if p.symbol==symbol]))
         else:
-            for account in self.GetAccounts():      
+            for account in self.account_set.all():      
                 print (account)
             
     def _GetActivities(self, account_id, startTime, endTime):
@@ -723,7 +749,7 @@ class Client(models.Model):
 
     def SyncAllActivitiesSlow(self, startDate):
         print ('Syncing all activities for {}...'.format(self.username))
-        for account in self.GetAccounts():
+        for account in self.account_set.all():
             start = account.GetMostRecentActivityDate()
             if start: start = arrow.get(start).shift(days=+1)
             else: start = arrow.get(startDate)
@@ -740,8 +766,8 @@ class Client(models.Model):
             account.LoadHistoryFromDB()
 
     def SyncPrices(self, start):
-        for p in self.GetPositions():
-            data_provider.SyncStockPrices(p.symbol)
+        for symbol in Holding.objects.filter(account__in=self.account_set.all()).values_list('symbol', flat=True):
+            data_provider.SyncStockPrices(symbol)
 
     def CloseSession(self):
         self.session.close()

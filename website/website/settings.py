@@ -25,7 +25,7 @@ SECRET_KEY = '9t$1+^w(px(e2_xn!!*bx@dea765+j8vhvs3ie865v2taq+ooo'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.11']
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.11', 'myapp.davidpayne.net']
 
 
 # Application definition
