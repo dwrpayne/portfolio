@@ -1,0 +1,11 @@
+{% load humanize %}
+<h1>Account Balances (in CAD combined)</h1>
+<table>
+    <tr>
+        <td>Account</td><td>SOD</td><td>Current</td>
+    </tr>
+    {% for account in all_accounts %}
+    <tr>
+        <td>{{account.client.username}} -- {{account.account_id}}</td><td>{{sod_balance | intcomma}}</td><td>{{cur_balance | intcomma}}</td>
+    </tr>
+</table>

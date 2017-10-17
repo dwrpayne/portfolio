@@ -1,18 +1,18 @@
 from django.contrib import admin
 from django.template.defaultfilters import floatformat
 
-from .models import Client, Account, Activity, ExchangeRate, StockPrice
+from .models import Client, Account, Activity, ExchangeRate, Holding, StockPrice
+
+def MakeNormalizedFloat(field, desc):
+    def display(self, obj, field=field):
+        return getattr(obj, field).normalize()
+    display.short_description = desc
+    display.admin_order_field = field
+    return display
 
 class ActivityAdmin(admin.ModelAdmin):    
-    def display_qty(self, obj):
-        return obj.qty.normalize()
-    display_qty.short_description = 'Quantity'
-    display_qty.admin_order_field = 'qty'
-
-    def display_price(self, obj):
-        return obj.price.normalize()
-    display_price.short_description = 'Price'
-    display_price.admin_order_field = 'price'
+    display_qty = MakeNormalizedFloat('qty', 'Quantity')
+    display_price = MakeNormalizedFloat('price', 'Price')
 
     list_display = ['account', 'tradeDate', 'type', 'action', 'symbol', 'display_qty', 'display_price', 'netAmount', 'description']
     list_filter = ['account', 'tradeDate', 'symbol', 'type']        
@@ -20,12 +20,14 @@ class ActivityAdmin(admin.ModelAdmin):
 admin.site.register(Activity, ActivityAdmin)
 
 
-
 class AccountAdmin(admin.ModelAdmin):
     list_display = ['client', 'type', 'account_id']
 admin.site.register(Account, AccountAdmin)
-
-
+    
+class HoldingAdmin(admin.ModelAdmin):
+    display_qty = MakeNormalizedFloat('qty', 'Quantity')
+    list_display = ['account', 'symbol', 'display_qty', 'startdate', 'enddate']
+admin.site.register(Holding, HoldingAdmin)
 
 admin.site.register(Client)
 

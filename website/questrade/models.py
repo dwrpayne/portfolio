@@ -8,7 +8,6 @@ import operator
 import arrow
 from collections import defaultdict
 import logging 
-import progressbar
 import pickle
 import copy
 import datetime
@@ -35,6 +34,7 @@ class StockPrice(models.Model):
 
     class Meta:
         unique_together = ('symbol', 'date')
+        get_latest_by = 'date'
         indexes = [
             models.Index(fields=['symbol', 'date'])
         ]
@@ -49,6 +49,7 @@ class ExchangeRate(models.Model):
     value = models.DecimalField(max_digits=16, decimal_places=6)
     class Meta:
         unique_together = ('basecurrency', 'currency', 'date')
+        get_latest_by = 'date'
         indexes = [
             models.Index(fields=['basecurrency', 'currency', 'date'])
         ]
@@ -80,7 +81,7 @@ class DataProvider:
         for retry in range(5):
             try:
                 print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date), end='')
-                df = pdr.DataReader(symbol, 'yahoo', start_date, end_date)
+                df = pdr.DataReader(symbol, 'yahoo', start_date, end_date).fillna(0)
                 StockPrice.objects.bulk_create(
                     [StockPrice(symbol=symbol, date=date, value=price) 
                     for date, price in zip(df.index, df['Close']) if date.date() > start_date and price > 0])
@@ -106,7 +107,7 @@ class DataProvider:
         for retry in range(5):
             try:
                 print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date), end='')
-                df = pdr.DataReader(symbol, 'fred', start_date, end_date)                
+                df = pdr.DataReader(symbol, 'fred', start_date, end_date).fillna(0)              
                 ExchangeRate.objects.bulk_create(
                     [ExchangeRate(basecurrency=self.base_currency, currency=currency, date=date, value=price) 
                     for date, price in zip(df.index, df[symbol]) if date.date() > start_date and price > 0])
@@ -247,7 +248,22 @@ class TaxData:
             div_amt = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * activity.netAmount
             logging.info("{} - Dividend of {}".format(strdate(activity.tradeDate), div_amt))
             self.dividends[activity.tradeDate.year] += div_amt
-            
+           
+class Holding(models.Model):
+    account = models.ForeignKey('Account', on_delete=models.CASCADE, db_index=True)
+    symbol = models.CharField(max_length=100)
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    startdate = models.DateField()
+    enddate = models.DateField(null=True)
+
+    class Meta:
+        unique_together = ('account', 'symbol', 'startdate')
+        get_latest_by = 'startdate'
+        ordering = ['startdate']
+
+    def __repr__(self):
+        return "Holding({},{},{},{},{})".format(self.account, self.symbol, self.qty, self.startdate, self.enddate)
+    
 
 class Activity(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE, db_index=True)
@@ -266,7 +282,7 @@ class Activity(models.Model):
     class Meta:
         unique_together = ('account', 'tradeDate', 'action', 'symbol', 'currency', 'qty', 'price', 'netAmount', 'type', 'description')
         verbose_name_plural = 'Activities'
-        get_latest_by = ['tradeDate']
+        get_latest_by = 'tradeDate'
         ordering = ['tradeDate']
 
     @classmethod
@@ -315,7 +331,80 @@ class Activity(models.Model):
         if self.price == 0 and self.symbol:   
             self.price = data_provider.GetPrice(self.symbol, strdate(self.tradeDate))
 
+    def Validate(self):
+        assert_msg = 'Unhandled type: {}'.format(self.account, self)
+        if self.type == 'Deposits':
+            if self.account.type in ['TFSA', 'RRSP']:      
+                assert self.action == 'CON', assert_msg
+            elif self.account.type == 'SRRSP':                          
+                assert self.action == 'CSP', assert_msg
+            else:                                               
+                assert self.action == 'DEP', assert_msg
+        elif self.type == 'Fees and rebates':
+            assert self.action=='FCH', assert_msg
+        elif self.type == 'FX conversion':
+            assert self.action=='FXT', assert_msg            
+        elif self.type == 'Other':
+            # BRW means a journalled trade
+            assert self.action == 'BRW' and self.symbol, assert_msg
+        elif self.type == 'Trades':
+            if not self.symbol:
+                print('Trade but no position: {}'.format(self))
+            assert self.action in ['Buy', 'Sell']        
+        elif self.type == 'Corporate actions':
+            # NAC = Name change
+            assert self.action == 'NAC', assert_msg
+        elif self.type in ['Withdrawals', 'Transfers', 'Dividends', 'Interest']:
+            pass
+        else:
+            assert False, assert_msg
 
+    def Preprocess(self):
+        # Hack to fix invalid Questrade data just for me
+        if 'ISHARES S&P/TSX 60 INDEX' in self.description: self.symbol = 'XIU.TO'
+        elif 'VANGUARD GROWTH ETF' in self.description: self.symbol = 'VUG'
+        elif 'SMALLCAP GROWTH ETF' in self.description: self.symbol = 'VBK'
+        elif 'SMALL-CAP VALUE ETF' in self.description: self.symbol = 'VBR'
+        elif 'ISHARES MSCI EAFE INDEX' in self.description: self.symbol = 'XIN.TO'
+        elif 'AMERICAN CAPITAL AGENCY CORP' in self.description: self.symbol = 'AGNC'
+        elif 'MSCI JAPAN INDEX FD' in self.description: self.symbol = 'EWJ'
+        elif 'VANGUARD EMERGING' in self.description: self.symbol = 'VWO'
+        elif 'VANGUARD MID-CAP GROWTH' in self.description: self.symbol = 'VOT'
+        elif 'ISHARES DEX SHORT TERM BOND' in self.description: self.symbol = 'XBB.TO'
+        elif 'ELECTRONIC ARTS INC' in self.description: self.symbol = 'EA'
+        elif 'WESTJET AIRLINES' in self.description: self.symbol = 'WJA.TO'
+
+        if self.action =='FXT':
+            if 'AS OF ' in self.description:
+                asof_date = arrow.get(self.description.split('AS OF ')[1].split(' ')[0], 'MM/DD/YY').date()
+                print("FXT Transaction at {} (asof date: {}). Timedelta is {}".format(self.tradeDate, asof_date, self.tradeDate-asof_date))
+                if (self.tradeDate-asof_date).days > 365:
+                    asof_date = asof_date.replace(year=asof_date.year+1)
+                self.tradeDate = asof_date
+        
+        self.Validate()
+
+    # Returns a dict {currency:amount, symbol:amount, ...}
+    def GetHoldingEffect(self):
+        effect = defaultdict(Decimal)
+        # TODO: Hack to skip calls/options - just track cash effect
+        if 'CALL ' in self.description or 'PUT ' in self.description: 
+            effect[self.currency] = self.netAmount
+            return
+
+        if self.type in ['Deposits', 'Withdrawals', 'Trades']:
+            effect[self.currency] = self.netAmount
+            if self.symbol:
+                effect[self.symbol] = self.qty
+
+        elif self.type in ['Transfers', 'Dividends', 'Fees and rebates', 'Interest', 'FX conversion']:
+            effect[self.currency] = self.netAmount
+            
+        elif self.type == 'Other':
+            # activity BRW means a journalled trade
+            effect[self.symbol] = self.qty
+        return effect         
+            
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE)
     type = models.CharField(max_length=100)
@@ -355,12 +444,6 @@ class Account(models.Model):
     def GetMostRecentActivityDate(self):
         self.activityHistory.latest().tradeDate
 
-    def SetBalance(self, json):
-        for currency in json['perCurrencyBalances']:
-            self.currentHoldings.cashByCurrency[currency['currency']] = Decimal(str(currency['cash']))
-        self.combinedCAD = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-        self.sodCombinedCAD = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-
     def GetTotalCAD(self):
         return self.balance.combinedCAD
 
@@ -383,19 +466,62 @@ class Account(models.Model):
         
     def ProcessActivityHistory(self):
         for a in self.activityHistory:
-            #logger.debug("Adding... {}".format(a))
+            logger.debug("Adding... {}".format(a))
             self.ProcessActivity(a)
-            #logger.debug(repr(self))
+            logger.debug(repr(self))
 
             holdings = Holdings(a.tradeDate, self.currentHoldings.positions, self.currentHoldings.cashByCurrency)
             self.holdings[holdings.strdate] = holdings
            
-            #logger.debug(repr(holdings))
+            logger.debug(repr(holdings))
+
+    def RegenerateDBHoldings(self):
+        Holding.objects.filter(account=self).delete()
+        for activity in self.activityHistory:
+            activity.Preprocess()
+            
+            # TODO: switch this hacky cash/symbol equivalence to a proper stock table foreign key. "CAD" shouldn't be a symbol
+            for symbol, amount in activity.GetHoldingEffect().items():
+                # TODO: this should be a "manager method"
+                queryset = Holding.objects.filter(account=self, symbol=symbol)
+                previous_amount = 0
+                if queryset.exists():
+                    current_holding = queryset.latest()
+                    assert current_holding.enddate is None
+                    if current_holding.startdate == activity.tradeDate:
+                        current_holding.qty += amount
+                        current_holding.save()
+                        continue
+
+                    current_holding.enddate = activity.tradeDate - datetime.timedelta(days=1)
+                    previous_amount = current_holding.qty
+                    current_holding.save()
+
+                Holding.objects.create(account=self, symbol=symbol, qty=previous_amount+amount, startdate=activity.tradeDate, enddate=None)
+
+    def GetValueAtDate(self, date):
+        print(date)
+        holdings_query = Holding.objects.filter(account=self, startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
+        if not holdings_query.exists(): return 0
+        cash = sum(holdings_query.filter(symbol__in=['CAD', 'USD']).values_list('qty', flat=True))
+        holdings_query = holdings_query.exclude(symbol='CAD').exclude(symbol='USD')
+        if not holdings_query.exists(): return cash
+
+        qtys = holdings_query.values_list('symbol', 'qty')
+        total = cash
+        for symbol in holdings_query.values_list('symbol', flat=True):
+            qty = holdings_query.get(symbol=symbol).qty
+            val = StockPrice.objects.filter(symbol=symbol, date__lte=date).latest().value
+            total += qty*val
+
+        return total
 
     def GetAllHoldings(self):
         return self.holdings
             
     def GenerateHoldingsHistory(self):        
+        print("Generating Holdings for {}".format(self))
+        last_holding = None
         for day in arrow.Arrow.range('day', arrow.get(min(self.holdings)), arrow.now()):
             if strdate(day) in self.holdings:
                 last_holding = self.holdings[strdate(day)]
@@ -406,45 +532,32 @@ class Account(models.Model):
                 self.holdings[strdate(day)] = new_holding
 
     def GetHistoricalValueAtDate(self, date):
+        if self.currentHoldings.strdate==date:
+            val = self.currentHoldings.GetTotalValue()
+            if val: return val
         if date in self.GetAllHoldings():
             val = self.GetAllHoldings()[date].GetTotalValue()
             if val: return val
         return 0
+
 
     def ProcessActivity(self, activity):
         assert_msg = 'Unhandled type: Account is {} and activity is {}'.format(self, activity)
 
         position = None
 
+        activity.Preprocess()
+
         # Hack to skip calls/options - just track cash effect
         if 'CALL ' in activity.description or 'PUT ' in activity.description: 
             self.AddCash(activity.currency, activity.netAmount)
             return
-
-        # Hack to fix invalid Questrade data just for me
-        if 'ISHARES S&P/TSX 60 INDEX' in activity.description: activity.symbol = 'XIU.TO'
-        elif 'VANGUARD GROWTH ETF' in activity.description: activity.symbol = 'VUG'
-        elif 'SMALLCAP GROWTH ETF' in activity.description: activity.symbol = 'VBK'
-        elif 'SMALL-CAP VALUE ETF' in activity.description: activity.symbol = 'VBR'
-        elif 'ISHARES MSCI EAFE INDEX' in activity.description: activity.symbol = 'XIN.TO'
-        elif 'AMERICAN CAPITAL AGENCY CORP' in activity.description: activity.symbol = 'AGNC'
-        elif 'MSCI JAPAN INDEX FD' in activity.description: activity.symbol = 'EWJ'
-        elif 'VANGUARD EMERGING' in activity.description: activity.symbol = 'VWO'
-        elif 'VANGUARD MID-CAP GROWTH' in activity.description: activity.symbol = 'VOT'
-        elif 'ISHARES DEX SHORT TERM BOND' in activity.description: activity.symbol = 'XBB.TO'
-        elif 'ELECTRONIC ARTS INC' in activity.description: activity.symbol = 'EA'
-        elif 'WESTJET AIRLINES LTD' in activity.description: activity.symbol = 'WJA.TO'
-
-        if activity.action =='FXT':
-            if 'AS OF ' in activity.description:
-                activity.tradeDate = arrow.get(activity.description.split('AS OF ')[1].split(' ')[0], 'MM/DD/YY')                
 
         if activity.symbol:
             position = self.GetPosition(activity.symbol)
             if not position:
                 position = Position(activity.symbol, activity.currency)
                 self.currentHoldings.positions.append(position)
-
             
         self.taxData.GatherTaxData(position, activity)
 
@@ -660,4 +773,14 @@ def HackInitMyAccount(account):
         account.currentHoldings.cashByCurrency['USD'] = Decimal('97.15')
     
     if len(account.GetPositions()) > 0: 
-        account.holdings['2011-02-01'] = Holdings(arrow.get('2011-02-01'), a.GetPositions(), a.currentHoldings.cashByCurrency)
+        account.holdings['2011-02-01'] = Holdings(arrow.get('2011-02-01'), a.GetPositions(), a.currentHoldings.cashByCurrency)        Holding(account=Account.objects.get(account_id=51424829), symbol='XIU.TO', qty=200, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51424829), symbol='CAD', qty=Decimal('0'), startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51424829), symbol='USD', qty=Decimal('-118.3'), startdate=start, enddate=None),
+
+        Holding(account=Account.objects.get(account_id=51419220), symbol='VBR', qty=90, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51419220), symbol='XBB.TO', qty=85, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51419220), symbol='XIN.TO', qty=140, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51419220), symbol='CAD', qty=Decimal('147.25'), startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51419220), symbol='USD', qty=Decimal('97.15'), startdate=start, enddate=None)
+    ])
+    

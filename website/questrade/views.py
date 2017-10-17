@@ -43,10 +43,14 @@ def DoWork():
     data_provider.SyncExchangeRates('USD')
     
     yield "<br>Processing accounts..."
-    
-    positions = GetAllPositions('David') + GetAllPositions('Sarah')
+    positions = []
+    try:
+        positions = GetAllPositions('David') + GetAllPositions('Sarah')
+    except Exception as e:
+        yield "<br>Error processing, please try again later."
+        return
 
-    yield 'Symbol\tPrice\t\t   Change\t\tShares\tGain<br>'
+    yield '<br><br>Symbol\tPrice\t\t   Change\t\tShares\tGain<br>'
     total_gain = 0
     total_value = 0
     for symbol in ['VBR', 'VTI', 'VUN.TO', 'VXUS', 'VCN.TO', 'VAB.TO', 'VDU.TO', 'TSLA']:
@@ -57,7 +61,7 @@ def DoWork():
         total_gain += this_gain
         total_value += total_pos.GetMarketValueCAD()
         color = "green" if price_delta > 0 else "red"
-        yield '{} \t{:.2f}\t\t<font color="{}">{:+.2f} ({:+.2%})</font>\t\t{}  \t{}<br>'.format(
+        yield '{} \t{:.2f}\t\t<font color="{}">{:+.2f} ({:+.2%})</font>\t\t{:.0f}  \t{}<br>'.format(
             symbol.split('.')[0], total_pos.marketprice, color, price_delta, price_delta / yesterday_price, total_pos.qty, as_currency(this_gain))
     yield '-------------------------------------<br>'
     
@@ -87,15 +91,50 @@ def DoWorkHistory():
     yield "<br>"
 
     start = min([min(a.GetAllHoldings()) for a in all_accounts])
-    yield '<br>Date\t\t' + '\t'.join([a.client.username[0] + ' ' + a.type for a in all_accounts])
+    yield '<br>Date\t\t' + '\t'.join([a.client.username[0] + a.type for a in all_accounts]) + '\tTotal'
     for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
         d = strdate(day)
-        
-        yield '<br>' + d + '\t' + '\t'.join([str(int(a.GetHistoricalValueAtDate(d))) for a in all_accounts])
+        account_vals = [int(a.GetHistoricalValueAtDate(d)) for a in all_accounts]
+        yield '<br>' + d + '\t' + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))
     yield '</pre></body></html>'
 
 def history(request):
     return StreamingHttpResponse(DoWorkHistory())  
+
+def DoWorkHistoryNew():
+    yield "<html><body><pre>"
+    yield "<br>Syncing Data..."
+    yield "<br>Processing history"
+    all_accounts = Account.objects.all()[:1]
+    #for a in all_accounts:
+    #    a.RegenerateDBHoldings()
+    #    yield "."
+    yield "<br>"
+    start = '2011-01-01'
+    yield '<br>Date\t\t' + '\t'.join([a.client.username[0] + a.type for a in all_accounts]) + '\tTotal'
+    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
+        d = day.date()
+        account_vals = [int(a.GetValueAtDate(d)) for a in all_accounts]
+        yield '<br>{}\t'.format(d) + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))
+    yield '</pre></body></html>'
+
+def historynew(request):
+    return StreamingHttpResponse(DoWorkHistoryNew())  
+
+def AccountBalances():
+    yield "<html><body><pre>"
+    yield "<br>Syncing Data..."
+    yield "<br>Account\tSOD in CAD\tCurrent CAD"
+    for c in Client.objects.all():
+        c.Authorize()
+        for a in c.GetAccounts():
+            json = c._GetRequest('accounts/%s/balances'%(a.account_id))            
+            combinedCAD = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
+            sodCombinedCAD = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
+            yield "<br>{} {}\t{}\t{}".format(a.client.username, a.type, sodCombinedCAD, combinedCAD)
+
+def balances(request):    
+    return StreamingHttpResponse(AccountBalances())  
 
 def index(request):
     return HttpResponse("Hello world, you're at the questrade index.")
