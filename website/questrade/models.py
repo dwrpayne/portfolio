@@ -606,6 +606,8 @@ class Account(models.Model):
             position.qty += activity.qty
 
         elif activity.type == 'Trades':
+            if not position:
+                print('Trade but no position: {}'.format(activity))
             assert activity.action == 'Buy' or activity.action == 'Sell', assert_msg
                                         
             self.AddCash(activity.currency, activity.netAmount)
@@ -669,11 +671,6 @@ class Client(models.Model):
             Account.CreateAccountFromJson(a, self)
         self.accounts = list(Account.objects.filter(client=self))
 
-    def SyncAccountBalances(self):
-        print('Syncing account balances for {}...'.format(self.username))
-        for account in self.GetAccounts():
-            account.SetBalance(self._GetRequest('accounts/%s/balances'%(account.account_id)))
-
     def PrintCombinedBalances(self):
         for account in self.GetAccounts():
             delta = account.combinedCAD - account.sodCombinedCAD
@@ -701,7 +698,7 @@ class Client(models.Model):
             if not price: price = q['lastTradePrice']            
             for account in self.GetAccounts():
                 position = account.GetPosition(q['symbol'])
-                if position: position.marketprice = price
+                if position: position.marketprice = Decimal(str(price))
 
     def GetPositions(self):
         return [p for a in self.GetAccounts() for p in a.GetPositions()]
@@ -773,7 +770,23 @@ def HackInitMyAccount(account):
         account.currentHoldings.cashByCurrency['USD'] = Decimal('97.15')
     
     if len(account.GetPositions()) > 0: 
-        account.holdings['2011-02-01'] = Holdings(arrow.get('2011-02-01'), a.GetPositions(), a.currentHoldings.cashByCurrency)        Holding(account=Account.objects.get(account_id=51424829), symbol='XIU.TO', qty=200, startdate=start, enddate=None),
+        account.holdings['2011-02-01'] = Holdings(arrow.get('2011-02-01'), a.GetPositions(), a.currentHoldings.cashByCurrency)
+
+def HackInitMyAccount2():
+    start = '2011-01-01'
+    Holding.objects.all().delete()
+    Holding.objects.bulk_create([
+        Holding(account=Account.objects.get(account_id=51407958), symbol='AGNC', qty=70, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51407958), symbol='VBK', qty=34, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51407958), symbol='VUG', qty=118, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51407958), symbol='CAD', qty=Decimal('92.30'), startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51407958), symbol='USD', qty=Decimal('163.62'), startdate=start, enddate=None),
+
+        Holding(account=Account.objects.get(account_id=51424829), symbol='EA', qty=300, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51424829), symbol='VOT', qty=120, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51424829), symbol='VWO', qty=220, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51424829), symbol='XBB.TO', qty=260, startdate=start, enddate=None),
+        Holding(account=Account.objects.get(account_id=51424829), symbol='XIU.TO', qty=200, startdate=start, enddate=None),
         Holding(account=Account.objects.get(account_id=51424829), symbol='CAD', qty=Decimal('0'), startdate=start, enddate=None),
         Holding(account=Account.objects.get(account_id=51424829), symbol='USD', qty=Decimal('-118.3'), startdate=start, enddate=None),
 
