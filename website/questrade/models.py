@@ -144,6 +144,7 @@ class DataProvider:
 
     def GetPrice(self, symbol, date):
         if symbol == 'DLR.U.TO': return 10    
+        if symbol in ['CAD', 'USD']: return 1
         try:
             return StockPrice.objects.filter(symbol=symbol, date__lte=date, value__gt=0).order_by('-date')[0].value
         except Exception as e:
@@ -714,7 +715,14 @@ class Client(models.Model):
             if symbol == s['symbol']: 
                 logger.debug("Matching {} to {}".format(symbol, s))
                 return str(s['symbolId'])                
-        return ''          
+        return ''    
+
+    def GetMarketPrice(self, symbol):
+        json = self._GetRequest('markets/quotes', 'ids=' + symbol)
+        for q in json['quotes']:
+            price = q['lastTradePriceTrHrs']
+            if not price: price = q['lastTradePrice']
+            return price	
 
     def UpdateMarketPrices(self):
         symbols = Holding.objects.filter(account__in=self.account_set.all()).values_list('symbol', flat=True)

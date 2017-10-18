@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse, StreamingHttpResponse
 
 # Create your views here.
-from .models import Client, Account, Holdings, Position, HackInitMyAccount2, DataProvider
+from .models import Client, Account, Holdings, Position, HackInitMyAccount2, DataProvider, Holding
 import arrow
 import datetime
 from utils import as_currency,  strdate
@@ -32,9 +32,6 @@ def GetFullClientData(client_name):
 def GetProcessedAccounts(client_name):    
     return GetFullClientData(client_name).account_set.all()
 
-def GetAllPositions(client_name):
-    return GetFullClientData(client_name).GetPositions()
-
 def DoWork():
     yield "<html><body><pre>"
     yield "<br>Syncing Data..."
@@ -43,27 +40,25 @@ def DoWork():
     data_provider.SyncExchangeRates('USD')
     
     yield "<br>Processing accounts..."
-    positions = []
-    try:
-        positions = GetAllPositions('David') + GetAllPositions('Sarah')
-    except Exception as e:
-        print (e)
-        yield "<br>Error processing, please try again later."
-        return
+    all_accounts = Account.objects.all()
+    all_holdings = Holding.objects.filter(account__in=Account.objects.all(), enddate=None)
 
     yield '<br><br>Symbol\tPrice\t\t   Change\t\tShares\tGain<br>'
     total_gain = 0
     total_value = 0
-    for symbol in ['VBR', 'VTI', 'VUN.TO', 'VXUS', 'VCN.TO', 'VAB.TO', 'VDU.TO', 'TSLA']:
-        total_pos = sum([p for p in positions if p.symbol==symbol])
-        yesterday_price = data_provider.GetPrice(symbol, datetime.date.today() - datetime.timedelta(days=1))
-        price_delta = total_pos.marketprice-yesterday_price
-        this_gain = price_delta * total_pos.qty * data_provider.GetExchangeRate(total_pos.currency, datetime.date.today())
+    for symbol in all_holdings.values_list('symbol',flat=True).distinct():
+        total_qty = sum(all_holdings.filter(symbol=symbol).values_list('qty', flat=True))
+
+		# TODO: Hacky to get it working.
+        yesterday_price = data_provider.GetPrice(symbol, datetime.date.today() - datetime.timedelta(days=7))
+        today_price = data_provider.GetPrice(symbol, datetime.date.today())
+        price_delta = today_price - yesterday_price
+        this_gain = price_delta * total_qty * data_provider.GetExchangeRate('CAD' if '.TO' in symbol else 'USD', datetime.date.today())
         total_gain += this_gain
-        total_value += total_pos.GetMarketValueCAD()
+        total_value += total_qty * today_price * data_provider.GetExchangeRate('CAD' if '.TO' in symbol else 'USD', datetime.date.today())
         color = "green" if price_delta > 0 else "red"
         yield '{} \t{:.2f}\t\t<font color="{}">{:+.2f} ({:+.2%})</font>\t\t{:.0f}  \t{}<br>'.format(
-            symbol.split('.')[0], total_pos.marketprice, color, price_delta, price_delta / yesterday_price, total_pos.qty, as_currency(this_gain))
+            symbol.split('.')[0], today_price, color, price_delta, price_delta / yesterday_price, total_qty, as_currency(this_gain))
     yield '-------------------------------------<br>'
     
     color = "green" if total_gain > 0 else "red"
@@ -132,7 +127,7 @@ def AccountBalances():
             json = c._GetRequest('accounts/%s/balances'%(a.account_id))            
             combinedCAD = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             sodCombinedCAD = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-            yield "<br>{} {}\t{}\t{}".format(a.client.username, a.type, sodCombinedCAD, combinedCAD)
+            yield "<br>{} {}\t{:.2f}\t{:.2f}".format(a.client.username, a.type, sodCombinedCAD, combinedCAD)
 
 def balances(request):    
     return StreamingHttpResponse(AccountBalances())  
