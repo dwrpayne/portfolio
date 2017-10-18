@@ -17,8 +17,8 @@ from decimal import Decimal
 import traceback
 
 from pandas_datareader import data as pdr
-from fix_yahoo_finance import pdr_override
-pdr_override()
+import fix_yahoo_finance as yf
+yf.pdr_override()
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -159,24 +159,7 @@ class DataProvider:
     
 data_provider = DataProvider()
 
-
 class Position:
-    def __init__(self, symbol, currency, qty=0, marketprice=0, bookprice=0):
-        self.symbol = symbol
-        self.currency = currency
-        self.qty = qty
-        self.marketprice = Decimal(marketprice)
-        self.bookprice = Decimal(bookprice)
-        
-        # TODO: track base price from actual init day of position in Canadian currency
-        self.bookpriceCAD = Decimal(bookprice)
-
-    @classmethod
-    def FromJson(self, json):
-        position = Position(json['symbol'], 'CAD' if '.TO' in json['symbol'] else 'USD', json['openQuantity'], 
-                            Decimal(str(json['currentPrice'])), Decimal(str(json['averageEntryPrice'])))
-        return position
-
     def Trade(self, qty, price, commission, trade_date):
         exch = data_provider.GetExchangeRate(self.currency, trade_date)
         trade_cost = qty * price + commission
@@ -190,56 +173,6 @@ class Position:
         self.marketprice = price
         self.qty = new_qty
         
-    def __radd__(self, other):
-        return Position(self.symbol, self.currency, self.qty, self.marketprice, self.bookprice)
-
-    def __add__(self, other):
-        total_qty = self.qty + other.qty
-        return Position(self.symbol, self.currency, total_qty, self.marketprice, (self.GetBookValue() + other.GetBookValue())/total_qty)
-
-    def __repr__(self):
-        return "Position({},{},{},{})".format(self.symbol, self.qty, self.marketprice, self.bookprice)
-
-    def __str__(self):
-        return "{}, {} @ {}: {} -> {} ({}) {}".format(self.symbol, self.qty, self.marketprice, as_currency(self.GetBookValue()), as_currency(self.GetMarketValue()), as_currency(self.GetPNL()), self.currency)
-
-    def GetMarketValue(self):
-        return self.marketprice * self.qty
-
-    def GetMarketValueCAD(self):
-        return self.marketprice * self.qty * data_provider.GetExchangeRate(self.currency, strdate(arrow.now()))
-
-    def GetBookValue(self):
-        return self.bookprice * self.qty
-
-    def GetBookValueCAD(self):
-        return self.bookpriceCAD * self.qty
-
-    def GetPNL(self):
-        return self.GetMarketValue() - self.GetBookValue()
-
-class Holdings:
-    def __init__(self, date=arrow.now(), positions=[], cashByCurrency = defaultdict(Decimal)):
-        self.strdate = strdate(date)
-        self.positions = copy.deepcopy(positions)
-        self.cashByCurrency = copy.deepcopy(cashByCurrency)
-        pass
-                
-    def __repr__(self):
-        return "Holdings({},{},{})".format(self.strdate, self.positions, self.cashByCurrency)
-
-    def __str__(self):
-        return "Total value as of as of {}: {}".format(self.strdate, as_currency(self.GetTotalValue()))
-    
-    def GetTotalValue(self):
-        total = sum([p.GetMarketValue() * data_provider.GetExchangeRate(p.currency, self.strdate) for p in self.positions])
-        total += sum([val * data_provider.GetExchangeRate(currency, self.strdate) for currency, val in self.cashByCurrency.items()])
-        return total
-
-    def UpdateMarketPrices(self):
-        for p in self.positions:
-            p.marketprice = data_provider.GetPrice(p.symbol, self.strdate)
-
 class TaxData:
     def __init__(self):
         self.capgains = defaultdict(Decimal)
@@ -318,7 +251,7 @@ class Activity(models.Model):
         if price == 0 and symbol:   
             price = data_provider.GetPrice(symbol, strdate(tradeDate))
 
-        obj, created = Activity.objects.get_or_create(
+        Activity.objects.get_or_create(
             account = account
             ,tradeDate = tradeDate
             ,transactionDate = arrow.get(json['transactionDate']).date()
@@ -351,11 +284,7 @@ class Activity(models.Model):
 
     def __repr__(self):
         return "Activity({},{},{},{},{},{},{},{},{},{})".format(self.tradeDate, self.action, self.symbol, self.currency,self.qty, self.price, self.commission, self.netAmount, self.type, self.description)
-
-    def UpdatePriceData(self):        
-        if self.price == 0 and self.symbol:   
-            self.price = data_provider.GetPrice(self.symbol, strdate(self.tradeDate))
-
+    
     def Validate(self):
         assert_msg = 'Unhandled type: {}'.format(self.__dict__)
         if self.type == 'Deposits':
@@ -441,76 +370,20 @@ class Activity(models.Model):
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE)
     type = models.CharField(max_length=100)
-    account_id = models.IntegerField(default=0, primary_key = True)
-       
-    @classmethod 
-    def CreateAccountFromJson(cls, json, client):
-        account = Account(type=json['type'], account_id=json['number'], client=client)
-        account.activityHistory=Activity.objects.filter(account=self)
-        account.holdings = {}
-        account.currentHoldings = Holdings()
-        account.taxData = TaxData()        
-        account.save()
-        return account
-
-    @classmethod
-    def from_db(cls, db, field_name, values):
-        instance = super().from_db(db, field_name, values)
-        instance.activityHistory=Activity.objects.filter(account=instance)
-        instance.holdings = {}
-        instance.currentHoldings = Holdings()
-        instance.taxData = TaxData()        
-        return instance
+    id = models.IntegerField(default=0, primary_key = True)
         
     def __repr__(self):
-        return "Account({},{},{})".format(self.client, self.account_id, self.type)
+        return "Account({},{},{})".format(self.client, self.id, self.type)
 
     def __str__(self):
-        return "{} {} {}".format(self.client, self.account_id, self.type)
-
-    def PrettyPrint(self):
-        return "Account {} - {}".format(self.account_id, self.type) + "\n======================================\n" + \
-               '\n'.join(map(str, self.GetPositions())) + '\n' + \
-               '\n'.join(["{} cash: {}".format(cur, as_currency(cash)) for cur,cash in self.currentHoldings.cashByCurrency.items()]) + '\n' + \
-                str(self.taxData) + '\n'
+        return "{} {} {}".format(self.client, self.id, self.type)
     
     def GetMostRecentActivityDate(self):
-        self.activityHistory.latest().tradeDate
-
-    def GetTotalCAD(self):
-        return self.balance.combinedCAD
-
-    def GetTotalSod(self):
-        return self.balance.sodCombinedCAD
-
-    def SetPositions(self, positions):
-        self.currentHoldings.positions = positions
-
-    def GetPosition(self, symbol, create=True):
-        matches = [p for p in self.currentHoldings.positions if p.symbol==symbol]
-        if len(matches) == 1: return matches[0]
-        return None
-
-    def GetPositions(self, include_closed=False):
-        return sorted([p for p in self.currentHoldings.positions if include_closed or p.qty > 0], key=operator.attrgetter('symbol'))
-    
-    def AddCash(self, currency, amt):
-        self.currentHoldings.cashByCurrency[currency] += amt
-        
-    def ProcessActivityHistory(self):
-        for a in self.activityHistory:
-            logger.debug("Adding... {}".format(a))
-            self.ProcessActivity(a)
-            logger.debug(repr(self))
-
-            holdings = Holdings(a.tradeDate, self.currentHoldings.positions, self.currentHoldings.cashByCurrency)
-            self.holdings[holdings.strdate] = holdings
-           
-            logger.debug(repr(holdings))
-
+        self.activity_set.latest().tradeDate
+            
     def RegenerateDBHoldings(self):
         Holding.objects.filter(account=self).delete()
-        for activity in self.activityHistory:
+        for activity in self.activity_set:
             activity.Preprocess()
             
             # TODO: switch this hacky cash/symbol equivalence to a proper stock table foreign key. "CAD" shouldn't be a symbol
@@ -549,111 +422,6 @@ class Account(models.Model):
 
         return total
 
-    def GetAllHoldings(self):
-        return self.holdings
-            
-    def GenerateHoldingsHistory(self):        
-        print("Generating Holdings for {}".format(self))
-        last_holding = None
-        for day in arrow.Arrow.range('day', arrow.get(min(self.holdings)), arrow.now()):
-            if strdate(day) in self.holdings:
-                last_holding = self.holdings[strdate(day)]
-                last_holding.UpdateMarketPrices()
-            else: 
-                new_holding = Holdings(day, last_holding.positions, last_holding.cashByCurrency)
-                new_holding.UpdateMarketPrices()
-                self.holdings[strdate(day)] = new_holding
-
-    def GetHistoricalValueAtDate(self, date):
-        if self.currentHoldings.strdate==date:
-            val = self.currentHoldings.GetTotalValue()
-            if val: return val
-        if date in self.GetAllHoldings():
-            val = self.GetAllHoldings()[date].GetTotalValue()
-            if val: return val
-        return 0
-
-
-    def ProcessActivity(self, activity):
-        assert_msg = 'Unhandled type: Account is {} and activity is {}'.format(self, activity)
-
-        position = None
-
-        activity.Preprocess()
-
-        # Hack to skip calls/options - just track cash effect
-        if 'CALL ' in activity.description or 'PUT ' in activity.description: 
-            self.AddCash(activity.currency, activity.netAmount)
-            return
-
-        if activity.symbol:
-            position = self.GetPosition(activity.symbol)
-            if not position:
-                position = Position(activity.symbol, activity.currency)
-                self.currentHoldings.positions.append(position)
-            
-        self.taxData.GatherTaxData(position, activity)
-
-        if activity.type == 'Deposits':
-            if self.type == 'TFSA' or self.type == 'RRSP':      assert activity.action == 'CON', assert_msg
-            elif self.type == 'SRRSP':                          assert activity.action == 'CSP', assert_msg
-            else:                                               assert activity.action == 'DEP', assert_msg
-
-            self.AddCash(activity.currency, activity.netAmount)
-            if position:
-                position.qty += activity.qty
-
-        elif activity.type == 'Transfers':
-            self.AddCash(activity.currency, activity.netAmount)
-            
-        elif activity.type == 'Withdrawals':
-            if position:
-                position.qty += activity.qty
-            self.AddCash(activity.currency, activity.netAmount)
-
-        elif activity.type == 'Dividends':
-            self.AddCash(activity.currency, activity.netAmount)
-
-            if position:
-                # Reduce book price of position by dividend amt per share held
-                # TODO: Hack for incomplete data
-                div_per_share = activity.netAmount / (position.qty if position.qty else 1)
-
-                # TODO: 15% withholding tax on USD stocks?
-                position.bookprice -= div_per_share
-
-        elif activity.type == 'Fees and rebates':
-            assert activity.action=='FCH', assert_msg
-            self.AddCash(activity.currency, activity.netAmount)
-
-        elif activity.type == 'Interest':
-            self.AddCash(activity.currency, activity.netAmount)
-
-        elif activity.type == 'FX conversion':
-            assert activity.action=='FXT', assert_msg            
-            self.AddCash(activity.currency, activity.netAmount)
-
-        elif activity.type == 'Other':
-            # BRW means a journalled trade
-            assert activity.action == 'BRW', assert_msg
-            position.qty += activity.qty
-
-        elif activity.type == 'Trades':
-            if not position:
-                print('Trade but no position: {}'.format(activity))
-            assert activity.action == 'Buy' or activity.action == 'Sell', assert_msg
-                                        
-            self.AddCash(activity.currency, activity.netAmount)
-            position.Trade(activity.qty, activity.price, activity.commission, strdate(activity.tradeDate))
-
-        elif activity.type == 'Corporate actions':
-            # NAC = Name change
-            assert activity.action == 'NAC', assert_msg
-
-        else: 
-            assert False, assert_msg
-
-
 class Client(models.Model):
     username = models.CharField(max_length=100, primary_key=True)
     refresh_token = models.CharField(max_length=100)
@@ -667,12 +435,7 @@ class Client(models.Model):
 
     def __str__(self):
         return self.username
-
-    @classmethod
-    def from_db(cls, db, field_name, values):
-        instance = super().from_db(db, field_name, values)
-        return instance
-
+    
     def Authorize(self):		
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
         _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
@@ -696,19 +459,8 @@ class Client(models.Model):
     def SyncAccounts(self):
         json = self._GetRequest('accounts')
         for a in json['accounts']:
-            Account.CreateAccountFromJson(a, self)
-
-    def PrintCombinedBalances(self):
-        for account in self.account_set.all():
-            delta = account.combinedCAD - account.sodCombinedCAD
-            print("{} {}: {} -> {} ({})".format(self.username, account.type, as_currency(account.sodCombinedCAD), as_currency(account.combinedCAD), as_currency(delta)))
-
-    def SyncAccountPositions(self):
-        print('Syncing account positions for {}...'.format(self.username))
-        for account in self.account_set.all():
-            json = self._GetRequest('accounts/%s/positions'%(account.account_id))
-            account.SetPositions([Position.FromJson(j) for j in json['positions']])
-
+            Account.objects.update_or_create(type=json['type'], account_id=json['number'], client=self)
+            
     def _FindSymbolId(self, symbol):
         json = self._GetRequest('symbols/search', {'prefix':symbol})
         for s in json['symbols']:
@@ -733,19 +485,7 @@ class Client(models.Model):
             for account in self.account_set.all():
                 pass
                 #TODO: Implement this correctly.... how is this going to work? Temp flag or "closed" flag in the stockprices table?
-
-    def GetPositions(self):
-        return [p for a in self.account_set.all() for p in a.GetPositions()]
-
-    def PrintPositions(self, collapse=False):
-        if collapse:
-            positions = self.GetPositions()
-            for symbol in {p.symbol for p in positions}:
-                print(sum([p for p in positions if p.symbol==symbol]))
-        else:
-            for account in self.account_set.all():      
-                print (account)
-            
+                            
     def _GetActivities(self, account_id, startTime, endTime):
         params = {}
         params['startTime'] = startTime.isoformat()
@@ -780,33 +520,7 @@ class Client(models.Model):
     def CloseSession(self):
         self.session.close()
 
-
-def HackInitMyAccount(account):
-    if account.account_id == '51407958': # David TFSA
-        account.currentHoldings.positions.append(Position('AGNC', 'USD', 70, marketprice=29.45, bookprice=29.301))
-        account.currentHoldings.positions.append(Position('VBK', 'USD', 34, marketprice=64.3, bookprice=61.151))
-        account.currentHoldings.positions.append(Position('VUG', 'USD', 118, marketprice=83.64, bookprice=53.79))
-        account.currentHoldings.cashByCurrency['CAD'] = Decimal('92.30')
-        account.currentHoldings.cashByCurrency['USD'] = Decimal('163.62')
-    if account.account_id == '51424829': # David RRSP
-        account.currentHoldings.positions.append(Position('EA', 'USD', 300, marketprice=18.06, bookprice=11))
-        account.currentHoldings.positions.append(Position('VOT', 'USD', 120, marketprice=66.4, bookprice=47.83))
-        account.currentHoldings.positions.append(Position('VWO', 'USD', 220, marketprice=46.41, bookprice=42.0))
-        account.currentHoldings.positions.append(Position('XBB.TO', 'CAD', 260, marketprice=28.73, bookprice=28.83))
-        account.currentHoldings.positions.append(Position('XIU.TO', 'CAD', 200, marketprice=20.45, bookprice=16.83))
-        account.currentHoldings.cashByCurrency['CAD'] = Decimal('0')
-        account.currentHoldings.cashByCurrency['USD'] = Decimal('-118.3')
-    if account.account_id == '51419220': # Sarah TFSA
-        account.currentHoldings.positions.append(Position('VBR', 'USD', 90, marketprice=70.42, bookprice=56.43))
-        account.currentHoldings.positions.append(Position('XBB.TO', 'CAD', 85, marketprice=28.73, bookprice=29.262))
-        account.currentHoldings.positions.append(Position('XIN.TO', 'CAD', 140, marketprice=19.1, bookprice=18.482))
-        account.currentHoldings.cashByCurrency['CAD'] = Decimal('147.25')
-        account.currentHoldings.cashByCurrency['USD'] = Decimal('97.15')
-    
-    if len(account.GetPositions()) > 0: 
-        account.holdings['2011-02-01'] = Holdings(arrow.get('2011-02-01'), a.GetPositions(), a.currentHoldings.cashByCurrency)
-
-def HackInitMyAccount2():
+def HackInitMyAccount():
     start = '2011-01-01'
     Holding.objects.all().delete()
     Holding.objects.bulk_create([

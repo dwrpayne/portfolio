@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse, StreamingHttpResponse
 
 # Create your views here.
-from .models import Client, Account, Holdings, Position, HackInitMyAccount2, DataProvider, Holding
+from .models import Client, Account, HackInitMyAccount, DataProvider, Holding
 import arrow
 import datetime
 from utils import as_currency,  strdate
@@ -16,21 +16,6 @@ def SyncNewData(start):
         c.SyncPrices(start)
         c.UpdateMarketPrices()
 
-def GetFullClientData(client_name):
-    c = Client.objects.get(username=client_name)
-    print('{}: Authorizing'.format(client_name))
-    c.Authorize()
-    for a in c.account_set.all(): 
-        HackInitMyAccount2()
-        print('{}: Processing {}'.format(client_name, a))
-        a.ProcessActivityHistory()
-    print('{}: Updating market prices'.format(client_name))
-    c.UpdateMarketPrices()    
-    c.CloseSession()
-    return c
-
-def GetProcessedAccounts(client_name):    
-    return GetFullClientData(client_name).account_set.all()
 
 def DoWork():
     yield "<html><body><pre>"
@@ -72,34 +57,6 @@ def analyze(request):
 def DoWorkHistory():
     yield "<html><body><pre>"
     yield "<br>Syncing Data..."
-
-    data_provider = DataProvider('CAD')
-    data_provider.SyncExchangeRates('USD')
-    
-    yield "<br>Processing David's accounts..."    
-    all_accounts = GetProcessedAccounts('David')
-    yield "<br>Processing Sarah's accounts..." 
-    all_accounts += GetProcessedAccounts('Sarah')
-    yield "<br>Processing history"
-    for a in all_accounts:
-        a.GenerateHoldingsHistory()
-        yield "."
-    yield "<br>"
-
-    start = min([min(a.GetAllHoldings()) for a in all_accounts])
-    yield '<br>Date\t\t' + '\t'.join([a.client.username[0] + a.type for a in all_accounts]) + '\tTotal'
-    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
-        d = strdate(day)
-        account_vals = [int(a.GetHistoricalValueAtDate(d)) for a in all_accounts]
-        yield '<br>' + d + '\t' + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))
-    yield '</pre></body></html>'
-
-def history(request):
-    return StreamingHttpResponse(DoWorkHistory())  
-
-def DoWorkHistoryNew():
-    yield "<html><body><pre>"
-    yield "<br>Syncing Data..."
     yield "<br>Processing history"
     all_accounts = Account.objects.all()[:1]
     #for a in all_accounts:
@@ -114,8 +71,8 @@ def DoWorkHistoryNew():
         yield '<br>{}\t'.format(d) + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))
     yield '</pre></body></html>'
 
-def historynew(request):
-    return StreamingHttpResponse(DoWorkHistoryNew())  
+def history(request):
+    return StreamingHttpResponse(DoWorkHistory())  
 
 def AccountBalances():
     yield "<html><body><pre>"

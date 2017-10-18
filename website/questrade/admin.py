@@ -21,7 +21,7 @@ admin.site.register(Activity, ActivityAdmin)
 
 
 class AccountAdmin(admin.ModelAdmin):
-    list_display = ['client', 'type', 'account_id']
+    list_display = ['client', 'type', 'id']
 admin.site.register(Account, AccountAdmin)
     
 class HoldingAdmin(admin.ModelAdmin):
