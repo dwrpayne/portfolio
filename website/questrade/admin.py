@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.template.defaultfilters import floatformat
 
-from .models import Client, Account, Activity, ExchangeRate, Holding, StockPrice
+from .models import Client, Account, Activity, Holding, SecurityPrice, Security
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
@@ -14,8 +14,8 @@ class ActivityAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     display_price = MakeNormalizedFloat('price', 'Price')
 
-    list_display = ['account', 'tradeDate', 'type', 'action', 'symbol', 'display_qty', 'display_price', 'netAmount', 'description']
-    list_filter = ['account', 'tradeDate', 'symbol', 'type']        
+    list_display = ['account', 'tradeDate', 'type', 'action', 'security', 'display_qty', 'display_price', 'netAmount', 'grossAmount', 'description']
+    list_filter = ['account', 'tradeDate', 'security', 'type']        
     search_fields = ['description']
 admin.site.register(Activity, ActivityAdmin)
 
@@ -26,21 +26,13 @@ admin.site.register(Account, AccountAdmin)
     
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
-    list_display = ['account', 'symbol', 'display_qty', 'startdate', 'enddate']
+    list_display = ['account', 'security', 'display_qty', 'startdate', 'enddate']
 admin.site.register(Holding, HoldingAdmin)
 
 admin.site.register(Client)
+admin.site.register(Security)
 
-
-
-class ExchangeRateAdmin(admin.ModelAdmin):
-    list_display = ['basecurrency', 'currency', 'date', 'value']
-    list_filter = ['basecurrency', 'currency', 'date']        
-admin.site.register(ExchangeRate, ExchangeRateAdmin)
-
-
-
-class StockPriceAdmin(admin.ModelAdmin):
-    list_display = ['symbol', 'date', 'value']
-    list_filter = ['date', 'symbol']        
-admin.site.register(StockPrice, StockPriceAdmin)
+class SecurityPriceAdmin(admin.ModelAdmin):
+    list_display = ['security', 'date', 'price']
+    list_filter = ['date', 'security']        
+admin.site.register(SecurityPrice, SecurityPriceAdmin)
