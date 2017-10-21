@@ -22,8 +22,8 @@ yf.pdr_override()
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '.'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
 from utils import as_currency, strdate
+
 
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,7 +76,10 @@ class Security(models.Model):
         verbose_name_plural = 'Securities' 
 
     def __str__(self):
-        return "{} {} ({}) {} {}".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
+        return "Cash " +self.symbol if self.type == Security.SecurityType.Currency else self.symbol
+
+    def __repr(self):
+        return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
 
 class SecurityPriceQuerySet(models.QuerySet):
     def atdate(self, date):
@@ -165,54 +168,6 @@ class DataProvider:
             else:
                 cls.SyncStockPrices(security)
 
-class Position:
-    def Trade(self, qty, price, commission, trade_date):
-        exch = 1
-        trade_cost = qty * price + commission
-        new_qty = self.qty + qty
-
-        if qty > 0:
-            # ACB only changes when you buy, not when you sell.
-            self.bookprice = (self.GetBookValue() + (trade_cost)) / new_qty if new_qty else 0
-            self.bookpriceCAD = (self.GetBookValueCAD() + (trade_cost * exch)) / new_qty  if new_qty else 0
-
-        self.marketprice = price
-        self.qty = new_qty
-        
-class TaxData:
-    def __init__(self):
-        self.capgains = defaultdict(Decimal)
-        self.income = defaultdict(Decimal)
-        self.dividends = defaultdict(Decimal)
-
-    def __str__(self):
-        s = "Year\tCapGains\tIncome\tDividends\n"
-        years = list(self.capgains) + list(self.income) + list(self.dividends)
-        if not years: return ""
-        for year in range(min(years), max(years)+1):
-            s += "{}\t{}\t\t{}\t{}\n".format(year, as_currency(self.capgains[year]), as_currency(self.income[year]), as_currency(self.dividends[year]))
-        return s
-
-    def GatherTaxData(self, position, activity):
-        if not position: return
-
-        if activity.action == 'Sell' or activity.type == 'Withdrawals':
-            capgains = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * (activity.price - position.bookprice) * -activity.qty
-            self.capgains[activity.tradeDate.year] += capgains
-            logging.info("{} - Sold {} {} at {}. Cost basis was {}. Capital gain of {}".format(
-                strdate(activity.tradeDate),
-                -activity.qty,
-                activity.symbol,
-                as_currency(activity.price),
-                as_currency(position.bookprice),
-                as_currency(capgains)
-                ))
-
-        if activity.type == 'Dividends':
-            div_amt = data_provider.GetExchangeRate(position.currency, strdate(activity.tradeDate)) * activity.netAmount
-            logging.info("{} - Dividend of {}".format(strdate(activity.tradeDate), div_amt))
-            self.dividends[activity.tradeDate.year] += div_amt
-
 class HoldingManager(models.Manager):
     def at_date(self, date):
         return super().get_queryset().filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
@@ -244,7 +199,7 @@ class Activity(models.Model):
     transactionDate = models.DateField()
     settlementDate = models.DateField()
     action = models.CharField(max_length=100)
-    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
+    security = models.ForeignKey(Security, on_delete=models.CASCADE)
     description = models.CharField(max_length=1000)
     currency = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
@@ -253,7 +208,7 @@ class Activity(models.Model):
     commission = models.DecimalField(max_digits=16, decimal_places=2)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
     type = models.CharField(max_length=100)
-    cleansed = models.BooleanField(default=False)
+    sourcejson = models.CharField(max_length=1000)
     
     class Meta:
         unique_together = ('account', 'tradeDate', 'action', 'security', 'currency', 'qty', 'price', 'netAmount', 'type', 'description')
@@ -263,8 +218,17 @@ class Activity(models.Model):
     
     @classmethod
     def ApplyQuestradeFixes(cls, json):
+
+        # Handle Options cleanup
+        if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
+            type, symbol, expiry, strike = json['description'].split()[:4]
+            symbol = symbol.strip('.7')
+            expiry = datetime.datetime.strptime(expiry, '%m/%d/%y').strftime('%y%m%d')
+            optionsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry, type[0], Decimal(strike)*1000)
+            json['symbol'] = optionsymbol
+
         # Hack to fix invalid Questrade data just for me   
-        if type == 'Trades' and not json['symbolId'] and not json['symbol']:
+        if json['type'] == 'Trades' and not json['symbolId'] and not json['symbol']:
             if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol']='XIU.TO'
             elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol']='VUG'
             elif 'SMALLCAP GROWTH ETF' in json['description']:             json['symbol']='VBK'
@@ -287,19 +251,25 @@ class Activity(models.Model):
                 if (tradeDate-asof_date).days > 365:
                     asof_date = asof_date.replace(year=asof_date.year+1)
                 json['tradeDate'] = asof_date.isoformat()
-                
-#        if self.price == 0 and self.security and self.security.type == Security.SecurityType.Stock:   
-#            self.price = DataProvider.GetPrice(self.security, strdate(self.tradeDate))
 
     @classmethod
     def CreateFromJson(cls, json, account):
+        # Either we are missing a stock in our init list above, or this is a cash transaction
+        security_id = json['symbolId']
+
+        if not security_id:
+            if not json['type'] in ['Deposits', 'Withdrawals', 'Dividends', 'FX conversion', 'Transfers', 'Fees and rebates', 'Other', 'Interest']:
+                print("Transaction didn't get cleaned properly, we don't have a security: Type {} {}".format(json['type'], json['action']))
+            assert json['currency'] in ['CAD', 'USD']
+            security_id = Security.currencies.get(symbol=json['currency']).symbolid
+
         activity, created = Activity.objects.update_or_create(
             account = account
             , tradeDate = arrow.get(json['tradeDate']).date()
             , transactionDate = arrow.get(json['transactionDate']).date()
             , settlementDate = arrow.get(json['settlementDate']).date()
             , action = json['action'] # "Buy" or "Sell" or "    "
-            , security_id = json['symbolId']
+            , security_id = security_id
             , description = json['description']
             , currency = json['currency']
             , qty = Decimal(str(json['quantity'])) # 0 if a dividend
@@ -308,19 +278,10 @@ class Activity(models.Model):
             , commission = Decimal(str(json['commission'])) # Always negative
             , netAmount = Decimal(str(json['netAmount']))
             , type = json['type'] # "Trades", "Dividends", "Deposits"
+            , sourcejson = str(json)
             )
 
         activity.Validate()
-
-        # Type          Action
-        # Trades                ["Buy", "Sell"]
-        # Dividends             "" or "DIV"
-        # Deposits              "DEP" for taxable, or "CON" for RRSP/TFSA, or "CSP" for SRRSP
-        # Fees and rebates      "FCH"
-        # FX conversion         "FXT" this has currency + netAmount pos/neg
-
-        # In sell trade, qty is negative, price and net amount are both positive.
-        # 
 
     def __str__(self):
         return "{} - {} - {}\t{}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.security, self.action, self.qty, self.price, self.type, self.description)
@@ -329,11 +290,7 @@ class Activity(models.Model):
         return "Activity({},{},{},{},{},{},{},{},{},{})".format(self.tradeDate, self.action, self.security, self.currency,self.qty, self.price, self.commission, self.netAmount, self.type, self.description)
     
     def Validate(self):
-        
-        if self.security_id == 0:
-            self.security = None
-        if not self.security:
-            print("No Security: {}".format(repr(self)))
+        assert self.security, "No security for {}".format(self)
 
         assert_msg = 'Unhandled type: {}'.format(self.__dict__)
         if self.type == 'Deposits':
@@ -350,16 +307,13 @@ class Activity(models.Model):
         elif self.type == 'Other':
             # Expired option
             if self.action == 'EXP': 
-                pass
+                assert self.security.type == Security.SecurityType.Option
             # BRW means a journalled trade
             elif self.action == 'BRW':
                assert self.security, assert_msg
             else:
                 assert False, assert_msg
         elif self.type == 'Trades':
-            # TODO: Hack to handle options
-            if not self.security and not 'CALL ' in self.description and not 'PUT ' in self.description: 
-                print('Trade but no position: {}'.format(self))
             assert self.action in ['Buy', 'Sell']        
         elif self.type == 'Corporate actions':
             # NAC = Name change
@@ -373,23 +327,21 @@ class Activity(models.Model):
     # Returns a dict {currency:amount, symbol:amount, ...}
     def GetHoldingEffect(self):
         effect = defaultdict(Decimal)
-        # TODO: Hack to skip calls/options - just track cash effect
-        if 'CALL ' in self.description or 'PUT ' in self.description: 
-            effect[self.currency] = self.netAmount
-            return effect
 
         if self.type in ['Deposits', 'Withdrawals', 'Trades']:
             effect[self.currency] = self.netAmount
-            if self.security:
-                effect[self.security.symbol] = self.qty
+            effect[self.security.symbol] = self.qty
 
         elif self.type in ['Transfers', 'Dividends', 'Fees and rebates', 'Interest', 'FX conversion']:
             effect[self.currency] = self.netAmount
             
         elif self.type == 'Other':
             # activity BRW means a journalled trade
-            if self.security:
+            if self.action == 'BRW':
                 effect[self.security.symbol] = self.qty
+            elif self.action == 'EXP':
+                effect[self.security.symbol] = self.qty                
+
         return effect         
             
 class Account(models.Model):
@@ -514,12 +466,17 @@ class Client(models.Model):
         return json['activities']
 
     def _FindSymbolId(self, symbol):
+        query = Security.objects.filter(symbol=symbol)
+        if query: return query[0].symbolid
+
         json = self._GetRequest('symbols/search', {'prefix':symbol})
         for s in json['symbols']:
-            if symbol == s['symbol']: 
+            if s['isTradable'] and symbol == s['symbol']: 
                 logger.debug("Matching {} to {}".format(symbol, s))
-                return s['symbolId']              
-        return 0
+                return s['symbolId']
+
+        # TODO: Hack for options because they don't have a symbol id. Maybe I should rejig everything so this can be null, and primarykey the symbol string.
+        return Security.objects.all().order_by('symbolid')[0].symbolid - 1
 
     def _GetSecurityInfoList(self, symbolids):
         if len(symbolids) == 0:
@@ -531,16 +488,15 @@ class Client(models.Model):
         logger.debug(json)
         return json['symbols']
 
-    def EnsureSecuritiesExist(self, symbolinfo):
-        symbolids = [ self._FindSymbolId(symbol) if symbol and not id else id for symbol, id in symbolinfo ]
+    def EnsureSecuritiesExist(self, symbolids):
         have_ids = Security.objects.filter(symbolid__in=symbolids).values_list('symbolid',flat=True)
         missing_ids = {id for id in symbolids if id > 0 and not id in have_ids}
         for security_json in self._GetSecurityInfoList(missing_ids):
             Security.CreateFromJson(security_json)
 
-    def SyncAllActivitiesSlow(self, startDate):
-        print ('Syncing all activities for {}...'.format(self.username))
+    def SyncAllActivitiesSlow(self, startDate='2011-02-01'):
         for account in self.account_set.all():
+            print ('Syncing all activities for {}...'.format(self))
             start = account.GetMostRecentActivityDate()
             if start: start = arrow.get(start).shift(days=+1)
             else: start = arrow.get(startDate)
@@ -549,11 +505,19 @@ class Client(models.Model):
             num_requests = len(date_range)
             
             for start, end in date_range:
-                print (account.id, start, end)
+                logger.debug(account.id, start, end)
                 activities_list = self._GetActivities(account.id, start, end.replace(hour=0, minute=0, second=0))
-                map(Activity.ApplyQuestradeFixes, activities_list)
+                for json in activities_list: 
+                    Activity.ApplyQuestradeFixes(json)
+                    if json['symbol'] and not json['symbolId']:
+                        json['symbolId'] = self._FindSymbolId(json['symbol'])
 
-                self.EnsureSecuritiesExist([(json['symbol'], json['symbolId']) for json in activities_list])
+                        # TODO: nasty hack assuming options have ids less than 0 - we probably don't want this as a primary key since we are inventing it.
+                        if json['symbolId'] < 0:      
+                            Security.objects.get_or_create(symbol=json['symbol'], symbolid=json['symbolId'], type=Security.SecurityType.Option, 
+                                                    currency=json['currency'], listingExchange='', prevDayClosePrice=0, description='')
+
+                self.EnsureSecuritiesExist({json['symbolId'] for json in activities_list})
                 for json in activities_list:                    
                     Activity.CreateFromJson(json, account)
 
