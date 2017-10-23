@@ -49,7 +49,7 @@ class Security(models.Model):
     type = models.CharField(max_length=12, choices=Type.choices, default=Type.Stock)
     listingExchange = models.CharField(max_length=20, default='')
     currency = models.CharField(max_length=3)
-    prevDayClosePrice = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    prevDayClosePrice = models.DecimalField(max_digits=10, decimal_places=2, default=0)    
 
     objects = models.Manager()
     stocks = StockSecurityManager()
@@ -77,8 +77,11 @@ class Security(models.Model):
         return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
 
 class SecurityPriceQuerySet(models.QuerySet):
-    def atdate(self, date):
-        return self.filter(date__lte=date, price__gt=0).order_by('-date')[0]
+    def price_at_date(self, date):
+        query = self.filter(date__lte=date, price__gt=0)
+        if query.exists():
+            return self.filter(date__lte=date, price__gt=0).order_by('-date')[0].price
+        return 0
         
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE)
@@ -136,7 +139,8 @@ class DataProvider:
 
     @classmethod
     def _GetLatestEntry(cls, security):
-        date = datetime.date(2000,1,1)
+
+        date = datetime.date(2010,1,1)
         all_prices = SecurityPrice.objects.filter(security=security)
         if all_prices.exists():
             date = all_prices.latest().date
@@ -144,7 +148,7 @@ class DataProvider:
     
     @classmethod
     def _GetLatestExchangeRate(cls, currency):
-        date = datetime.date(2000,1,1)
+        date = datetime.date(2010,1,1)
         all_prices = ExchangeRate.objects.filter(currency=currency)
         if all_prices.exists():
             date = all_prices.latest().date
@@ -167,7 +171,7 @@ class DataProvider:
         # Currency type is always worth $1 per unit.
         if security.type == Security.Type.Currency: return 1
         try:
-            return SecurityPrice.objects.filter(security=security, date__lte=date, price__gt=0).order_by('-date')[0].price
+            return SecurityPrice.objects.filter(security=security).price_at_date(date)
         except Exception as e:
             print ("Couldn't get stock price for {} on {}".format(security, date))
             traceback.print_exc()
@@ -179,7 +183,7 @@ class DataProvider:
 
     @classmethod
     def GetExchangeRate(cls, currency_str, date):
-        if currency_str=='CAD': return 1
+        if currency_str in 'CAD': return 1
         return ExchangeRate.objects.filter(currency=currency_str, date__lte=date, price__gt=0).order_by('-date')[0].price
 
     @classmethod
@@ -191,7 +195,26 @@ class DataProvider:
 
 class HoldingManager(models.Manager):
     def at_date(self, date):
-        return super().get_queryset().filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
+        return self.get_queryset().filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
+
+    def add_effect(self, account, symbol, qty_delta, date):                       
+        previous_qty = 0
+        try:
+            current_holding = self.get(security__symbol=symbol, enddate=None)
+            if current_holding.startdate == date:
+                current_holding.qty += qty_delta
+            else:                        
+                current_holding.enddate = date - datetime.timedelta(days=1)
+                previous_qty = current_holding.qty
+            current_holding.save()
+        except Holding.MultipleObjectsReturned:
+            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(symbol, qty_delta, date))
+        except Holding.DoesNotExist:
+            pass
+
+        print ("Creating {} {} {} {}".format(symbol, previous_qty+qty_delta, date, None))
+        self.create(account=account,security_id=symbol, qty=previous_qty+qty_delta, startdate=date, enddate=None)
+
 
 class CurrentHoldingManager(HoldingManager):
     def get_queryset(self):
@@ -391,35 +414,55 @@ class Account(models.Model):
             
     def RegenerateDBHoldings(self):
         Holding.objects.filter(account=self).delete()
-        HackInitMyAccount(self.id)
+        self.HackInitMyAccount()
         for activity in self.activity_set.all():          
-            for symbol, amount in activity.GetHoldingEffect().items():
+            for symbol, qty_delta in activity.GetHoldingEffect().items():
                 # TODO: this should be a "manager method"
-                queryset = Holding.objects.filter(account=self, security__symbol=symbol)
-                previous_amount = 0
-                if queryset.exists():
-                    current_holding = queryset.latest()
-                    assert current_holding.enddate is None
+                # Holding.objects.add_effect(self, symbol, qty_delta, activity.tradeDate)
+                previous_qty = 0
+                current_holding = self.holding_set.filter(security__symbol=symbol, enddate=None).first()
+                if current_holding:
                     if current_holding.startdate == activity.tradeDate:
-                        current_holding.qty += amount
-                        current_holding.save()
-                        continue
-
-                    current_holding.enddate = activity.tradeDate - datetime.timedelta(days=1)
-                    previous_amount = current_holding.qty
+                        current_holding.qty += qty_delta
+                    else:                        
+                        current_holding.enddate = activity.tradeDate - datetime.timedelta(days=1)
+                        previous_qty = current_holding.qty
                     current_holding.save()
 
-                print ("Creating {} {} {} {} {}".format(self, symbol, previous_amount+amount, activity.tradeDate, None))
-                self.holding_set.create(security_id=symbol, qty=previous_amount+amount, startdate=activity.tradeDate, enddate=None)
+                print ("Creating {} {} {} {} {}".format(self, symbol, previous_qty+qty_delta, activity.tradeDate, None))
+                self.holding_set.create(security_id=symbol, qty=previous_qty+qty_delta, startdate=activity.tradeDate, enddate=None)
 
     def GetValueAtDate(self, date):
-        print(date)
-        holdings_atdate = Holding.objects.at_date(date)
-        if not holdings_atdate.exists(): return 0
-        return sum([h.qty * DataProvider.GetPriceCAD(h.security, date) for h in holdings_atdate])
-        cash_value = sum([h.qty * DataProvider.GetPriceCAD(h.security, date) for h in holdings_atdate.filter(security__type=Security.Type.Currency)])
-        stock_value = sum([h.qty * DataProvider.GetPriceCAD(h.security, date) for h in holdings_atdate.exclude(security__type=Security.Type.Currency)])
-        return stock_value + cash_value
+        return sum([h.qty * DataProvider.GetPriceCAD(h.security, date) for h in self.holding_set.at_date(date)])
+
+    def GetValuesForDates(self, dates):
+        self.holding_set
+        
+    def HackInitMyAccount(self):
+        start = '2011-01-01'
+        if self.id == 51407958:
+            self.holding_set.create(security_id='AGNC', qty=70, startdate=start, enddate=None)
+            self.holding_set.create(security_id='VBK', qty=34, startdate=start, enddate=None)
+            self.holding_set.create(security_id='VUG', qty=118, startdate=start, enddate=None)
+            self.holding_set.create(security_id='CashCAD', qty=Decimal('92.30'), startdate=start, enddate=None)
+            self.holding_set.create(security_id='CashUSD', qty=Decimal('163.62'), startdate=start, enddate=None)
+
+        if self.id == 51424829:     
+            self.holding_set.create(security_id='EA', qty=300, startdate=start, enddate=None)
+            self.holding_set.create(security_id='VOT', qty=120, startdate=start, enddate=None)
+            self.holding_set.create(security_id='VWO', qty=220, startdate=start, enddate=None)
+            self.holding_set.create(security_id='XBB.TO', qty=260, startdate=start, enddate=None)
+            self.holding_set.create(security_id='XIU.TO', qty=200, startdate=start, enddate=None)
+            self.holding_set.create(security_id='CashCAD', qty=Decimal('0'), startdate=start, enddate=None)
+            self.holding_set.create(security_id='CashUSD', qty=Decimal('-118.3'), startdate=start, enddate=None)
+
+        if self.id == 51419220:     
+            self.holding_set.create(security_id='VBR', qty=90, startdate=start, enddate=None)
+            self.holding_set.create(security_id='XBB.TO', qty=85, startdate=start, enddate=None)
+            self.holding_set.create(security_id='XIN.TO', qty=140, startdate=start, enddate=None)
+            self.holding_set.create(security_id='CashCAD', qty=Decimal('147.25'), startdate=start, enddate=None)
+            self.holding_set.create(security_id='CashUSD', qty=Decimal('97.15'), startdate=start, enddate=None)
+    
 
 class Client(models.Model):
     username = models.CharField(max_length=100, primary_key=True)
@@ -517,8 +560,8 @@ class Client(models.Model):
 
         for symbol,id in symboldata:
             if id == 0:
-                Security.objects.update_or_create(symbol=symbol, symbolid=0, type=Security.Type.Option, 
-                                                    currency='', listingExchange='', prevDayClosePrice=0, description='')
+                related = Security.objects.filter(symbol__startswith=symbol[:3])[0]
+                Security.objects.update_or_create(symbol=symbol, type=Security.Type.Option, currency=related.currency)
 
                 
     def SyncAllActivitiesSlow(self, startDate='2011-02-01'):
@@ -545,35 +588,3 @@ class Client(models.Model):
 
     def CloseSession(self):
         self.session.close()
-
-def HackInitMyAccount(account_id):
-    start = '2011-01-01'
-    if account_id == 51407958:
-        Holding.objects.bulk_create([
-            Holding(account=Account.objects.get(account_id=51407958), symbol='AGNC', qty=70, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51407958), symbol='VBK', qty=34, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51407958), symbol='VUG', qty=118, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51407958), symbol='CAD', qty=Decimal('92.30'), startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51407958), symbol='USD', qty=Decimal('163.62'), startdate=start, enddate=None),
-        ])
-
-    if account_id == 51424829:
-        Holding.objects.bulk_create([
-            Holding(account=Account.objects.get(account_id=51424829), symbol='EA', qty=300, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51424829), symbol='VOT', qty=120, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51424829), symbol='VWO', qty=220, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51424829), symbol='XBB.TO', qty=260, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51424829), symbol='XIU.TO', qty=200, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51424829), symbol='CAD', qty=Decimal('0'), startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51424829), symbol='USD', qty=Decimal('-118.3'), startdate=start, enddate=None),
-        ])
-
-    if account_id == 51419220:
-        Holding.objects.bulk_create([
-            Holding(account=Account.objects.get(account_id=51419220), symbol='VBR', qty=90, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51419220), symbol='XBB.TO', qty=85, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51419220), symbol='XIN.TO', qty=140, startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51419220), symbol='CAD', qty=Decimal('147.25'), startdate=start, enddate=None),
-            Holding(account=Account.objects.get(account_id=51419220), symbol='USD', qty=Decimal('97.15'), startdate=start, enddate=None)
-        ])
-    

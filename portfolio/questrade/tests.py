@@ -161,6 +161,7 @@ class DataProviderTests(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.usd = Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
+        cls.cad = Security.objects.create(symbol='CashCAD', currency='CAD', type=Security.Type.Currency)
         cls.tsla = Security.objects.create(symbol='TSLA', currency='USD')        
         DataProvider.SyncAllSecurities()
 
@@ -186,6 +187,12 @@ class DataProviderTests(TestCase):
 
     def test_exchange_rate_price_cad(self):
         self.assertEqual( DataProvider.GetPriceCAD(self.usd, '2015-01-01'), Decimal('1.160100') )
+        
+    def test_exchange_rate_price_2(self):
+        self.assertEqual( DataProvider.GetPrice(self.cad, '2015-01-01'), 1)
+
+    def test_exchange_rate_price_cad_2(self):
+        self.assertEqual( DataProvider.GetPriceCAD(self.cad, '2015-01-01'), 1 )
 
     def test_stock_price_up_to_date(self):
         self.assertTrue( datetime.date.today() - DataProvider._GetLatestEntry(self.tsla) < datetime.timedelta(days=5))

@@ -3,7 +3,7 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.db.models.aggregates import Sum
 
 # Create your views here.
-from .models import Client, Account, HackInitMyAccount, DataProvider, Holding, SecurityPrice
+from .models import Client, Account, DataProvider, Holding, SecurityPrice
 import arrow
 import datetime
 from utils import as_currency,  strdate
