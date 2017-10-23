@@ -68,7 +68,7 @@ def DoWorkHistory():
     yield "<br>Processing history"
     all_accounts = Account.objects.all()
     yield "<br>"
-    start = '2011-01-01'
+    start = '2017-10-22'
     yield '<br>Date\t\t' + '\t'.join([a.client.username[0] + a.type for a in all_accounts]) + '\tTotal'
     for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
         d = day.date()
@@ -76,50 +76,9 @@ def DoWorkHistory():
         yield '<br>{}\t'.format(d) + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))
     yield '</pre></body></html>'
 
-def GetDateVal():
-    yield "<html><body><pre>"
-    account = Account.objects.all()[0]
-    for day in arrow.Arrow.range('day', arrow.get('2017-01-01'), arrow.now()):
-        date = str(day.date())
-        open_positions_query = Holding.objects.at_date(date).filter(account=account)
-        if not open_positions_query.exists(): return 0
-        cash = sum(open_positions_query.filter(symbol__in=['CAD', 'USD']).values_list('qty', flat=True))
-        open_positions_query = open_positions_query.exclude(symbol='CAD').exclude(symbol='USD')
-        if not open_positions_query.exists(): return cash
-
-        qtys = open_positions_query.values_list('symbol', 'qty')
-        total = cash
-        for symbol in open_positions_query.values_list('symbol', flat=True):
-            qty = open_positions_query.get(symbol=symbol).qty
-            val = DataProvider.GetPrice(symbol, date)
-            total += qty*val
-        yield "<br>{}\t{}".format(date,total)
-    yield '</pre></body></html>'
-    
-def GetDateVal2():
-    yield "<html><body><pre>"
-    account = Account.objects.all()[0]
-    for day in arrow.Arrow.range('day', arrow.get('2017-01-01'), arrow.now()):
-        total = 0
-        date = str(day.date())
-        open_positions_query = Holding.objects.at_date(date).filter(account=account).order_by('symbol')
-        if not open_positions_query.exists(): yield "<br>{}\t{}".format(date,total)
-        total = open_positions_query.get(symbol='CAD').qty
-        if not open_positions_query.exists(): yield "<br>{}\t{}".format(date,total)
-        
-        qtys = open_positions_query.values_list('qty', flat=True)        
-        symbols = open_positions_query.values_list('symbol', flat=True)
-        prices = list(SecurityPrice.objects.atdate(date).values_list('value').filter(symbol__in=symbols))
-        
-        for p,q in zip(prices, qtys):
-            total += qty*val
-        yield "<br>{}\t{}".format(date,total)
-    yield '</pre></body></html>'
     
 def history(request): 
-    #return StreamingHttpResponse(GetDateVal2())  
-    #return HttpResponse(''.join([l for l in GetDateVal2()])) 
-    return StreamingHttpResponse(DoWorkHistory())  
+    return HttpResponse([l for l in DoWorkHistory()], content_type='text/html') 
 
 def AccountBalances():
     yield "<html><body><pre>"

@@ -77,41 +77,41 @@ class Security(models.Model):
         return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
 
 class SecurityPriceQuerySet(models.QuerySet):
-    def price_at_date(self, date):
-        query = self.filter(date__lte=date, price__gt=0)
+    def price_at_day(self, day):
+        query = self.filter(day__lte=day, price__gt=0)
         if query.exists():
-            return self.filter(date__lte=date, price__gt=0).order_by('-date')[0].price
+            return self.filter(day__lte=day, price__gt=0).order_by('-day')[0].price
         return 0
         
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE)
-    date = models.DateField(default=datetime.date.today)
+    day = models.DateField(default=datetime.date.today)
     price = models.DecimalField(max_digits=16, decimal_places=2)
     objects = SecurityPriceQuerySet.as_manager()
 
     class Meta:
-        unique_together = ('security', 'date')
-        get_latest_by = 'date'
+        unique_together = ('security', 'day')
+        get_latest_by = 'day'
         indexes = [
-            models.Index(fields=['security', 'date'])
+            models.Index(fields=['security', 'day'])
         ]
 
     def __str__(self):
-        return "{} {} {}".format(self.security, self.date, self.price)
+        return "{} {} {}".format(self.security, self.day, self.price)
 
 class ExchangeRate(models.Model):
     currency = models.CharField(max_length=3)
-    date = models.DateField(default=datetime.date.today)
+    day = models.DateField(default=datetime.date.today)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     class Meta:
-        unique_together = ('currency', 'date')
-        get_latest_by = 'date'
+        unique_together = ('currency', 'day')
+        get_latest_by = 'day'
         indexes = [
-            models.Index(fields=['currency', 'date'])
+            models.Index(fields=['currency', 'day'])
         ]
 
     def __str__(self):
-        return "{} {} {}".format(self.currency, self.date, self.price)
+        return "{} {} {}".format(self.currency, self.day, self.price)
 
 
 class DataProvider:
@@ -119,7 +119,7 @@ class DataProvider:
              
     @classmethod
     def _RetrieveData(cls, symbol, source, start_date):
-        # Returns a list of tuples (date, price)
+        # Returns a list of tuples (day, price)
         if symbol in cls.REMAP:
             symbol = cls.REMAP[symbol]
         end_date = datetime.date.today()
@@ -139,51 +139,51 @@ class DataProvider:
 
     @classmethod
     def _GetLatestEntry(cls, security):
-        date = datetime.date(2010,1,1)
+        day = datetime.date(2010,1,1)
         all_prices = security.securityprice_set.all()
         if all_prices.exists():
-            date = all_prices.latest().date
-        return date
+            day = all_prices.latest().day
+        return day
     
     @classmethod
     def _GetLatestExchangeRate(cls, currency):
-        date = datetime.date(2010,1,1)
+        day = datetime.date(2010,1,1)
         all_prices = ExchangeRate.objects.filter(currency=currency)
         if all_prices.exists():
-            date = all_prices.latest().date
-        return date
+            day = all_prices.latest().day
+        return day
     
     @classmethod
     def SyncStockPrices(cls, security):
         data = cls._RetrieveData(security.symbol, 'yahoo', cls._GetLatestEntry(security) + datetime.timedelta(days=1))
-        security.securityprice_set.bulk_create([SecurityPrice(security=security, date=date, price=price) for date, price in data])
+        security.securityprice_set.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in data])
 
     @classmethod
     def SyncExchangeRates(cls, security):
         if security.currency == 'CAD': return
         data = cls._RetrieveData(security.description, 'fred', cls._GetLatestExchangeRate(security.currency) + datetime.timedelta(days=1))
-        ExchangeRate.objects.bulk_create([ExchangeRate(currency=security.currency, date=date, price=price) for date, price in data])
+        ExchangeRate.objects.bulk_create([ExchangeRate(currency=security.currency, day=day, price=price) for day, price in data])
 
     @classmethod
-    def GetPrice(cls, security, date):
+    def GetPrice(cls, security, day):
         if security.symbol == 'DLR.U.TO': return 10    
         # Currency type is always worth $1 per unit.
         if security.type == Security.Type.Currency: return 1
         try:
-            return security.securityprice_set.price_at_date(date)
+            return security.securityprice_set.price_at_date(day)
         except Exception as e:
-            print ("Couldn't get stock price for {} on {}".format(security, date))
+            print ("Couldn't get stock price for {} on {}".format(security, day))
             traceback.print_exc()
             return None
 
     @classmethod
-    def GetPriceCAD(cls, security, date):
-        return cls.GetPrice(security, date) * cls.GetExchangeRate(security.currency, date)
+    def GetPriceCAD(cls, security, day):
+        return cls.GetPrice(security, day) * cls.GetExchangeRate(security.currency, day)
 
     @classmethod
-    def GetExchangeRate(cls, currency_str, date):
+    def GetExchangeRate(cls, currency_str, day):
         if currency_str in 'CAD': return 1
-        return ExchangeRate.objects.filter(currency=currency_str, date__lte=date, price__gt=0).order_by('-date')[0].price
+        return ExchangeRate.objects.filter(currency=currency_str, day__lte=day, price__gt=0).order_by('-day')[0].price
 
     @classmethod
     def SyncAllSecurities(cls):
@@ -191,50 +191,6 @@ class DataProvider:
             cls.SyncExchangeRates(currency)
         for stock in Security.stocks.all():
             cls.SyncStockPrices(stock)
-
-class HoldingManager(models.Manager):
-    def at_date(self, date):
-        return self.get_queryset().filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
-
-    def add_effect(self, account, symbol, qty_delta, date):                       
-        previous_qty = 0
-        try:
-            current_holding = self.get(security__symbol=symbol, enddate=None)
-            if current_holding.startdate == date:
-                current_holding.qty += qty_delta
-            else:                        
-                current_holding.enddate = date - datetime.timedelta(days=1)
-                previous_qty = current_holding.qty
-            current_holding.save()
-        except Holding.MultipleObjectsReturned:
-            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(symbol, qty_delta, date))
-        except Holding.DoesNotExist:
-            pass
-
-        print ("Creating {} {} {} {}".format(symbol, previous_qty+qty_delta, date, None))
-        self.create(account=account,security_id=symbol, qty=previous_qty+qty_delta, startdate=date, enddate=None)
-
-
-class CurrentHoldingManager(HoldingManager):
-    def get_queryset(self):
-        return self.at_date(datetime.date.today())
-           
-class Holding(models.Model):
-    account = models.ForeignKey('Account', on_delete=models.CASCADE)
-    security = models.ForeignKey(Security, on_delete=models.CASCADE)
-    qty = models.DecimalField(max_digits=16, decimal_places=6)
-    startdate = models.DateField()
-    enddate = models.DateField(null=True)
-    
-    objects = HoldingManager()
-    current = CurrentHoldingManager()
-
-    class Meta:
-        unique_together = ('account', 'security', 'startdate')
-        get_latest_by = 'startdate'
-
-    def __repr__(self):
-        return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
 
 class Activity(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE)
@@ -392,8 +348,54 @@ class Activity(models.Model):
             elif self.action == 'EXP':
                 effect[self.security.symbol] = self.qty                
 
-        return effect         
-            
+        return effect                     
+               
+class HoldingManager(models.Manager):
+    def at_date(self, date):
+        return self.filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
+
+    def add_effect(self, account, symbol, qty_delta, date):                       
+        previous_qty = 0
+        try:
+            current_holding = self.get(security__symbol=symbol, enddate=None)
+            if current_holding.startdate == date:
+                current_holding.qty += qty_delta
+                current_holding.save()
+                return
+            else:                        
+                current_holding.enddate = date - datetime.timedelta(days=1)
+                previous_qty = current_holding.qty
+            current_holding.save()
+        except Holding.MultipleObjectsReturned:
+            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(symbol))
+        except Holding.DoesNotExist:
+            pass
+
+        print ("Creating {} {} {} {}".format(symbol, previous_qty+qty_delta, date, None))
+        self.create(account=account,security_id=symbol, qty=previous_qty+qty_delta, startdate=date, enddate=None)
+
+
+class CurrentHoldingManager(HoldingManager):
+    def get_queryset(self):
+        return super().filter(enddate=None)
+
+class Holding(models.Model):
+    account = models.ForeignKey('Account', on_delete=models.CASCADE)
+    security = models.ForeignKey(Security, on_delete=models.CASCADE)
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    startdate = models.DateField()
+    enddate = models.DateField(null=True)
+    
+    objects = HoldingManager()
+    current = CurrentHoldingManager()
+
+    class Meta:
+        unique_together = ('account', 'security', 'startdate')
+        get_latest_by = 'startdate'
+
+    def __repr__(self):
+        return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
+
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE)
     type = models.CharField(max_length=100)
@@ -412,32 +414,15 @@ class Account(models.Model):
             return None
             
     def RegenerateDBHoldings(self):
-        Holding.objects.filter(account=self).delete()
+        self.holding_set.all().delete()
         self.HackInitMyAccount()
         for activity in self.activity_set.all():          
             for symbol, qty_delta in activity.GetHoldingEffect().items():
-                # TODO: this should be a "manager method"
-                # Holding.objects.add_effect(self, symbol, qty_delta, activity.tradeDate)
-                previous_qty = 0
-                current_holding = self.holding_set.filter(security__symbol=symbol, enddate=None).first()
-                if current_holding:
-                    if current_holding.startdate == activity.tradeDate:
-                        current_holding.qty += qty_delta
-                    else:                        
-                        current_holding.enddate = activity.tradeDate - datetime.timedelta(days=1)
-                        previous_qty = current_holding.qty
-                    current_holding.save()
-
-                new_qty = previous_qty + qty_delta
-                if not new_qty == 0:
-                    print ("Creating {} {} {} {} {}".format(self, symbol, previous_qty+qty_delta, activity.tradeDate, None))
-                    self.holding_set.create(security_id=symbol, qty=previous_qty+qty_delta, startdate=activity.tradeDate, enddate=None)
+                self.holding_set.add_effect(self, symbol, qty_delta, activity.tradeDate)
 
     def GetValueAtDate(self, date):
         return sum([h.qty * DataProvider.GetPriceCAD(h.security, date) for h in self.holding_set.at_date(date)])
 
-    def GetValuesForDates(self, dates):
-        self.holding_set
         
     def HackInitMyAccount(self):
         start = '2011-01-01'

@@ -27,6 +27,8 @@ admin.site.register(Account, AccountAdmin)
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     list_display = ['account', 'security', 'display_qty', 'startdate', 'enddate']
+    list_filter = ['account', 'security', 'enddate']        
+
 admin.site.register(Holding, HoldingAdmin)
 
 admin.site.register(Client)
@@ -39,6 +41,6 @@ class SecurityAdmin(admin.ModelAdmin):
 admin.site.register(Security, SecurityAdmin)
 
 class SecurityPriceAdmin(admin.ModelAdmin):
-    list_display = ['security', 'date', 'price']
-    list_filter = ['date', 'security']        
+    list_display = ['security', 'day', 'price']
+    list_filter = ['day', 'security']        
 admin.site.register(SecurityPrice, SecurityPriceAdmin)

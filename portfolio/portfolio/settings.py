@@ -27,12 +27,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.11', '96.48.177.151']
 
+INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
+
 
 # Application definition
 
 INSTALLED_APPS = [
     'questrade.apps.QuestradeConfig',
     'polls.apps.PollsConfig',
+    'debug_toolbar',
     'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -44,6 +47,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -51,6 +55,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
 ]
 
 ROOT_URLCONF = 'portfolio.urls'
