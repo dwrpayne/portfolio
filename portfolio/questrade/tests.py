@@ -1,29 +1,211 @@
 from django.test import TestCase
 
 from .models import *
+from decimal import Decimal
+import unittest
 
-client = Client.objects.get(username='David')
-client.Authorize()
+def setUpModule():
+    Security.objects.all().delete()
+    Client.objects.all().delete()
+    #Client.CreateClient('test', '123457890')
 
+def tearDownModule():
+    pass
+
+
+@unittest.skip('No Client API support outside production')
 class ClientModelTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = Client.objects.get(username='David')
+        cls.client.Authorize()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.client.CloseSession()
+
     def test_make_security(self):
-        client.EnsureSecuritiesExist([38526])
+        self.client.EnsureSecuritiesExist([38526])
         s = Security.objects.get(symbolid=38526)
         self.assertEqual(str(s.symbol), 'TSLA')
 
     def test_make_security_preexisting(self):
-        client.EnsureSecuritiesExist([38526])
-        client.EnsureSecuritiesExist([38526,8049])
+        self.client.EnsureSecuritiesExist([38526])
+        self.client.EnsureSecuritiesExist([38526,8049])
         self.assertEqual(len(Security.objects.all()), 2)
 
+class ActivityModelTests(TestCase):
+    @classmethod
+    def setUpClass(cls): 
+        cls.cad = Security.objects.create(symbol='CashCAD', currency='CAD', type=Security.Type.Currency)
+        Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
+        cls.vti = Security.objects.create(symbol='VTI', currency='USD')
+        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': 'VANGUARD INDEX FUNDS           VANGUARD TOTAL STOCK MARKET    ETF                            WE ACTED AS AGENT', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+        c = Client.objects.create(username='test', refresh_token='test_token')
+        a = Account.objects.create(client=c, id=0, type='')
+        cls.buy = Activity.CreateFromJson(json, a)
+
+        json={'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23T00:00:00.000000-04:00', 'settlementDate': '2013-07-23T00:00:00.000000-04:00', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+        cls.dep = Activity.CreateFromJson(json, a)
+
+    @classmethod
+    def tearDownClass(cls):
+        Client.objects.all().delete()
+        Security.objects.all().delete()
+        Activity.objects.all().delete()
+
+    def test_buy_quantity(self):
+        self.assertEqual(self.buy.qty,11)
+                
+    def test_buy_price(self):
+        self.assertEqual(self.buy.price,Decimal('87.12'))
+
+    def test_buy_effect_cash(self):
+        self.assertEqual(self.buy.GetHoldingEffect()['CashUSD'], Decimal('-958.32'))
+        
+    def test_dep_effect_cash_2(self):
+        self.assertNotIn('USD', self.dep.GetHoldingEffect())
+        
+    def test_buy_effect_stock(self):
+        self.assertEqual(self.buy.GetHoldingEffect()['VTI'], 11)
+
+    def test_buy_security(self):
+        self.assertEqual(self.buy.security, self.vti)
+
+    def test_buy_currency(self):
+        self.assertEqual(self.buy.currency, 'USD')
+
+    def test_dep_quantity(self):
+        self.assertEqual(self.dep.qty,0)
+                
+    def test_dep_price(self):
+        self.assertEqual(self.dep.price,0)
+
+    def test_dep_effect_cash(self):
+        self.assertEqual(self.dep.GetHoldingEffect()['CashCAD'], 1000)
+        
+    def test_dep_effect_cash_2(self):
+        self.assertNotIn('CAD', self.dep.GetHoldingEffect())
+
+    def test_dep_security(self):
+        self.assertEqual(self.dep.security, self.cad)
+        
+
+class AccountModelTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        c = Client.objects.create(username='test', refresh_token='test_token')
+        cls.account = Account.objects.create(client=c, id=0, type='')
+        Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
+        Security.objects.create(symbol='CashCAD', currency='CAD', type=Security.Type.Currency)
+        Security.objects.create(symbol='VTI', currency='USD')
+        DataProvider.SyncAllSecurities()
+        json={'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+        Activity.CreateFromJson(json, cls.account)
+        json={'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23', 'settlementDate': '2013-07-23', 'action': 'DEP', 'symbol': 'USD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'USD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+        Activity.CreateFromJson(json, cls.account)
+        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01', 'settlementDate': '2013-08-01', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+        Activity.CreateFromJson(json, cls.account)
+        cls.account.RegenerateDBHoldings()
+
+    @classmethod
+    def tearDownClass(cls):
+        Security.objects.all().delete()
+        Client.objects.all().delete()
+
+    def test_recent_activity(self):
+        self.assertEqual(self.account.GetMostRecentActivityDate(), datetime.date(2013,7,29))
+
+    def test_value_before(self):
+        self.assertEqual(self.account.GetValueAtDate('2011-01-01'), 0)
+        
+    def test_value_after_dep_1(self):
+        self.assertEqual(self.account.GetValueAtDate('2013-07-15'), 1000)
+
+    def test_value_after_dep_2(self):
+        self.assertEqual(self.account.GetValueAtDate('2013-07-25'), 2000)
+
+    def test_value_after_buy_1(self):
+        self.assertEqual(self.account.GetValueAtDate('2013-07-30'), 2000)
+
+    def test_value_after_buy_2(self):
+        self.assertEqual(self.account.GetValueAtDate('2014-07-15'), 2500)
+
+        
 
 class SecurityModelTests(TestCase):
-    def hi(self):
-        pass
+    @classmethod
+    def setUpClass(cls):
+        Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
+        Security.objects.create(symbol='CashCAD', currency='CAD', type=Security.Type.Currency)
+        Security.objects.create(symbol='TSLA', currency='USD')
+        Security.objects.create(symbol='MSFT', currency='USD')
+        Security.objects.create(symbol='VUN.TO', currency='CAD')
+        Security.objects.create(symbol='ATVI  23400827IU4', currency='USD', type=Security.Type.Option)
 
-class ActivityModelTests(TestCase):
-    def test_create_from_json(self):
-        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': 'VANGUARD INDEX FUNDS           VANGUARD TOTAL STOCK MARKET    ETF                            WE ACTED AS AGENT', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
-        Activity.CreateFromJson(json, c.account_set.all()[0])
-        self.assertEqual(Activity.objects.all()[0].quantity,11)
-        self.assertEqual(Activity.objects.all()[0].quantity,Decimal(87.12))
+    @classmethod
+    def tearDownClass(cls):
+        Security.objects.all().delete()
+
+    def test_manager_objects(self):
+        self.assertEqual(len(Security.objects.all()), 6)
+
+    def test_manager_stocks(self):
+        self.assertEqual(len(Security.stocks.all()), 3)
+
+    def test_manager_currencies(self):
+        self.assertEqual(len(Security.currencies.all()), 2)
+
+class DataProviderTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.usd = Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
+        cls.tsla = Security.objects.create(symbol='TSLA', currency='USD')        
+        DataProvider.SyncAllSecurities()
+
+
+    @classmethod
+    def tearDownClass(cls):        
+        Security.objects.all().delete()
+        
+    def test_exchange_rates_holiday(self):
+        self.assertEqual( DataProvider.GetExchangeRate('USD', '2015-01-01'), Decimal('1.160100') )
+
+    def test_exchange_rates_normal_1(self):
+        self.assertEqual( DataProvider.GetExchangeRate('USD', '2014-12-31'), Decimal('1.160100') )
+        
+    def test_exchange_rates_normal_2(self):
+        self.assertEqual( DataProvider.GetExchangeRate('USD', '2014-12-30'), Decimal('1.159700') )
+        
+    def test_exchange_rates_up_to_date(self):
+        self.assertTrue( datetime.date.today() - DataProvider._GetLatestExchangeRate('USD') < datetime.timedelta(days=10))
+        
+    def test_exchange_rate_price(self):
+        self.assertEqual( DataProvider.GetPrice(self.usd, '2015-01-01'), 1)
+
+    def test_exchange_rate_price_cad(self):
+        self.assertEqual( DataProvider.GetPriceCAD(self.usd, '2015-01-01'), Decimal('1.160100') )
+
+    def test_stock_price_up_to_date(self):
+        self.assertTrue( datetime.date.today() - DataProvider._GetLatestEntry(self.tsla) < datetime.timedelta(days=5))
+        
+    def test_stock_price_holiday(self):
+        self.assertEqual( DataProvider.GetPrice(self.tsla, '2015-01-01'), Decimal('222.41') )
+
+    def test_stock_price_normal_1(self):
+        self.assertEqual( DataProvider.GetPrice(self.tsla, '2014-12-31'), Decimal('222.41') )
+
+    def test_stock_price_normal_2(self):
+        self.assertEqual( DataProvider.GetPrice(self.tsla, '2014-12-30'), Decimal('222.23') )
+
+    def test_stock_price_exch_holiday_both(self):
+        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2015-01-01'), Decimal('258.017841') )
+
+    def test_stock_price_exch_normal_1(self):
+        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2014-12-31'), Decimal('258.017841') )
+
+    def test_stock_price_exch_normal_2(self):
+        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2014-12-30'), Decimal('257.720131') )
+
+    def test_stock_price_exch_holiday_one(self):
+        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2014-12-26'), Decimal('264.749622') )

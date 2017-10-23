@@ -7,11 +7,12 @@
     <IsWindowsApplication>False</IsWindowsApplication>
     <WebBrowserPort>
     </WebBrowserPort>
-    <PythonDebugWebServerCommandArguments>runserver --noreload 0:80 $(CommandLineArguments) --settings $(DjangoSettingsModule) </PythonDebugWebServerCommandArguments>
-    <CommandLineArguments>shell</CommandLineArguments>
+    <PythonDebugWebServerCommandArguments>runserver --noreload 0:80 $(CommandLineArguments) </PythonDebugWebServerCommandArguments>
+    <CommandLineArguments>porfolio.settings</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <InterpreterPath>
     </InterpreterPath>
+    <InterpreterId>Global|PythonCore|3.6</InterpreterId>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -25,7 +26,7 @@
     <WorkingDirectory>.</WorkingDirectory>
     <WebBrowserUrl>
     </WebBrowserUrl>
-    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <LaunchProvider>Django launcher</LaunchProvider>
     <DjangoSettingsModule>portfolio.settings</DjangoSettingsModule>
     <OutputPath>.</OutputPath>
     <SuppressCollectPythonCloudServiceFiles>true</SuppressCollectPythonCloudServiceFiles>
@@ -75,6 +76,11 @@
     <Compile Include="questrade\migrations\0018_auto_20171019_0009.py" />
     <Compile Include="questrade\migrations\0019_activity_symbol.py" />
     <Compile Include="questrade\migrations\0020_auto_20171019_0809.py" />
+    <Compile Include="questrade\migrations\0021_auto_20171020_2351.py" />
+    <Compile Include="questrade\migrations\0022_auto_20171021_0050.py" />
+    <Compile Include="questrade\migrations\0023_auto_20171021_0133.py" />
+    <Compile Include="questrade\migrations\0024_auto_20171021_0137.py" />
+    <Compile Include="questrade\migrations\0025_security_id.py" />
     <Compile Include="questrade\migrations\__init__.py" />
     <Compile Include="questrade\models.py" />
     <Compile Include="questrade\tests.py" />
@@ -160,6 +166,9 @@
     <None Include="readme.html">
       <SubType>WebBrowser</SubType>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="Global|PythonCore|3.6" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.Django.targets" />
   <!-- Specify pre- and post-build commands in the BeforeBuild and 

@@ -118,7 +118,7 @@ def GetDateVal2():
     
 def history(request): 
     #return StreamingHttpResponse(GetDateVal2())  
-    return HttpResponse(''.join([l for l in GetDateVal2()])) 
+    #return HttpResponse(''.join([l for l in GetDateVal2()])) 
     return StreamingHttpResponse(DoWorkHistory())  
 
 def AccountBalances():
