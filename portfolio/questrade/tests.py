@@ -32,7 +32,7 @@ class ClientModelTests(TestCase):
     def test_make_security_preexisting(self):
         self.client.EnsureSecuritiesExist([38526])
         self.client.EnsureSecuritiesExist([38526,8049])
-        self.assertEqual(len(Security.objects.all()), 2)
+        self.assertEqual(len(Security.objects.all()), 2)        
 
 class ActivityModelTests(TestCase):
     @classmethod
@@ -40,7 +40,7 @@ class ActivityModelTests(TestCase):
         cls.cad = Security.objects.create(symbol='CashCAD', currency='CAD', type=Security.Type.Currency)
         Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
         cls.vti = Security.objects.create(symbol='VTI', currency='USD')
-        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': 'VANGUARD INDEX FUNDS           VANGUARD TOTAL STOCK MARKET    ETF                            WE ACTED AS AGENT', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
         c = Client.objects.create(username='test', refresh_token='test_token')
         a = Account.objects.create(client=c, id=0, type='')
         cls.buy = Activity.CreateFromJson(json, a)
@@ -73,7 +73,7 @@ class ActivityModelTests(TestCase):
         self.assertEqual(self.buy.security, self.vti)
 
     def test_buy_currency(self):
-        self.assertEqual(self.buy.currency, 'USD')
+        self.assertEqual(self.buy.currency, 'CashUSD')
 
     def test_dep_quantity(self):
         self.assertEqual(self.dep.qty,0)
@@ -119,17 +119,17 @@ class AccountModelTests(TestCase):
     def test_value_before(self):
         self.assertEqual(self.account.GetValueAtDate('2011-01-01'), 0)
         
-    def test_value_after_dep_1(self):
+    def test_value_after_1(self):
         self.assertEqual(self.account.GetValueAtDate('2013-07-15'), 1000)
 
-    def test_value_after_dep_2(self):
-        self.assertEqual(self.account.GetValueAtDate('2013-07-25'), 2000)
+    def test_value_after_2(self):
+        self.assertEqual(self.account.GetValueAtDate('2013-07-25'), Decimal('2028.3'))
 
-    def test_value_after_buy_1(self):
-        self.assertEqual(self.account.GetValueAtDate('2013-07-30'), 2000)
+    def test_value_after_3(self):
+        self.assertEqual(self.account.GetValueAtDate('2013-07-30'), Decimal('2031.577452'))
 
-    def test_value_after_buy_2(self):
-        self.assertEqual(self.account.GetValueAtDate('2014-07-15'), 2500)
+    def test_value_after_4(self):
+        self.assertEqual(self.account.GetValueAtDate('2014-07-15'), Decimal('2252.46261'))
 
         
 
@@ -156,6 +156,7 @@ class SecurityModelTests(TestCase):
     def test_manager_currencies(self):
         self.assertEqual(len(Security.currencies.all()), 2)
 
+            
 class DataProviderTests(TestCase):
     @classmethod
     def setUpClass(cls):
