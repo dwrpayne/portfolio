@@ -139,9 +139,8 @@ class DataProvider:
 
     @classmethod
     def _GetLatestEntry(cls, security):
-
         date = datetime.date(2010,1,1)
-        all_prices = SecurityPrice.objects.filter(security=security)
+        all_prices = security.securityprice_set.all()
         if all_prices.exists():
             date = all_prices.latest().date
         return date
@@ -157,7 +156,7 @@ class DataProvider:
     @classmethod
     def SyncStockPrices(cls, security):
         data = cls._RetrieveData(security.symbol, 'yahoo', cls._GetLatestEntry(security) + datetime.timedelta(days=1))
-        SecurityPrice.objects.bulk_create([SecurityPrice(security=security, date=date, price=price) for date, price in data])
+        security.securityprice_set.bulk_create([SecurityPrice(security=security, date=date, price=price) for date, price in data])
 
     @classmethod
     def SyncExchangeRates(cls, security):
@@ -171,7 +170,7 @@ class DataProvider:
         # Currency type is always worth $1 per unit.
         if security.type == Security.Type.Currency: return 1
         try:
-            return SecurityPrice.objects.filter(security=security).price_at_date(date)
+            return security.securityprice_set.price_at_date(date)
         except Exception as e:
             print ("Couldn't get stock price for {} on {}".format(security, date))
             traceback.print_exc()
@@ -429,8 +428,10 @@ class Account(models.Model):
                         previous_qty = current_holding.qty
                     current_holding.save()
 
-                print ("Creating {} {} {} {} {}".format(self, symbol, previous_qty+qty_delta, activity.tradeDate, None))
-                self.holding_set.create(security_id=symbol, qty=previous_qty+qty_delta, startdate=activity.tradeDate, enddate=None)
+                new_qty = previous_qty + qty_delta
+                if not new_qty == 0:
+                    print ("Creating {} {} {} {} {}".format(self, symbol, previous_qty+qty_delta, activity.tradeDate, None))
+                    self.holding_set.create(security_id=symbol, qty=previous_qty+qty_delta, startdate=activity.tradeDate, enddate=None)
 
     def GetValueAtDate(self, date):
         return sum([h.qty * DataProvider.GetPriceCAD(h.security, date) for h in self.holding_set.at_date(date)])
