@@ -17,6 +17,7 @@ import datetime
 from decimal import Decimal
 import traceback
 
+import pandas
 from pandas_datareader import data as pdr
 import fix_yahoo_finance as yf
 yf.pdr_override()
@@ -29,32 +30,38 @@ from utils import as_currency, strdate
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class Currency(models.Model):
+    code = models.CharField(max_length=3, primary_key=True)
+    rateLookup = models.CharField(max_length=10)
+
+    def __str__(self):
+        return self.code
+
+    class Meta:
+        verbose_name_plural = 'Currencies'
+        
+    def GetExchangeRate(self, day):
+        return self.exchangerate_set.get(day=day).price
 
 class StockSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
 
-class CurrencySecurityManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Currency)
-    
 class Security(models.Model):
     class Type(DjangoChoices):
         Stock = ChoiceItem()
         Option = ChoiceItem()
-        Currency = ChoiceItem()
 
     symbolid = models.BigIntegerField(default=0)
     symbol = models.CharField(max_length=100, primary_key=True)
     description = models.CharField(max_length=500, default='')
     type = models.CharField(max_length=12, choices=Type.choices, default=Type.Stock)
     listingExchange = models.CharField(max_length=20, default='')
-    currency = models.CharField(max_length=3)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
     prevDayClosePrice = models.DecimalField(max_digits=10, decimal_places=2, default=0)    
 
     objects = models.Manager()
     stocks = StockSecurityManager()
-    currencies = CurrencySecurityManager()
 
     @classmethod
     def CreateFromJson(cls, json):
@@ -64,7 +71,7 @@ class Security(models.Model):
             , description = json['description']
             , type = json['securityType']
             , listingExchange = json['listingExchange']
-            , currency = json['currency']
+            , currency_id = json['currency']
             , prevDayClosePrice = Decimal(str(json['prevDayClosePrice'])) if json['prevDayClosePrice'] else 0
             )
       
@@ -75,7 +82,13 @@ class Security(models.Model):
         try:
             return self.securityprice_set.latest().day
         except SecurityPrice.DoesNotExist:
-            return datetime.date(2010,1,1)
+            return datetime.date(2000,1,1)
+
+    def GetPrice(self, day):
+        return self.securityprice_set.get(day=day).price
+
+    def GetPriceCAD(self, day):
+        return self.GetPrice(day) * self.currency.exchangerate_set.get(day=day).price
 
     def __str__(self):
         return self.symbol
@@ -83,18 +96,10 @@ class Security(models.Model):
     def __repr(self):
         return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
 
-class SecurityPriceQuerySet(models.QuerySet):
-    def price_at_day(self, day):
-        query = self.filter(day__lte=day)
-        if query.exists():
-            return self.filter(day__lte=day).order_by('-day')[0].price
-        return 0
-        
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE)
     day = models.DateField(default=datetime.date.today)
     price = models.DecimalField(max_digits=16, decimal_places=2)
-    objects = SecurityPriceQuerySet.as_manager()
 
     class Meta:
         unique_together = ('security', 'day')
@@ -108,7 +113,7 @@ class SecurityPrice(models.Model):
         return "{} {} {}".format(self.security, self.day, self.price)
 
 class ExchangeRate(models.Model):
-    currency = models.CharField(max_length=3)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
     day = models.DateField(default=datetime.date.today)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     class Meta:
@@ -122,30 +127,29 @@ class ExchangeRate(models.Model):
     def __str__(self):
         return "{} {} {}".format(self.currency, self.day, self.price)
     
-    def GetLatestEntry(self):
-        try:
-            return self.securityprice_set.latest().day
-        except SecurityPrice.DoesNotExist:
-            return datetime.date(2010,1,1)
-
 
 class DataProvider:
-    SKIP = ['DLR.U.TO', 'CAD']
+    FAKED_VALS = {'DLR.U.TO' : 10., 'CADBASE': 1.}
              
     @classmethod
     def _RetrieveData(cls, symbol, source, start_date):
         # Returns a list of tuples (day, price)
-        if symbol in cls.SKIP: return []
-        end_date = datetime.date.today()
+        end_date = datetime.date.today() - datetime.timedelta(days=1)
         if start_date >= end_date:
             print ('Already synced data for {}, skipping.'.format(symbol))
             return []
+
+        if symbol in cls.FAKED_VALS:
+            index = pandas.date_range(start_date, end_date, freq='D').date
+            return zip(index, pandas.Series(cls.FAKED_VALS[symbol], index))
 
         column = 'Close' if source == 'yahoo' else symbol
         for retry in range(5):
             try:
                 print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date))
-                df = pdr.DataReader(symbol, source, start_date, end_date).fillna(0)
+                df = pdr.DataReader(symbol, source, start_date, end_date)
+                ix = pandas.DatetimeIndex(start=df.index[0], end=end_date, freq='D')
+                df.reindex(ix).ffill().fillna(method='pad')
                 return [(date, price) for date, price in zip(df.index, df[column]) if date.date() > start_date and price > 0]
             except Exception as e:
                 print (e)
@@ -157,34 +161,34 @@ class DataProvider:
         security.securityprice_set.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in data])
 
     @classmethod
-    def SyncExchangeRates(cls, security):
-        data = cls._RetrieveData(security.description, 'fred', security.GetLatestEntry() + datetime.timedelta(days=1))
-        ExchangeRate.objects.bulk_create([ExchangeRate(currency=security.currency, day=day, price=price) for day, price in data])
+    def SyncExchangeRates(cls, currency):
+        latest = datetime.date(2000,1,1)
+        try:
+            latest = ExchangeRate.objects.filter(currency=currency).latest().day
+        except ExchangeRate.DoesNotExist:
+            pass
+        data = cls._RetrieveData(currency.rateLookup, 'fred', latest + datetime.timedelta(days=1))
+        ExchangeRate.objects.bulk_create([ExchangeRate(currency=currency, day=day, price=price) for day, price in data])
 
     @classmethod
     def SyncAllSecurities(cls):
-        for currency in Security.currencies.all():
+        for currency in Currency.objects.all():
             cls.SyncExchangeRates(currency)
-            SecurityPrice.objects.create(security=currency, day='2000-01-01',price=1)
         for stock in Security.stocks.all():
             cls.SyncStockPrices(stock)
-        
-        SecurityPrice.objects.update_or_create(security_id='DLR.U.TO', day='2000-01-01', price=10)
-        ExchangeRate.objects.update_or_create(currency='CAD', day='2000-01-01', price=1)
-
-    @classmethod
-    def GetPriceCAD(cls, security, day):
-        return security.securityprice_set.filter(day__lte=day).order_by('-day')[0].price * ExchangeRate.objects.filter(currency=security.currency, day__lte=day).order_by('-day')[0].price
-
+            
+    options = {s:0 for s in Security.objects.filter(type='Option').values_list('symbol', flat=True) }
     @classmethod
     def GetAllPricesCAD(cls, day):
-        price_ids = Security.objects.filter(securityprice__day__lt=day).annotate(latest_id=Max('securityprice__id')).values_list('latest_id', flat=True)
-        return {s:p for s,p in SecurityPrice.objects.filter(id__in=price_ids).values_list('security_id', 'price')}
+        cash = {s:p for s,p in Currency.objects.filter(exchangerate__day=day).
+                values_list('code', 'exchangerate__price') }
 
-    @classmethod
-    def GetExchangeRate(cls, currency_str, day):
-        return ExchangeRate.objects.filter(currency=currency_str, day__lte=day).order_by('-day')[0].price
-
+        stocks = {s:p for s,p in Security.stocks.filter(securityprice__day=day).
+                filter(currency__exchangerate__day=day).
+                annotate(price=F('securityprice__price')*F('currency__exchangerate__price')).
+                values_list('symbol', 'price') }
+        
+        return {**cash, **stocks, **cls.options}
 
 class Activity(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE)
@@ -192,9 +196,9 @@ class Activity(models.Model):
     transactionDate = models.DateField()
     settlementDate = models.DateField()
     action = models.CharField(max_length=100)
-    security = models.ForeignKey(Security, on_delete=models.CASCADE)
+    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
     description = models.CharField(max_length=1000)
-    currency = models.CharField(max_length=7)
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     grossAmount = models.DecimalField(max_digits=16, decimal_places=2)
@@ -244,36 +248,37 @@ class Activity(models.Model):
                 if (tradeDate-asof_date).days > 365:
                     asof_date = asof_date.replace(year=asof_date.year+1)
                 json['tradeDate'] = asof_date.isoformat()
+                        
+        if json['currency'] == json['symbol']:
+            json['symbol'] = None
 
     @classmethod
-    def CreateFromJson(cls, json, account):
-        # Either we are missing a stock in our init list above, or this is a cash transaction
-        if not json['symbol']:
-            if not json['type'] in ['Deposits', 'Withdrawals', 'Dividends', 'FX conversion', 'Transfers', 'Fees and rebates', 'Other', 'Interest']:
-                print("Transaction didn't get cleaned properly, we don't have a security: Type {} {}".format(json['type'], json['action']))
-            assert json['currency'] in ['CAD', 'USD']
-            json['symbol'] = json['currency']
+    def AllowDuplicate(cls, json):        
+        # Hack to support actual duplicate transactions (no disambiguation available)
+        if json['tradeDate'] == datetime.date(2012,8,17) and json['security_id'] == 'EWJ   130119C00010000':
+            return True      
+        return False
 
-        #Hack to adapt to the fact that the symbol for a currency type is hacked to start with "Cash"
-        if json['symbol'] == json['currency']:
-            json['symbol'] = 'Cash'+json['symbol']
-        json['currency'] = 'Cash'+json['currency']
-
-        create_args = {'account' : account, 'security_id': json['symbol'], 'qty': Decimal(str(json['quantity'])), 'sourcejson':str(json)}
+    @classmethod
+    def CreateFromJson(cls, json, account):              
+        create_args = {'account' : account, 'currency_id': json['currency'], 
+                       'qty': Decimal(str(json['quantity'])), 'sourcejson':str(json)}
         for item in ['tradeDate', 'transactionDate', 'settlementDate']:
             create_args[item] = parser.parse(json[item])
-        for item in ['action', 'description', 'currency', 'type']:
+        for item in ['action', 'description', 'type']:
             create_args[item] = json[item]
         for item in ['price', 'grossAmount', 'commission', 'netAmount']:
             create_args[item] = Decimal(str(json[item])) if json[item] else 0
 
+        if json['symbol']: 
+            create_args['security_id'] = json['symbol']
+        else:
+            create_args['security'] = None
+
         activity, created = Activity.objects.update_or_create(**create_args)
-        if not created: 
-            print("Duplicate Activity found: {}".format(activity))
-            # Hack to support actual duplicate transactions (no disambiguation available)
-            if create_args['tradeDate'] == datetime.date(2012,8,17) and create_args['security_id'] == 'EWJ   130119C00010000':
-                create_args['description'] = create_args['description'] + ' NUM2'
-                Activity.objects.create(**create_args)
+        if not created and cls.AllowDuplicate(json):
+            create_args['description'] = create_args['description'] + 'NUM2'
+            Activity.objects.create(**create_args)
 
         activity.Validate()
 
@@ -286,7 +291,7 @@ class Activity(models.Model):
         return "Activity({},{},{},{},{},{},{},{},{},{})".format(self.tradeDate, self.action, self.security, self.currency,self.qty, self.price, self.commission, self.netAmount, self.type, self.description)
     
     def Validate(self):
-        assert self.security, "No security for {}".format(self)
+        assert self.security or self.currency
 
         assert_msg = 'Unhandled type: {}'.format(self.__dict__)
         if self.type == 'Deposits':
@@ -323,10 +328,17 @@ class Activity(models.Model):
         """Generates a dict {currency:amount, symbol:amount, ...}"""
         effect = defaultdict(Decimal)
 
-        if self.type in ['Deposits', 'Withdrawals', 'Trades']:
+        # Trades affect both currency and stock.
+        if self.type in ['Trades']:
             effect[self.currency] = self.netAmount
-            if not self.currency == self.security.symbol:
-                effect[self.security.symbol] = self.qty
+            effect[self.security] = self.qty
+
+        # Can affect either stock or currency, but not both.
+        if self.type in ['Deposits', 'Withdrawals']:
+            if self.security:
+                effect[self.security] = self.qty
+            else:
+                effect[self.currency] = self.netAmount
 
         elif self.type in ['Transfers', 'Dividends', 'Fees and rebates', 'Interest', 'FX conversion']:
             effect[self.currency] = self.netAmount
@@ -334,11 +346,9 @@ class Activity(models.Model):
         elif self.type == 'Other':
             # activity BRW means a journalled trade
             if self.action == 'BRW':
-                effect[self.security.symbol] = self.qty
+                effect[self.security] = self.qty
             elif self.action == 'EXP':
-                # TODO: Fix this hack on expired options to account for a double transaction that is actually real on EWJ option.
-                effect[self.security.symbol] = self.qty
-
+                effect[self.security] = self.qty
 
         return effect                     
                
@@ -349,9 +359,9 @@ class HoldingManager(models.Manager):
     def add_effect(self, account, symbol, qty_delta, date):                       
         previous_qty = 0
         try:
-            if self.filter(security__symbol=symbol, startdate=date, enddate=None).update(qty=F('qty')+qty_delta): return
+            if self.filter(symbol=symbol, startdate=date, enddate=None).update(qty=F('qty')+qty_delta): return
 
-            current_holding = self.get(security__symbol=symbol, enddate=None)
+            current_holding = self.get(symbol=symbol, enddate=None)
             current_holding.enddate = date - datetime.timedelta(days=1)
             previous_qty = current_holding.qty
             current_holding.save(update_fields=['enddate'])
@@ -364,16 +374,18 @@ class HoldingManager(models.Manager):
         new_qty = previous_qty+qty_delta
         if new_qty:
             print ("Creating {} {} {} {}".format(symbol, previous_qty+qty_delta, date, None))
-            self.create(account=account,security_id=symbol, qty=previous_qty+qty_delta, startdate=date, enddate=None)
+            self.create(account=account,symbol=symbol, qty=previous_qty+qty_delta, startdate=date, enddate=None)
 
 
 class CurrentHoldingManager(HoldingManager):
     def get_queryset(self):
         return super().filter(enddate=None)
 
+from django.contrib.contenttypes.models import ContentType
+
 class Holding(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE)
-    security = models.ForeignKey(Security, on_delete=models.CASCADE)
+    symbol = models.CharField(max_length=10, default='')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     startdate = models.DateField()
     enddate = models.DateField(null=True)
@@ -382,11 +394,11 @@ class Holding(models.Model):
     current = CurrentHoldingManager()
 
     class Meta:
-        unique_together = ('account', 'security', 'startdate')
+        unique_together = ('account', 'symbol', 'startdate')
         get_latest_by = 'startdate'
 
     def __repr__(self):
-        return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
+        return "Holding({},{},{},{},{})".format(self.account, self.symbol, self.qty, self.startdate, self.enddate)
 
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE)
@@ -405,7 +417,7 @@ class Account(models.Model):
         except:
             return None
             
-    def RegenerateDBHoldings(self):
+    def RegenerateHoldings(self):
         self.holding_set.all().delete()
         self.HackInitMyAccount()
         for activity in self.activity_set.all():          
@@ -414,33 +426,33 @@ class Account(models.Model):
 
     def GetValueAtDate(self, date):
         prices = DataProvider.GetAllPricesCAD(date)
-        return sum([qty * prices[symbol] for qty, symbol in self.holding_set.at_date(date).values_list('qty', 'security_id')])
+        return sum([qty * prices[symbol] for qty, symbol in self.holding_set.at_date(date).values_list('qty', 'symbol')])
 
         
     def HackInitMyAccount(self):
         start = '2011-01-01'
         if self.id == 51407958:
-            self.holding_set.create(security_id='AGNC', qty=70, startdate=start, enddate=None)
-            self.holding_set.create(security_id='VBK', qty=34, startdate=start, enddate=None)
-            self.holding_set.create(security_id='VUG', qty=118, startdate=start, enddate=None)
-            self.holding_set.create(security_id='CashCAD', qty=Decimal('92.30'), startdate=start, enddate=None)
-            self.holding_set.create(security_id='CashUSD', qty=Decimal('163.62'), startdate=start, enddate=None)
+            self.holding_set.create(symbol='AGNC', qty=70, startdate=start, enddate=None)
+            self.holding_set.create(symbol='VBK', qty=34, startdate=start, enddate=None)
+            self.holding_set.create(symbol='VUG', qty=118, startdate=start, enddate=None)
+            self.holding_set.create(symbol='CAD', qty=Decimal('92.30'), startdate=start, enddate=None)
+            self.holding_set.create(symbol='USD', qty=Decimal('163.62'), startdate=start, enddate=None)
 
         if self.id == 51424829:     
-            self.holding_set.create(security_id='EA', qty=300, startdate=start, enddate=None)
-            self.holding_set.create(security_id='VOT', qty=120, startdate=start, enddate=None)
-            self.holding_set.create(security_id='VWO', qty=220, startdate=start, enddate=None)
-            self.holding_set.create(security_id='XBB.TO', qty=260, startdate=start, enddate=None)
-            self.holding_set.create(security_id='XIU.TO', qty=200, startdate=start, enddate=None)
-            self.holding_set.create(security_id='CashCAD', qty=Decimal('0'), startdate=start, enddate=None)
-            self.holding_set.create(security_id='CashUSD', qty=Decimal('-118.3'), startdate=start, enddate=None)
+            self.holding_set.create(symbol='EA', qty=300, startdate=start, enddate=None)
+            self.holding_set.create(symbol='VOT', qty=120, startdate=start, enddate=None)
+            self.holding_set.create(symbol='VWO', qty=220, startdate=start, enddate=None)
+            self.holding_set.create(symbol='XBB.TO', qty=260, startdate=start, enddate=None)
+            self.holding_set.create(symbol='XIU.TO', qty=200, startdate=start, enddate=None)
+            self.holding_set.create(symbol='CAD', qty=Decimal('0'), startdate=start, enddate=None)
+            self.holding_set.create(symbol='USD', qty=Decimal('-118.3'), startdate=start, enddate=None)
 
         if self.id == 51419220:     
-            self.holding_set.create(security_id='VBR', qty=90, startdate=start, enddate=None)
-            self.holding_set.create(security_id='XBB.TO', qty=85, startdate=start, enddate=None)
-            self.holding_set.create(security_id='XIN.TO', qty=140, startdate=start, enddate=None)
-            self.holding_set.create(security_id='CashCAD', qty=Decimal('147.25'), startdate=start, enddate=None)
-            self.holding_set.create(security_id='CashUSD', qty=Decimal('97.15'), startdate=start, enddate=None)
+            self.holding_set.create(symbol='VBR', qty=90, startdate=start, enddate=None)
+            self.holding_set.create(symbol='XBB.TO', qty=85, startdate=start, enddate=None)
+            self.holding_set.create(symbol='XIN.TO', qty=140, startdate=start, enddate=None)
+            self.holding_set.create(symbol='CAD', qty=Decimal('147.25'), startdate=start, enddate=None)
+            self.holding_set.create(symbol='USD', qty=Decimal('97.15'), startdate=start, enddate=None)
     
 
 class Client(models.Model):
@@ -541,11 +553,10 @@ class Client(models.Model):
             if symbol and not id:
                 related = Security.objects.filter(symbol__startswith=symbol[:3])[0]
                 Security.objects.update_or_create(symbol=symbol, type=Security.Type.Option, currency=related.currency)
-
-                
-    def SyncAllActivitiesSlow(self, startDate='2011-02-01'):
+                                
+    def SyncActivities(self, startDate='2011-02-01'):
         for account in self.account_set.all():
-            print ('Syncing all activities for {}...'.format(self))
+            print ('Syncing all activities for {}...'.format(account))
             start = account.GetMostRecentActivityDate()
             if start: start = arrow.get(start).shift(days=+1)
             else: start = arrow.get(startDate)

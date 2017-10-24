@@ -26,7 +26,6 @@ def show404(request):
     raise Http404("Page does not exist")
 
 urlpatterns = [
-    url(r'^polls/', include('polls.urls')),
     url(r'^admin/', admin.site.urls),
     url(r'^hello/', hello),
     url(r'^finance/', include('questrade.urls'))

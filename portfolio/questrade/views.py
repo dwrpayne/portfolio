@@ -68,9 +68,9 @@ def DoWorkHistory():
     yield "<br>Processing history"
     all_accounts = Account.objects.all()
     yield "<br>"
-    start = '2017-10-20'
+    start = '2017-10-01'
     yield '<br>Date\t\t' + '\t'.join([name[0] + type for name, type in all_accounts.values_list('client__username', 'type')]) + '\tTotal'
-    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
+    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now().shift(days=-4)):
         d = day.date()
         account_vals = [int(a.GetValueAtDate(d)) for a in all_accounts]
         yield '<br>{}\t'.format(d) + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))

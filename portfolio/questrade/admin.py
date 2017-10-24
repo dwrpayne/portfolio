@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.template.defaultfilters import floatformat
 
-from .models import Client, Account, Activity, Holding, SecurityPrice, Security, ExchangeRate
+from .models import Client, Account, Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
@@ -26,17 +26,21 @@ admin.site.register(Account, AccountAdmin)
     
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
-    list_display = ['account', 'security', 'display_qty', 'startdate', 'enddate']
-    list_filter = ['account', 'security', 'enddate']        
+    list_display = ['account', 'symbol', 'display_qty', 'startdate', 'enddate']
+    list_filter = ['account', 'symbol', 'enddate']        
 
 admin.site.register(Holding, HoldingAdmin)
 
 admin.site.register(Client)
 
+class CurrencyAdmin(admin.ModelAdmin):
+    list_display = ['code', 'rateLookup']
+admin.site.register(Currency, CurrencyAdmin)
+
 class SecurityAdmin(admin.ModelAdmin):
     def security_price_count(self, obj):
-        return obj.securityprice_set.count()
-    security_price_count.short_description = "Number of Prices"
+        return obj.securityprice_set.latest().day
+    security_price_count.short_description = "Latest Price"
     list_display = ['symbol', 'symbolid', 'type', 'currency', 'listingExchange', 'description', 'security_price_count']
 admin.site.register(Security, SecurityAdmin)
 

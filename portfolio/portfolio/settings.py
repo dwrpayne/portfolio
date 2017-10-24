@@ -34,7 +34,6 @@ INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
 
 INSTALLED_APPS = [
     'questrade.apps.QuestradeConfig',
-    'polls.apps.PollsConfig',
     'debug_toolbar',
     'django_extensions',
     'django.contrib.admin',
@@ -74,6 +73,13 @@ TEMPLATES = [
             ],
         },
     },
+]
+
+SHELL_PLUS_PRE_IMPORTS = [
+    ('questrade.models', 'DataProvider'),
+    'datetime',
+    'arrow',
+    ('dateutil', 'parser')
 ]
 
 WSGI_APPLICATION = 'portfolio.wsgi.application'

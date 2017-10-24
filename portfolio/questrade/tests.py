@@ -7,6 +7,9 @@ import unittest
 def setUpModule():
     Security.objects.all().delete()
     Client.objects.all().delete()
+
+    Currency.objects.create(code='CAD', rateLookup='CADBASE')
+    Currency.objects.create(code='USD', rateLookup='DEXCAUS')
     #Client.CreateClient('test', '123457890')
 
 def tearDownModule():
@@ -37,9 +40,8 @@ class ClientModelTests(TestCase):
 class ActivityModelTests(TestCase):
     @classmethod
     def setUpClass(cls): 
-        cls.cad = Security.objects.create(symbol='CashCAD', currency='CAD', description='CAD', type=Security.Type.Currency)
-        Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
-        cls.vti = Security.objects.create(symbol='VTI', currency='USD')
+        cls.cad = Currency.objects.get(code='CAD')
+        cls.vti = Security.objects.create(symbol='VTI', currency_id='USD')
         json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
         c = Client.objects.create(username='test', refresh_token='test_token')
         a = Account.objects.create(client=c, id=0, type='')
@@ -50,6 +52,7 @@ class ActivityModelTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        Currency.objects.all().delete()
         Client.objects.all().delete()
         Security.objects.all().delete()
         Activity.objects.all().delete()
@@ -96,10 +99,8 @@ class AccountModelTests(TestCase):
     @classmethod
     def setUpClass(cls):
         c = Client.objects.create(username='test', refresh_token='test_token')
-        cls.account = Account.objects.create(client=c, id=0, type='')
-        Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
-        Security.objects.create(symbol='CashCAD', currency='CAD', description='CAD', type=Security.Type.Currency)
-        Security.objects.create(symbol='VTI', currency='USD')
+        cls.account = Account.objects.create(client=c, id=0, type='')        
+        Security.objects.create(symbol='VTI', currency_id='USD')
         DataProvider.SyncAllSecurities()
         json={'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         Activity.CreateFromJson(json, cls.account)
@@ -111,6 +112,7 @@ class AccountModelTests(TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        Currency.objects.all().delete()
         Security.objects.all().delete()
         Client.objects.all().delete()
         ExchangeRate.objects.all().delete()
@@ -138,39 +140,35 @@ class AccountModelTests(TestCase):
 class SecurityModelTests(TestCase):
     @classmethod
     def setUpClass(cls):
-        Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
-        Security.objects.create(symbol='CashCAD', currency='CAD', description='CAD', type=Security.Type.Currency)
-        Security.objects.create(symbol='TSLA', currency='USD')
-        Security.objects.create(symbol='MSFT', currency='USD')
-        Security.objects.create(symbol='VUN.TO', currency='CAD')
-        Security.objects.create(symbol='ATVI  23400827IU4', currency='USD', type=Security.Type.Option)
+        Security.objects.create(symbol='TSLA', currency_id='USD')
+        Security.objects.create(symbol='MSFT', currency_id='USD')
+        Security.objects.create(symbol='VUN.TO', currency_id='CAD')
+        Security.objects.create(symbol='ATVI  23400827IU4', currency_id='USD', type=Security.Type.Option)
 
     @classmethod
     def tearDownClass(cls):
+        Currency.objects.all().delete()
         Security.objects.all().delete()
         ExchangeRate.objects.all().delete()
 
     def test_manager_objects(self):
-        self.assertEqual(len(Security.objects.all()), 6)
+        self.assertEqual(len(Security.objects.all()), 4)
 
     def test_manager_stocks(self):
         self.assertEqual(len(Security.stocks.all()), 3)
-
-    def test_manager_currencies(self):
-        self.assertEqual(len(Security.currencies.all()), 2)
-
+        
             
 class DataProviderTests(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.usd = Security.objects.create(symbol='CashUSD', currency='USD', description='DEXCAUS', type=Security.Type.Currency)
-        cls.cad = Security.objects.create(symbol='CashCAD', currency='CAD', description='CAD', type=Security.Type.Currency)
-        cls.tsla = Security.objects.create(symbol='TSLA', currency='USD')        
+        cls.cad = Currency.objects.get(code='CAD')
+        cls.usd = Currency.objects.get(code='USD')
+        cls.tsla = Security.objects.create(symbol='TSLA', currency_id='USD')        
         DataProvider.SyncAllSecurities()
 
-
     @classmethod
-    def tearDownClass(cls):        
+    def tearDownClass(cls):   
+        Currency.objects.all().delete()     
         Security.objects.all().delete()
         ExchangeRate.objects.all().delete()
         
@@ -184,40 +182,28 @@ class DataProviderTests(TestCase):
         self.assertEqual( DataProvider.GetExchangeRate('USD', '2014-12-30'), Decimal('1.159700') )
         
     def test_exchange_rates_up_to_date(self):
-        self.assertTrue( datetime.date.today() - self.usd.GetLatestEntry() < datetime.timedelta(days=10))
+        self.assertTrue( datetime.date.today() - self.usd.GetLatestEntry() < datetime.timedelta(days=14))
         
-    def test_exchange_rate_price(self):
-        self.assertEqual( DataProvider.GetPrice(self.usd, '2015-01-01'), 1)
-
-    def test_exchange_rate_price_cad(self):
-        self.assertEqual( DataProvider.GetPriceCAD(self.usd, '2015-01-01'), Decimal('1.160100') )
-        
-    def test_exchange_rate_price_2(self):
-        self.assertEqual( DataProvider.GetPrice(self.cad, '2015-01-01'), 1)
-
-    def test_exchange_rate_price_cad_2(self):
-        self.assertEqual( DataProvider.GetPriceCAD(self.cad, '2015-01-01'), 1 )
-
     def test_stock_price_up_to_date(self):
         self.assertTrue( datetime.date.today() - self.tsla.GetLatestEntry() < datetime.timedelta(days=5))
         
     def test_stock_price_holiday(self):
-        self.assertEqual( DataProvider.GetPrice(self.tsla, '2015-01-01'), Decimal('222.41') )
+        self.assertEqual( self.tsla.GetPrice('2015-01-01'), Decimal('222.41') )
 
     def test_stock_price_normal_1(self):
-        self.assertEqual( DataProvider.GetPrice(self.tsla, '2014-12-31'), Decimal('222.41') )
+        self.assertEqual( self.tsla.GetPrice('2014-12-31'), Decimal('222.41') )
 
     def test_stock_price_normal_2(self):
-        self.assertEqual( DataProvider.GetPrice(self.tsla, '2014-12-30'), Decimal('222.23') )
+        self.assertEqual( self.tsla.GetPrice('2014-12-30'), Decimal('222.23') )
 
     def test_stock_price_exch_holiday_both(self):
-        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2015-01-01'), Decimal('258.017841') )
+        self.assertEqual( self.tsla.GetPriceCAD('2015-01-01'), Decimal('258.017841') )
 
     def test_stock_price_exch_normal_1(self):
-        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2014-12-31'), Decimal('258.017841') )
+        self.assertEqual( self.tsla.GetPriceCAD('2014-12-31'), Decimal('258.017841') )
 
     def test_stock_price_exch_normal_2(self):
-        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2014-12-30'), Decimal('257.720131') )
+        self.assertEqual( self.tsla.GetPriceCAD('2014-12-30'), Decimal('257.720131') )
 
     def test_stock_price_exch_holiday_one(self):
-        self.assertEqual( DataProvider.GetPriceCAD(self.tsla, '2014-12-26'), Decimal('264.749622') )
+        self.assertEqual( self.tsla.GetPriceCAD('2014-12-26'), Decimal('264.749622') )
