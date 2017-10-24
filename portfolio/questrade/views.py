@@ -59,7 +59,7 @@ def DoWork():
     yield '</pre></body></html>'
     
 def analyze(request):
-    return HttpResponse(''.join([l for l in DoWork()])) 
+    return HttpResponse(DoWork()) 
     return StreamingHttpResponse(DoWork())
 
 def DoWorkHistory():
@@ -68,8 +68,8 @@ def DoWorkHistory():
     yield "<br>Processing history"
     all_accounts = Account.objects.all()
     yield "<br>"
-    start = '2017-10-22'
-    yield '<br>Date\t\t' + '\t'.join([a.client.username[0] + a.type for a in all_accounts]) + '\tTotal'
+    start = '2017-10-20'
+    yield '<br>Date\t\t' + '\t'.join([name[0] + type for name, type in all_accounts.values_list('client__username', 'type')]) + '\tTotal'
     for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
         d = day.date()
         account_vals = [int(a.GetValueAtDate(d)) for a in all_accounts]
@@ -78,7 +78,7 @@ def DoWorkHistory():
 
     
 def history(request): 
-    return HttpResponse([l for l in DoWorkHistory()], content_type='text/html') 
+    return HttpResponse(DoWorkHistory()) 
 
 def AccountBalances():
     yield "<html><body><pre>"

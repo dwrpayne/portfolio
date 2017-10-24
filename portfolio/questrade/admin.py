@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.template.defaultfilters import floatformat
 
-from .models import Client, Account, Activity, Holding, SecurityPrice, Security
+from .models import Client, Account, Activity, Holding, SecurityPrice, Security, ExchangeRate
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
@@ -44,3 +44,8 @@ class SecurityPriceAdmin(admin.ModelAdmin):
     list_display = ['security', 'day', 'price']
     list_filter = ['day', 'security']        
 admin.site.register(SecurityPrice, SecurityPriceAdmin)
+
+class ExchangeRateAdmin(admin.ModelAdmin):
+    list_display = ['currency', 'day', 'price']
+    list_filter = ['day', 'currency']        
+admin.site.register(ExchangeRate, ExchangeRateAdmin)
