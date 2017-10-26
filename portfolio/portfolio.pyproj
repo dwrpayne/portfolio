@@ -83,6 +83,8 @@
     <Compile Include="questrade\migrations\0034_auto_20171023_2353.py" />
     <Compile Include="questrade\migrations\0035_auto_20171024_0005.py" />
     <Compile Include="questrade\migrations\0036_auto_20171024_0046.py" />
+    <Compile Include="questrade\migrations\0037_remove_holding_security.py" />
+    <Compile Include="questrade\migrations\0038_auto_20171024_0806.py" />
     <Compile Include="questrade\migrations\__init__.py" />
     <Compile Include="questrade\models.py" />
     <Compile Include="questrade\tests.py" />

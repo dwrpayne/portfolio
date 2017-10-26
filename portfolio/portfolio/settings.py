@@ -77,6 +77,7 @@ TEMPLATES = [
 
 SHELL_PLUS_PRE_IMPORTS = [
     ('questrade.models', 'DataProvider'),
+    ('questrade.models', 'All'),
     'datetime',
     'arrow',
     ('dateutil', 'parser')

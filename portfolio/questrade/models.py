@@ -1,8 +1,9 @@
 from django.db import models
 from django.db.utils import IntegrityError
 from django.utils import timezone
-from django.db.models import F, Max
+from django.db.models import F, Max, Q, Sum
 from djchoices import DjangoChoices, ChoiceItem
+from model_utils.managers import InheritanceManager
 
 import requests
 import os
@@ -30,7 +31,10 @@ from utils import as_currency, strdate
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class Currency(models.Model):
+class SecurityBase(models.Model):
+    objects = InheritanceManager()
+
+class Currency(SecurityBase):
     code = models.CharField(max_length=3, primary_key=True)
     rateLookup = models.CharField(max_length=10)
 
@@ -47,7 +51,7 @@ class StockSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
 
-class Security(models.Model):
+class Security(SecurityBase):
     class Type(DjangoChoices):
         Stock = ChoiceItem()
         Option = ChoiceItem()
@@ -57,7 +61,7 @@ class Security(models.Model):
     description = models.CharField(max_length=500, default='')
     type = models.CharField(max_length=12, choices=Type.choices, default=Type.Stock)
     listingExchange = models.CharField(max_length=20, default='')
-    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
+    security_currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
     prevDayClosePrice = models.DecimalField(max_digits=10, decimal_places=2, default=0)    
 
     objects = models.Manager()
@@ -71,7 +75,7 @@ class Security(models.Model):
             , description = json['description']
             , type = json['securityType']
             , listingExchange = json['listingExchange']
-            , currency_id = json['currency']
+            , security_currency_id = json['currency']
             , prevDayClosePrice = Decimal(str(json['prevDayClosePrice'])) if json['prevDayClosePrice'] else 0
             )
       
@@ -88,13 +92,13 @@ class Security(models.Model):
         return self.securityprice_set.get(day=day).price
 
     def GetPriceCAD(self, day):
-        return self.GetPrice(day) * self.currency.exchangerate_set.get(day=day).price
+        return self.GetPrice(day) * self.security_currency.exchangerate_set.get(day=day).price
 
     def __str__(self):
         return self.symbol
 
     def __repr(self):
-        return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
+        return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.security_currency, self.listingExchange, self.description)   
 
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE)
@@ -148,12 +152,15 @@ class DataProvider:
             try:
                 print('Syncing prices for {} from {} to {}...'.format(symbol, start_date, end_date))
                 df = pdr.DataReader(symbol, source, start_date, end_date)
+                if df.size == 0:
+                    return []
                 ix = pandas.DatetimeIndex(start=df.index[0], end=end_date, freq='D')
-                df.reindex(ix).ffill().fillna(method='pad')
-                return [(date, price) for date, price in zip(df.index, df[column]) if date.date() > start_date and price > 0]
+                df = df.reindex(ix).ffill()
+                return zip(ix, df[column])
             except Exception as e:
                 print (e)
                 print ('Failed, retrying!')
+        return []
      
     @classmethod
     def SyncStockPrices(cls, security):
@@ -184,8 +191,8 @@ class DataProvider:
                 values_list('code', 'exchangerate__price') }
 
         stocks = {s:p for s,p in Security.stocks.filter(securityprice__day=day).
-                filter(currency__exchangerate__day=day).
-                annotate(price=F('securityprice__price')*F('currency__exchangerate__price')).
+                filter(security_currency__exchangerate__day=day).
+                annotate(price=F('securityprice__price')*F('security_currency__exchangerate__price')).
                 values_list('symbol', 'price') }
         
         return {**cash, **stocks, **cls.options}
@@ -356,25 +363,25 @@ class HoldingManager(models.Manager):
     def at_date(self, date):
         return self.filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
 
-    def add_effect(self, account, symbol, qty_delta, date):                       
+    def add_effect(self, account, securitybase, qty_delta, date):                       
         previous_qty = 0
         try:
-            if self.filter(symbol=symbol, startdate=date, enddate=None).update(qty=F('qty')+qty_delta): return
+            if self.filter(securitybase=securitybase, startdate=date, enddate=None).update(qty=F('qty')+qty_delta): return
 
-            current_holding = self.get(symbol=symbol, enddate=None)
+            current_holding = self.get(securitybase=securitybase, enddate=None)
             current_holding.enddate = date - datetime.timedelta(days=1)
             previous_qty = current_holding.qty
             current_holding.save(update_fields=['enddate'])
 
         except Holding.MultipleObjectsReturned:
-            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(symbol))
+            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(securitybase))
         except Holding.DoesNotExist:
             pass
 
         new_qty = previous_qty+qty_delta
         if new_qty:
-            print ("Creating {} {} {} {}".format(symbol, previous_qty+qty_delta, date, None))
-            self.create(account=account,symbol=symbol, qty=previous_qty+qty_delta, startdate=date, enddate=None)
+            print ("Creating {} {} {} {}".format(securitybase, previous_qty+qty_delta, date, None))
+            self.create(account=account,securitybase=securitybase, qty=previous_qty+qty_delta, startdate=date, enddate=None)
 
 
 class CurrentHoldingManager(HoldingManager):
@@ -385,7 +392,7 @@ from django.contrib.contenttypes.models import ContentType
 
 class Holding(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE)
-    symbol = models.CharField(max_length=10, default='')
+    securitybase = models.ForeignKey(SecurityBase, on_delete=models.CASCADE)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     startdate = models.DateField()
     enddate = models.DateField(null=True)
@@ -394,11 +401,11 @@ class Holding(models.Model):
     current = CurrentHoldingManager()
 
     class Meta:
-        unique_together = ('account', 'symbol', 'startdate')
+        unique_together = ('account', 'securitybase', 'startdate')
         get_latest_by = 'startdate'
 
     def __repr__(self):
-        return "Holding({},{},{},{},{})".format(self.account, self.symbol, self.qty, self.startdate, self.enddate)
+        return "Holding({},{},{},{},{})".format(self.account, self.securitybase, self.qty, self.startdate, self.enddate)
 
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE)
@@ -421,38 +428,50 @@ class Account(models.Model):
         self.holding_set.all().delete()
         self.HackInitMyAccount()
         for activity in self.activity_set.all():          
-            for symbol, qty_delta in activity.GetHoldingEffect().items():
-                self.holding_set.add_effect(self, symbol, qty_delta, activity.tradeDate)
+            for securitybase, qty_delta in activity.GetHoldingEffect().items():
+                self.holding_set.add_effect(self, securitybase, qty_delta, activity.tradeDate)
+
+    def GetValueList(self):
+        val_list = SecurityPrice.objects.filter(
+            Q(security__holding__enddate__gt=F('day'))|Q(security__holding__enddate=None), 
+            security__holding__startdate__lte=F('day'),
+            security__holding__account_id=self.id
+        ).values_list('day').annotate(
+            val=Sum(F('price') * F('security__holding__qty'))
+        )
+        d = defaultdict(int)
+        d.update({date:val for date,val in val_list})
+        return d
 
     def GetValueAtDate(self, date):
         prices = DataProvider.GetAllPricesCAD(date)
-        return sum([qty * prices[symbol] for qty, symbol in self.holding_set.at_date(date).values_list('qty', 'symbol')])
+        return sum([qty * prices[securitybase.symbol if securitybase.hasattr('symbol') else securitybase.code] for qty, securitybase in self.holding_set.at_date(date).values_list('qty', 'securitybase')])
 
         
     def HackInitMyAccount(self):
         start = '2011-01-01'
-        if self.id == 51407958:
-            self.holding_set.create(symbol='AGNC', qty=70, startdate=start, enddate=None)
-            self.holding_set.create(symbol='VBK', qty=34, startdate=start, enddate=None)
-            self.holding_set.create(symbol='VUG', qty=118, startdate=start, enddate=None)
-            self.holding_set.create(symbol='CAD', qty=Decimal('92.30'), startdate=start, enddate=None)
-            self.holding_set.create(symbol='USD', qty=Decimal('163.62'), startdate=start, enddate=None)
+        #if self.id == 51407958:
+        #    self.holding_set.create(symbol='AGNC', qty=70, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='VBK', qty=34, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='VUG', qty=118, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='CAD', qty=Decimal('92.30'), startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='USD', qty=Decimal('163.62'), startdate=start, enddate=None)
 
-        if self.id == 51424829:     
-            self.holding_set.create(symbol='EA', qty=300, startdate=start, enddate=None)
-            self.holding_set.create(symbol='VOT', qty=120, startdate=start, enddate=None)
-            self.holding_set.create(symbol='VWO', qty=220, startdate=start, enddate=None)
-            self.holding_set.create(symbol='XBB.TO', qty=260, startdate=start, enddate=None)
-            self.holding_set.create(symbol='XIU.TO', qty=200, startdate=start, enddate=None)
-            self.holding_set.create(symbol='CAD', qty=Decimal('0'), startdate=start, enddate=None)
-            self.holding_set.create(symbol='USD', qty=Decimal('-118.3'), startdate=start, enddate=None)
+        #if self.id == 51424829:     
+        #    self.holding_set.create(symbol='EA', qty=300, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='VOT', qty=120, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='VWO', qty=220, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='XBB.TO', qty=260, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='XIU.TO', qty=200, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='CAD', qty=Decimal('0'), startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='USD', qty=Decimal('-118.3'), startdate=start, enddate=None)
 
-        if self.id == 51419220:     
-            self.holding_set.create(symbol='VBR', qty=90, startdate=start, enddate=None)
-            self.holding_set.create(symbol='XBB.TO', qty=85, startdate=start, enddate=None)
-            self.holding_set.create(symbol='XIN.TO', qty=140, startdate=start, enddate=None)
-            self.holding_set.create(symbol='CAD', qty=Decimal('147.25'), startdate=start, enddate=None)
-            self.holding_set.create(symbol='USD', qty=Decimal('97.15'), startdate=start, enddate=None)
+        #if self.id == 51419220:     
+        #    self.holding_set.create(symbol='VBR', qty=90, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='XBB.TO', qty=85, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='XIN.TO', qty=140, startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='CAD', qty=Decimal('147.25'), startdate=start, enddate=None)
+        #    self.holding_set.create(symbol='USD', qty=Decimal('97.15'), startdate=start, enddate=None)
     
 
 class Client(models.Model):
@@ -551,9 +570,13 @@ class Client(models.Model):
 
         for symbol,id in symboldata:
             if symbol and not id:
-                related = Security.objects.filter(symbol__startswith=symbol[:3])[0]
-                Security.objects.update_or_create(symbol=symbol, type=Security.Type.Option, currency=related.currency)
-                                
+                # TODO: TOtal hack for option currency
+                try:
+                    related = Security.objects.filter(symbol__startswith=symbol[:3])[0]
+                    Security.objects.update_or_create(symbol=symbol, type=Security.Type.Option, security_currency=related.security_currency)
+                except:
+                    Security.objects.update_or_create(symbol=symbol, type=Security.Type.Option, security_currency_id='CAD')
+
     def SyncActivities(self, startDate='2011-02-01'):
         for account in self.account_set.all():
             print ('Syncing all activities for {}...'.format(account))
@@ -578,3 +601,13 @@ class Client(models.Model):
 
     def CloseSession(self):
         self.session.close()
+
+
+
+def All():
+    for c in Client.objects.all():
+        c.Authorize()
+        c.SyncActivities()
+    for a in Account.objects.all():
+        a.RegenerateHoldings()
+    DataProvider.SyncAllSecurities()

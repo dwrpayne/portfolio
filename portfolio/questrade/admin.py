@@ -26,8 +26,8 @@ admin.site.register(Account, AccountAdmin)
     
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
-    list_display = ['account', 'symbol', 'display_qty', 'startdate', 'enddate']
-    list_filter = ['account', 'symbol', 'enddate']        
+    list_display = ['account', 'securitybase', 'display_qty', 'startdate', 'enddate']
+    list_filter = ['account', 'securitybase', 'enddate']        
 
 admin.site.register(Holding, HoldingAdmin)
 
@@ -41,7 +41,7 @@ class SecurityAdmin(admin.ModelAdmin):
     def security_price_count(self, obj):
         return obj.securityprice_set.latest().day
     security_price_count.short_description = "Latest Price"
-    list_display = ['symbol', 'symbolid', 'type', 'currency', 'listingExchange', 'description', 'security_price_count']
+    list_display = ['symbol', 'symbolid', 'type', 'security_currency', 'listingExchange', 'description', 'security_price_count']
 admin.site.register(Security, SecurityAdmin)
 
 class SecurityPriceAdmin(admin.ModelAdmin):
