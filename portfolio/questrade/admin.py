@@ -14,7 +14,7 @@ class ActivityAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     display_price = MakeNormalizedFloat('price', 'Price')
 
-    list_display = ['account', 'tradeDate', 'type', 'action', 'security', 'display_qty', 'display_price', 'cash', 'netAmount']
+    list_display = ['account', 'tradeDate', 'type', 'security', 'display_qty', 'display_price', 'cash', 'netAmount']
     list_filter = ['account', 'tradeDate', ('security', admin.RelatedOnlyFieldListFilter), 'type', ('cash', admin.RelatedOnlyFieldListFilter)]        
     search_fields = ['description']
 admin.site.register(Activity, ActivityAdmin)

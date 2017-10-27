@@ -50,6 +50,20 @@ def analyze(request):
     return HttpResponse(DoWork()) 
     return StreamingHttpResponse(DoWork())
 
+# WOAH
+#for acc in a:
+#  x,y = list(zip(*acc.GetValueList().items()))
+#  t.append(go.Scatter(name=acc.client.username + ' ' +acc.type, x=x, y=y))
+
+#vals = defaultdict(Decimal)
+#for acc in a:
+#       for date, v in acc.GetValueList().items(): vals[date] += v
+#pair = list(zip(*sorted(vals.items())))
+#trace = go.Scatter(name='Total', x=pair[0], y=pair[1])
+#plotly.offline.plot(t+[trace])
+
+
+
 def DoWorkHistory():
     yield "<html><body><pre>"
     yield "<br>Syncing Data..."
@@ -72,17 +86,33 @@ def history(request):
 def AccountBalances():
     yield "<html><body><pre>"
     yield "<br>Syncing Data..."
-    yield "<br>Account\tSOD in CAD\tCurrent CAD"
+    yield "<br>Account\t\tSOD in CAD\tCurrent CAD\tChange"
+    total_sod = 0
+    total_current = 0
     for c in Client.objects.all():
         c.Authorize()
         for a in c.account_set.all():
-            json = c._GetRequest('accounts/%s/balances'%(a.account_id))            
+            json = c._GetRequest('accounts/%s/balances'%(a.id))            
             combinedCAD = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             sodCombinedCAD = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-            yield "<br>{} {}\t{:.2f}\t{:.2f}".format(a.client.username, a.type, sodCombinedCAD, combinedCAD)
+            total_current += combinedCAD
+            total_sod += sodCombinedCAD
+
+            price_delta = combinedCAD - sodCombinedCAD
+            color = "green" if price_delta > 0 else "red"
+            yield "<br>{} {}\t{}\t{}\t<font color=\"{}\">{}</font>".format(
+                a.client.username, a.type, as_currency(sodCombinedCAD), as_currency(combinedCAD), color, as_currency(price_delta)
+                )
+
+        
+    price_delta = total_current - total_sod
+    color = "green" if price_delta > 0 else "red"
+    yield "<br><br>Total\t\t{}\t{}\t<font color=\"{}\">{}</font>".format(
+            as_currency(total_current), as_currency(total_sod), color, as_currency(price_delta)
+            )
 
 def balances(request):    
-    return StreamingHttpResponse(AccountBalances())  
+    return HttpResponse(AccountBalances())  
 
 def index(request):
     return HttpResponse("Hello world, you're at the questrade index.")

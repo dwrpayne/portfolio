@@ -2,7 +2,6 @@ from django.db import models, transaction
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from django.db.models import F, Max, Q, Sum
-from djchoices import DjangoChoices, ChoiceItem
 from model_utils import Choices
 from model_utils.managers import InheritanceManager
 
@@ -269,36 +268,61 @@ class Activity(models.Model):
     tradeDate = models.DateField()
     transactionDate = models.DateField()
     settlementDate = models.DateField()
-    action = models.CharField(max_length=100)
+    action = models.CharField(null=True, max_length=1000)
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_security')
     description = models.CharField(max_length=1000)
     cash = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_cash')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
-    grossAmount = models.DecimalField(max_digits=16, decimal_places=2)
-    commission = models.DecimalField(max_digits=16, decimal_places=2)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
-    type = models.CharField(max_length=100)
+    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal')
+    type = models.CharField(max_length=100, choices=Type)
     sourcejson = models.ForeignKey(ActivityJson, on_delete=models.CASCADE)
     
     class Meta:
-        unique_together = ('account', 'tradeDate', 'action', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
+        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
         verbose_name_plural = 'Activities'
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']
         
     @classmethod
+    def GetActivityType(cls, type, action):
+        mapping = {('Deposits', 'CON'): Activity.Type.Deposit,
+                   ('Deposits', 'CSP'): Activity.Type.Deposit,
+                   ('Deposits', 'DEP'): Activity.Type.Deposit,
+                   ('Fees and rebates', 'FCH'): Activity.Type.Fee,
+                   ('FX conversion', 'FXT'): Activity.Type.FX,
+                   ('Other', 'EXP'): Activity.Type.Expiry,
+                   ('Other', 'BRW'): Activity.Type.Journal,
+                   ('Trades', 'Buy'): Activity.Type.Buy,
+                   ('Trades', 'Sell'): Activity.Type.Sell,
+                   ('Withdrawals', 'CON'): Activity.Type.Withdrawal,
+                   ('Transfers', 'TF6'): Activity.Type.Transfer,
+                   ('Dividends', 'DIV'): Activity.Type.Dividend,
+                   ('Dividends', ''): Activity.Type.Dividend,
+                   ('Dividends', '   '): Activity.Type.Dividend,
+                   ('Dividends', 'NRT'): Activity.Type.Dividend,
+                   ('Interest', '   '): Activity.Type.Interest
+                   }
+        if (type, action) in mapping: return mapping[(type, action)]
+        print ('No action type mapping for "{}" "{}"'.format(type, action))
+        return None
+        
+    @classmethod
     def CreateFromJson(cls, activityjson): 
         json = simplejson.loads(activityjson.cleaned)
-
-        create_args = {'account' : activityjson.account, 'qty': Decimal(str(json['quantity'])), 'sourcejson' : activityjson}
+        
+        type = cls.GetActivityType(json['type'], json['action'])
+        if not type:
+            return
+        
+        create_args = {'account' : activityjson.account, 'qty': Decimal(str(json['quantity'])), 'sourcejson' : activityjson, 'type': type}
         for item in ['tradeDate', 'transactionDate', 'settlementDate']:
             create_args[item] = parser.parse(json[item])
-        for item in ['action', 'description', 'type']:
-            create_args[item] = json[item]
-        for item in ['price', 'grossAmount', 'commission', 'netAmount']:
+        create_args['description'] = json['description']
+        for item in ['price', 'netAmount']:
             create_args[item] = Decimal(str(json[item])) 
-
+            
         if json['symbol']: 
             try:
                 type = Security.Type.Stock if len(json['symbol']) < 20 else Security.Type.Option
@@ -315,67 +339,27 @@ class Activity(models.Model):
         create_args['cash_id'] = json['currency']+' Cash'
             
         activity = Activity(**create_args)
-        activity.Validate()
         return activity
 
     def __str__(self):
-        return "{} - {} - {}\t{}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.security, self.action, self.qty, self.price, self.type, self.description)
+        return "{} - {} - {}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.security, self.qty, self.price, self.type, self.description)
 
     def __repr__(self):
-        return "Activity({},{},{},{},{},{},{},{},{},{})".format(self.tradeDate, self.action, self.security, self.cash, self.qty, self.price, self.commission, self.netAmount, self.type, self.description)
-    
-    def Validate(self):
-        assert self.security or self.cash
-
-        assert_msg = 'Unhandled type: {}'.format(self.__dict__)
-        if self.type == 'Deposits':
-            if self.account.type in ['TFSA', 'RRSP']:      
-                assert self.action == 'CON', assert_msg
-            elif self.account.type == 'SRRSP':                          
-                assert self.action == 'CSP', assert_msg
-            else:                                               
-                assert self.action == 'DEP', assert_msg
-        elif self.type == 'Fees and rebates':
-            assert self.action=='FCH', assert_msg
-        elif self.type == 'FX conversion':
-            assert self.action=='FXT', assert_msg            
-        elif self.type == 'Other':
-            # Expired option
-            if self.action == 'EXP': 
-                assert self.security.type == Security.Type.Option
-            # BRW means a journalled trade
-            elif self.action == 'BRW':
-               assert self.security, assert_msg
-            else:
-                assert False, assert_msg
-        elif self.type == 'Trades':
-            assert self.action in ['Buy', 'Sell']        
-        elif self.type == 'Corporate actions':
-            # NAC = Name change
-            assert self.action == 'NAC', assert_msg
-        elif self.type in ['Withdrawals', 'Transfers', 'Dividends', 'Interest']:
-            pass
-        else:
-            assert False, assert_msg
-            
+        return "Activity({},{},{},{},{},{},{},{})".format(self.tradeDate, self.security, self.cash, self.qty, self.price, self.netAmount, self.type, self.description)
+             
     def GetHoldingEffect(self):
         """Generates a dict {security:amount, ...}"""
         effect = defaultdict(Decimal)
 
-        # Trades affect both cash and stock.
-        if self.type in ['Trades', 'Deposits', 'Withdrawals']:
+        if self.type in [Activity.Type.Buy, Activity.Type.Sell, Activity.Type.Deposit, Activity.Type.Withdrawal]:
             effect[self.security] = self.qty
             effect[self.cash] = self.netAmount
 
-        elif self.type in ['Transfers', 'Dividends', 'Fees and rebates', 'Interest', 'FX conversion']:
+        elif self.type in [Activity.Type.Transfer, Activity.Type.Dividend, Activity.Type.Fee, Activity.Type.Interest, Activity.Type.FX]:
             effect[self.cash] = self.netAmount
             
-        elif self.type == 'Other':
-            # activity BRW means a journalled trade
-            if self.action == 'BRW':
-                effect[self.security] = self.qty
-            elif self.action == 'EXP':
-                effect[self.security] = self.qty
+        elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
+            effect[self.security] = self.qty
 
         return effect                     
                
@@ -406,7 +390,7 @@ class HoldingManager(models.Manager):
 
 class CurrentHoldingManager(HoldingManager):
     def get_queryset(self):
-        return super().filter(enddate=None)
+        return super().get_queryset().filter(enddate=None)
     
 class Holding(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE)
@@ -471,7 +455,8 @@ class Account(models.Model):
                 activityjson.CleanSourceData()
         self.activity_set.all().delete()
         all_activities = [Activity.CreateFromJson(j) for j in self.activityjson_set.all()]
-        Activity.objects.bulk_create(all_activities)
+
+        Activity.objects.bulk_create([a for a in all_activities if a is not None])
         for activityjson in self.activityjson_set.all():
             Activity.CreateFromJson(activityjson)
         
@@ -548,7 +533,7 @@ class Client(models.Model):
             Account.objects.update_or_create(type=json['type'], account_id=json['number'], client=self)
             
     def UpdateMarketPrices(self):
-        securities = Holding.current.filter(account__client=self, security__type__=Security.Type.Stock).values_list('security__symbol')
+        securities = Holding.current.filter(account__client=self, security__type=Security.Type.Stock).values_list('security__symbol')
         json = self._GetRequest('markets/quotes', 'ids=' + ','.join([s.symbolid for s in securities if s.symbolid > 0]))
         for q in json['quotes']:
             price = q['lastTradePriceTrHrs']
