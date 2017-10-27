@@ -1,24 +1,24 @@
 from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponse, StreamingHttpResponse
+from django.http import HttpResponse
 from django.db.models.aggregates import Sum
 
 # Create your views here.
-from .models import Client, Account, DataProvider, Holding, SecurityPrice, Security, ExchangeRate
+from .models import Client, Account, DataProvider, Holding, Security, Currency
 import arrow
 import datetime
 from .utils import as_currency,  strdate
 
 def UpdatePrices():
-    for client in Client.objects.all():
-        client.Authorize()
-        client.UpdateMarketPrices()   
+    c=Client.objects.all()[0]
+    c.Authorize()
+    c.UpdateMarketPrices()   
 
 def DoWork():
     yield "<html><body><pre>"
     
     all_holdings = Holding.current.all()
 
-    yield '<br><br>Symbol\tPrice\t   Change\tShares\tGain (CAD)<br>'
+    yield '<br><br>Symbol\tPrice\t   Change\tShares\tGain (CAD)\tTotal Value (CAD)<br>'
     total_gain = 0
     total_value = 0  
     UpdatePrices()
@@ -27,20 +27,25 @@ def DoWork():
         security = Security.objects.get(symbol=symbol)
         # TODO: Hacky to get it working.
         yesterday_price = security.GetLatestPrice()
-        today_price = security.lastTradePrice
+        yesterday_price_CAD = security.GetLatestPrice() * security.currency.GetLatestRate()
+
+        today_price = security.livePrice
+        today_price_CAD = today_price * security.currency.livePrice
+
         price_delta = today_price - yesterday_price
         percent_delta = price_delta / yesterday_price
-        this_gain = price_delta * qty * security.currency.GetLatestRate()
+        this_gain = qty * (today_price_CAD - yesterday_price_CAD)
         total_gain += this_gain
-        total_value += qty * today_price * security.currency.GetLatestRate()
+        value_CAD = qty * today_price_CAD
+        total_value += value_CAD
         color = "green" if price_delta > 0 else "red"
-        yield '{} \t{:.2f}\t<font color="{}">{:+.2f} ({:+.2%})</font>\t{:.0f}  \t{}<br>'.format(
-            symbol.split('.')[0], today_price, color, price_delta, price_delta / yesterday_price, qty, as_currency(this_gain))
+        yield '{0:} \t{1:.2f}\t<font color="{2:}">{3:+.2f} ({4:+.2%})</font>\t{5:.0f}  \t<font color="{2:}">{6:}</font>    \t{7:}<br>'.format(
+            symbol.split('.')[0], today_price, color, price_delta, price_delta / yesterday_price, qty, as_currency(this_gain), as_currency(value_CAD))
     yield '-------------------------------------<br>'
     
     color = "green" if total_gain > 0 else "red"
-    yield 'Total: \t\t<font color="{}">{:+,.2f}({:+.2%})</font>\t{}<br>'.format(color, total_gain, total_gain / total_value, as_currency(total_value))
-    yield '\nCurrent USD exchange: {:.4f}<br>'.format( 1/ExchangeRate.objects.filter(currency_id='USD').latest().price)
+    yield 'Total: \t\t<font color="{}">{:+,.2f} ({:+.2%})</font>\t\t\t{}<br>'.format(color, total_gain, total_gain / total_value, as_currency(total_value))
+    yield '\nCurrent USD exchange: {:.4f}<br>'.format( 1/Currency.objects.get(code='USD').livePrice )
     yield '</pre></body></html>'
     
 def analyze(request):
@@ -69,7 +74,7 @@ def DoWorkHistory():
     start = '2011-01-01'
     yield '<br>Date\t\t' + '\t'.join([name[0] + type for name, type in all_accounts.values_list('client__username', 'type')]) + '\tTotal'
     value_lists = [a.GetValueList() for a in all_accounts]
-    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now().shift(days=-4)):
+    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
         d = day.date()
         account_vals = [int(value[d]) for value in value_lists]
         yield '<br>{}\t'.format(d) + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))

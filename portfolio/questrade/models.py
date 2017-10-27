@@ -1,4 +1,5 @@
 from django.db import models, transaction
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.utils import IntegrityError
 from django.utils import timezone
 from django.db.models import F, Max, Q, Sum
@@ -25,37 +26,6 @@ from pandas_datareader import data as pdr
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class RateLookupMixin(models.Model):
-    """
-    A mixin class that adds the necessary fields to support looking up historical rates from pandas-datareader
-    Classes that use this must define a subclass of RateHistoryTableMixin and create a foreign key back to this class with related_name="rates"
-    """
-    lookupSymbol = models.CharField(max_length=16, null=True, blank=True, default=None)
-    lookupSource = models.CharField(max_length=10, null=True, blank=True, default=None)
-    lookupColumn = models.CharField(max_length=10, null=True, blank=True, default=None)
-        
-    def GetLatestEntryDate(self):
-        try:
-            return self.rates.latest().day
-        except ExchangeRate.DoesNotExist:
-            return datetime.date(2009,1,1)
-
-    def GetLatestRate(self):
-        return self.rates.latest().price
-                
-    def GetRate(self, day):
-        return self.rates.get(day=day).price
-        
-    def save(self):
-        if hasattr(self, 'symbol'): 
-            self.lookupSymbol = self.symbol
-            self.lookupSource = 'yahoo'
-            self.lookupColumn = 'Close'
-        super().save()
-
-    class Meta:
-        abstract = True
-
 class RateHistoryTableMixin(models.Model):
     """
     A mixin class for rate history.
@@ -66,6 +36,39 @@ class RateHistoryTableMixin(models.Model):
     
     class Meta:
         abstract = True
+
+class RateLookupMixin(models.Model):
+    """
+    A mixin class that adds the necessary fields to support looking up historical rates from pandas-datareader
+    Classes that use this must define a subclass of RateHistoryTableMixin and create a foreign key back to this class with related_name="rates"
+    """
+    lookupSymbol = models.CharField(max_length=16, null=True, blank=True, default=None)
+    lookupSource = models.CharField(max_length=16, null=True, blank=True, default=None)
+    lookupColumn = models.CharField(max_length=10, null=True, blank=True, default=None)    
+    livePrice = models.DecimalField(max_digits=19, decimal_places=6, default=0)   
+        
+    def GetLatestEntryDate(self):
+        try:
+            return self.rates.latest().day
+        except ObjectDoesNotExist:
+            return datetime.date(2009,1,1)
+
+    def GetLatestRate(self):
+        return self.rates.latest().price
+                
+    def GetRate(self, day):
+        return self.rates.get(day=day).price
+        
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'symbol'): 
+            self.lookupSymbol = self.symbol
+            self.lookupSource = 'yahoo'
+            self.lookupColumn = 'Close'
+        super().save(*args, **kwargs)
+
+    class Meta:
+        abstract = True
+
 
 class Currency(RateLookupMixin):
     code = models.CharField(max_length=3, primary_key=True)
@@ -99,8 +102,7 @@ class Security(RateLookupMixin):
     description = models.CharField(max_length=500, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
     listingExchange = models.CharField(max_length=20, default='')
-    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
-    lastTradePrice = models.DecimalField(max_digits=16, decimal_places=4, default=0)    
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE) 
 
     objects = models.Manager()
     stocks = StockSecurityManager()
@@ -176,7 +178,7 @@ class DataProvider:
         start_date = lookup.GetLatestEntryDate() + datetime.timedelta(days=1)
         end_date = datetime.date.today() - datetime.timedelta(days=1)
         if start_date >= end_date:
-            print ('Already synced data for {}, skipping.'.format(symbol))
+            print ('Already synced data for {}, skipping.'.format(lookup.lookupSymbol))
             return []
 
         if lookup.lookupSymbol in cls.FAKED_VALS:
@@ -184,7 +186,7 @@ class DataProvider:
             return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start_date, end_date))
-        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5)
+        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5, pause=1.0)
         if df.size == 0:
             return []
         ix = pandas.DatetimeIndex(start=min(df.index), end=end_date, freq='D')
@@ -202,14 +204,17 @@ class DataProvider:
     def SyncExchangeRates(cls, currency):
         data = cls._RetrieveData(currency)
         currency.rates.bulk_create([ExchangeRate(currency=currency, day=day, price=price) for day, price in data])
-
+        
     @classmethod
-    def SyncAllSecurities(cls):        
-        Currency.objects.update_or_create(code='CAD', lookupSymbol='CADBASE')
-        Currency.objects.update_or_create(code='USD', lookupSymbol='DEXCAUS')
+    def Init(cls):        
+        Currency.objects.update_or_create(code='CAD')
+        Currency.objects.update_or_create(code='USD', lookupSymbol='FXUSDCAD', lookupSource='bankofcanada', lookupColumn='FXUSDCAD')
         for currency in Currency.objects.all():
             Security.objects.update_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             cls.SyncExchangeRates(currency)
+            
+    @classmethod
+    def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
             cls.SyncStockPrices(stock)
 
@@ -475,9 +480,9 @@ class Account(models.Model):
             Q(security__holding__enddate__gte=F('day'))|Q(security__holding__enddate=None), 
             security__holding__startdate__lte=F('day'),
             security__holding__account_id=self.id, 
-            security__currency__exchangerate__day=F('day')
+            security__currency__rates__day=F('day')
         ).values_list('day').annotate(
-            val=Sum(F('price') * F('security__holding__qty') * F('security__currency__exchangerate__price'))
+            val=Sum(F('price') * F('security__holding__qty') * F('security__currency__rates__price'))
         )
         d = defaultdict(int)
         d.update({date:val for date,val in val_list})
@@ -576,8 +581,12 @@ class Client(models.Model):
             price = q['lastTradePriceTrHrs']
             if not price: price = q['lastTradePrice']   
             stock = Security.stocks.get(symbol=q['symbol'])
-            stock.lastTradePrice = Decimal(str(price))
+            stock.livePrice = Decimal(str(price))
             stock.save()
+
+        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
+        price = Decimal(str(r.json()['rates']['CAD']))
+        Currency.objects.filter(code='USD').update(livePrice=price)
                             
     def _GetActivities(self, account_id, startTime, endTime):
         json = self._GetRequest('accounts/{}/activities'.format(account_id), {'startTime': startTime.isoformat(), 'endTime': endTime.isoformat()})
@@ -634,6 +643,7 @@ class Client(models.Model):
 
 
 def DoWork():
+    DataProvider.Init()
     for a in Account.objects.all():
         a.RegenerateActivities()
         a.RegenerateHoldings()
