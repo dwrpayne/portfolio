@@ -77,10 +77,13 @@ TEMPLATES = [
 
 SHELL_PLUS_PRE_IMPORTS = [
     ('questrade.models', 'DataProvider'),
+    ('questrade.models', 'DoWork'),
     ('questrade.models', 'All'),
     'datetime',
     'arrow',
-    ('dateutil', 'parser')
+    'simplejson',
+    ('dateutil', 'parser'),
+    ('decimal', 'Decimal')
 ]
 
 WSGI_APPLICATION = 'portfolio.wsgi.application'

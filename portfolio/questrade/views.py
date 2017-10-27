@@ -6,7 +6,7 @@ from django.db.models.aggregates import Sum
 from .models import Client, Account, DataProvider, Holding, SecurityPrice
 import arrow
 import datetime
-from utils import as_currency,  strdate
+from .utils import as_currency,  strdate
 
 def UpdatePrices():
     for client in Client.objects.all():
@@ -14,24 +14,12 @@ def UpdatePrices():
         client.SyncPrices('2017-10-10')
         client.UpdateMarketPrices()   
 
-def SyncNewData(start):
-    for client in Client.objects.all():
-        client.Authorize()
-        client.SyncAccounts()
-        client.SyncAllActivitiesSlow(start)
-        client.SyncPrices(start)
-        client.UpdateMarketPrices()
-
-def RegenerateHoldings():
-    for a in all_accounts:
-        a.RegenerateDBHoldings()
-
 
 def DoWork():
     yield "<html><body><pre>"
     yield "<br>Syncing Data..."
     
-    all_holdings = Holding.objects.filter(account__in=Account.objects.all(), qty__gt=0, enddate=None)
+    all_holdings = Holding.current.all()
 
     yield '<br><br>Symbol\tPrice\t\t   Change\t\tShares\tGain<br>'
     total_gain = 0
