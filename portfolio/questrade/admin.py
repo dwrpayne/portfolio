@@ -39,14 +39,14 @@ admin.site.register(Holding, HoldingAdmin)
 admin.site.register(Client)
 
 class CurrencyAdmin(admin.ModelAdmin):
-    list_display = ['code', 'rateLookup']
+    list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn']
 admin.site.register(Currency, CurrencyAdmin)
 
 class SecurityAdmin(admin.ModelAdmin):
     def security_price_count(self, obj):
         return obj.securityprice_set.latest().day
     security_price_count.short_description = "Latest Price"
-    list_display = ['symbol', 'symbolid', 'type', 'currency', 'listingExchange', 'description', 'security_price_count']
+    list_display = ['symbol', 'symbolid', 'type', 'currency', 'lastTradePrice', 'description', 'security_price_count']
 admin.site.register(Security, SecurityAdmin)
 
 class SecurityPriceAdmin(admin.ModelAdmin):

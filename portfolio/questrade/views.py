@@ -3,7 +3,7 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.db.models.aggregates import Sum
 
 # Create your views here.
-from .models import Client, Account, DataProvider, Holding, SecurityPrice
+from .models import Client, Account, DataProvider, Holding, SecurityPrice, Security, ExchangeRate
 import arrow
 import datetime
 from .utils import as_currency,  strdate
@@ -11,44 +11,40 @@ from .utils import as_currency,  strdate
 def UpdatePrices():
     for client in Client.objects.all():
         client.Authorize()
-        client.SyncPrices('2017-10-10')
         client.UpdateMarketPrices()   
-
 
 def DoWork():
     yield "<html><body><pre>"
-    yield "<br>Syncing Data..."
     
     all_holdings = Holding.current.all()
 
-    yield '<br><br>Symbol\tPrice\t\t   Change\t\tShares\tGain<br>'
+    yield '<br><br>Symbol\tPrice\t   Change\tShares\tGain (CAD)<br>'
     total_gain = 0
     total_value = 0  
     UpdatePrices()
         
-    for symbol, qty in all_holdings.values_list('symbol').distinct().annotate(Sum('qty')):
-        total_qty = sum(all_holdings.filter(symbol=symbol).values_list('qty', flat=True))
-
+    for symbol, qty in all_holdings.exclude(security__type=Security.Type.Cash).values_list('security__symbol').distinct().annotate(Sum('qty')):
+        security = Security.objects.get(symbol=symbol)
         # TODO: Hacky to get it working.
-        yesterday_price = DataProvider.GetPrice(symbol, datetime.date.today() - datetime.timedelta(days=1))
-        today_price = DataProvider.GetPrice(symbol, datetime.date.today())
+        yesterday_price = security.GetLatestPrice()
+        today_price = security.lastTradePrice
         price_delta = today_price - yesterday_price
-        this_gain = price_delta * total_qty * DataProvider.GetExchangeRate('CAD' if '.TO' in symbol else 'USD', datetime.date.today())
+        percent_delta = price_delta / yesterday_price
+        this_gain = price_delta * qty * security.currency.GetLatestRate()
         total_gain += this_gain
-        total_value += total_qty * today_price * DataProvider.GetExchangeRate('CAD' if '.TO' in symbol else 'USD', datetime.date.today())
+        total_value += qty * today_price * security.currency.GetLatestRate()
         color = "green" if price_delta > 0 else "red"
-        yield '{} \t{:.2f}\t\t<font color="{}">{:+.2f} ({:+.2%})</font>\t\t{:.0f}  \t{}<br>'.format(
-            symbol.split('.')[0], today_price, color, price_delta, price_delta / yesterday_price, total_qty, as_currency(this_gain))
+        yield '{} \t{:.2f}\t<font color="{}">{:+.2f} ({:+.2%})</font>\t{:.0f}  \t{}<br>'.format(
+            symbol.split('.')[0], today_price, color, price_delta, price_delta / yesterday_price, qty, as_currency(this_gain))
     yield '-------------------------------------<br>'
     
     color = "green" if total_gain > 0 else "red"
-    yield 'Total: \t\t\t<font color="{}">{:+,.2f}({:+.2%})</font>\t{}<br>'.format(color, total_gain, total_gain / total_value, as_currency(total_value))
-    yield '\nCurrent USD exchange: {:.4f}<br>'.format( 1/DataProvider.GetExchangeRate('USD', datetime.date.today()))
+    yield 'Total: \t\t<font color="{}">{:+,.2f}({:+.2%})</font>\t{}<br>'.format(color, total_gain, total_gain / total_value, as_currency(total_value))
+    yield '\nCurrent USD exchange: {:.4f}<br>'.format( 1/ExchangeRate.objects.filter(currency_id='USD').latest().price)
     yield '</pre></body></html>'
     
 def analyze(request):
     return HttpResponse(DoWork()) 
-    return StreamingHttpResponse(DoWork())
 
 # WOAH
 #for acc in a:
@@ -83,36 +79,22 @@ def DoWorkHistory():
 def history(request): 
     return HttpResponse(DoWorkHistory()) 
 
-def AccountBalances():
-    yield "<html><body><pre>"
-    yield "<br>Syncing Data..."
-    yield "<br>Account\t\tSOD in CAD\tCurrent CAD\tChange"
-    total_sod = 0
-    total_current = 0
+def AccountBalances(request):
+    data = []
     for c in Client.objects.all():
         c.Authorize()
         for a in c.account_set.all():
-            json = c._GetRequest('accounts/%s/balances'%(a.id))            
-            combinedCAD = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-            sodCombinedCAD = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-            total_current += combinedCAD
-            total_sod += sodCombinedCAD
+            json = c._GetRequest('accounts/%s/balances'%(a.id))           
+            cur_balance = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
+            sod_balance = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
+            data.append(('{} {}'.format(c.username, a.type), sod_balance, cur_balance, cur_balance-sod_balance))
+        c.CloseSession()
 
-            price_delta = combinedCAD - sodCombinedCAD
-            color = "green" if price_delta > 0 else "red"
-            yield "<br>{} {}\t{}\t{}\t<font color=\"{}\">{}</font>".format(
-                a.client.username, a.type, as_currency(sodCombinedCAD), as_currency(combinedCAD), color, as_currency(price_delta)
-                )
+    names,sod,cur,change = list(zip(*data))
+    data.append(('Total', sum(sod), sum(cur), sum(change)))
 
-        
-    price_delta = total_current - total_sod
-    color = "green" if price_delta > 0 else "red"
-    yield "<br><br>Total\t\t{}\t{}\t<font color=\"{}\">{}</font>".format(
-            as_currency(total_current), as_currency(total_sod), color, as_currency(price_delta)
-            )
-
-def balances(request):    
-    return HttpResponse(AccountBalances())  
+    context = {'data':data }
+    return render(request, 'questrade/balances.html', context)
 
 def index(request):
     return HttpResponse("Hello world, you're at the questrade index.")
