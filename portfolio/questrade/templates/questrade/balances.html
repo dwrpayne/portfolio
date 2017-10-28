@@ -1,14 +1,22 @@
 {% load humanize %}
-<html><body>
-<h1>Account Balances (in CAD combined)</h1>
-<table cellspacing="10">
-    <tr>
-        <th>Account</th><th>SOD</th><th>Current</th><th>Change</th>
-    </tr>
-    {% for name, sod, cur, change in data %}
-        <tr>
-            <th>{{name}}</th><td>${{sod | floatformat:0 | intcomma}}</td><td>${{cur | floatformat:0 | intcomma}}</td><td>${{change | floatformat:0 | intcomma}}</td>
-        </tr>
-    {% endfor %}
-</table>
-</body></html>
+<div id="balances">
+    Refresh Count: {{balance_refresh_count}}
+    <pre>
+        <table cellspacing="10">
+            <tr>
+                <th>Account</th>
+                <th>SOD</th>
+                <th>Current</th>
+                <th>Change</th>
+            </tr>
+            {% for name, sod, cur, change in account_data %}
+                <tr>
+                    <td>{{name}}</td>
+                    <td>${{sod | floatformat:0 | intcomma}}</td>
+                    <td>${{cur | floatformat:0 | intcomma}}</td>
+                    <td>${{change | floatformat:0 | intcomma}}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    </pre>
+</div>

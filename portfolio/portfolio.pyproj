@@ -94,6 +94,7 @@
     <Compile Include="questrade\__init__.py" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="questrade\static\" />
     <Folder Include="portfolio\" />
     <Folder Include="questrade\" />
     <Folder Include="questrade\fixtures\" />
@@ -127,7 +128,10 @@
     <Content Include="questrade\migrations\__pycache__\0019_activity_symbol.cpython-36.pyc" />
     <Content Include="questrade\migrations\__pycache__\0020_auto_20171019_0809.cpython-36.pyc" />
     <Content Include="questrade\migrations\__pycache__\__init__.cpython-36.pyc" />
+    <Content Include="questrade\static\refresh_button.js" />
     <Content Include="questrade\templates\questrade\balances.html" />
+    <Content Include="questrade\templates\questrade\portfolio.html" />
+    <Content Include="questrade\templates\questrade\holdings.html" />
     <Content Include="questrade\__pycache__\admin.cpython-36.pyc" />
     <Content Include="questrade\__pycache__\apps.cpython-36.pyc" />
     <Content Include="questrade\__pycache__\dataprovider.cpython-36.pyc" />

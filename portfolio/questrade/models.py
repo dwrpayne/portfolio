@@ -99,9 +99,9 @@ class Security(RateLookupMixin):
 
     symbol = models.CharField(max_length=32, primary_key=True)
     symbolid = models.BigIntegerField(default=0)
-    description = models.CharField(max_length=500, default='')
+    description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
-    listingExchange = models.CharField(max_length=20, default='')
+    listingExchange = models.CharField(max_length=20, null=True, blank=True, default='')
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE) 
 
     objects = models.Manager()
@@ -240,6 +240,29 @@ class ActivityJson(models.Model):
         if not created and cls.AllowDuplicate(s):
             s = s.replace('YOUR ACCOUNT   ', 'YOUR ACCOUNT X2')
             ActivityJson.objects.create(jsonstr=s, account=account)
+
+    @classmethod
+    def GetActivityType(cls, type, action):
+        mapping = {('Deposits', 'CON'): Activity.Type.Deposit,
+                   ('Deposits', 'CSP'): Activity.Type.Deposit,
+                   ('Deposits', 'DEP'): Activity.Type.Deposit,
+                   ('Fees and rebates', 'FCH'): Activity.Type.Fee,
+                   ('FX conversion', 'FXT'): Activity.Type.FX,
+                   ('Other', 'EXP'): Activity.Type.Expiry,
+                   ('Other', 'BRW'): Activity.Type.Journal,
+                   ('Trades', 'Buy'): Activity.Type.Buy,
+                   ('Trades', 'Sell'): Activity.Type.Sell,
+                   ('Withdrawals', 'CON'): Activity.Type.Withdrawal,
+                   ('Transfers', 'TF6'): Activity.Type.Transfer,
+                   ('Dividends', 'DIV'): Activity.Type.Dividend,
+                   ('Dividends', ''): Activity.Type.Dividend,
+                   ('Dividends', '   '): Activity.Type.Dividend,
+                   ('Dividends', 'NRT'): Activity.Type.Dividend,
+                   ('Interest', '   '): Activity.Type.Interest
+                   }
+        if (type, action) in mapping: return mapping[(type, action)]
+        print ('No action type mapping for "{}" "{}"'.format(type, action))
+        return None
     
     @classmethod
     def AllowDuplicate(cls, s):        
@@ -276,7 +299,7 @@ class ActivityJson(models.Model):
             elif 'WESTJET AIRLINES' in json['description']:                json['symbol']='WJA.TO'         
             
         if json['symbol'] == 'TWMJF':
-            json['currency'] = 'CAD'
+            json['currency'] = 'USD'
 
         if json['action'] =='FXT':
             if 'AS OF ' in json['description']:
@@ -288,6 +311,13 @@ class ActivityJson(models.Model):
                     asof = asof.shift(years=+1)
 
                 json['tradeDate'] = tradeDate.replace(year=asof.year, month=asof.month, day=asof.day).isoformat()
+
+        for item in ['tradeDate', 'transactionDate', 'settlementDate']:
+            json[item] = str(parser.parse(json[item].date()))
+
+        json['type'] = self.GetActivityType(json['type'], json['action'])
+        json['qty'] = json['quantity']
+        del json['quantity']
                         
         if json['currency'] == json['symbol']:
             json['symbol'] = None
@@ -317,51 +347,21 @@ class Activity(models.Model):
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']
         
-    @classmethod
-    def GetActivityType(cls, type, action):
-        mapping = {('Deposits', 'CON'): Activity.Type.Deposit,
-                   ('Deposits', 'CSP'): Activity.Type.Deposit,
-                   ('Deposits', 'DEP'): Activity.Type.Deposit,
-                   ('Fees and rebates', 'FCH'): Activity.Type.Fee,
-                   ('FX conversion', 'FXT'): Activity.Type.FX,
-                   ('Other', 'EXP'): Activity.Type.Expiry,
-                   ('Other', 'BRW'): Activity.Type.Journal,
-                   ('Trades', 'Buy'): Activity.Type.Buy,
-                   ('Trades', 'Sell'): Activity.Type.Sell,
-                   ('Withdrawals', 'CON'): Activity.Type.Withdrawal,
-                   ('Transfers', 'TF6'): Activity.Type.Transfer,
-                   ('Dividends', 'DIV'): Activity.Type.Dividend,
-                   ('Dividends', ''): Activity.Type.Dividend,
-                   ('Dividends', '   '): Activity.Type.Dividend,
-                   ('Dividends', 'NRT'): Activity.Type.Dividend,
-                   ('Interest', '   '): Activity.Type.Interest
-                   }
-        if (type, action) in mapping: return mapping[(type, action)]
-        print ('No action type mapping for "{}" "{}"'.format(type, action))
-        return None
         
     @classmethod
     def CreateFromJson(cls, activityjson): 
         json = simplejson.loads(activityjson.cleaned)
-        
-        type = cls.GetActivityType(json['type'], json['action'])
-        if not type:
-            return
-        
-        create_args = {'account' : activityjson.account, 'qty': Decimal(str(json['quantity'])), 'sourcejson' : activityjson, 'type': type}
-        for item in ['tradeDate', 'transactionDate', 'settlementDate']:
-            create_args[item] = parser.parse(json[item])
-        create_args['description'] = json['description']
-        for item in ['price', 'netAmount']:
+                
+        create_args = {'account' : activityjson.account, 'sourcejson' : activityjson}
+        for item in ['description', 'tradeDate', 'transactionDate', 'settlementDate', 'type']:
+            create_args[item] = json[item]
+        for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item])) 
             
         if json['symbol']: 
             try:
                 type = Security.Type.Stock if len(json['symbol']) < 20 else Security.Type.Option
-                security, created = Security.objects.get_or_create(symbol=json['symbol'], currency_id=json['currency'], type=type)
-                if created:                    
-                    print ("Creating {} {} from activityjson id --> {}".format(json['symbol'], json['currency'], activityjson.id))
-                create_args['security'] = security
+                create_args['security'], created = Security.objects.get_or_create(symbol=json['symbol'], currency_id=json['currency'], type=type)
             except:
                 print ("Couldn't create {} {}".format(json['symbol'], json['currency']))
             
@@ -451,15 +451,21 @@ class Holding(models.Model):
         return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
 
 class Account(models.Model):
-    client = models.ForeignKey('Client', on_delete=models.CASCADE)
+    client = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.IntegerField(default=0, primary_key = True)
+    curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
+    sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
         
     def __repr__(self):
         return "Account({},{},{})".format(self.client, self.id, self.type)
 
     def __str__(self):
         return "{} {} {}".format(self.client, self.id, self.type)
+
+    @property
+    def display_name(self):
+        return "{} {}".format(self.client.username, self.type)
     
     def GetMostRecentActivityDate(self):
         try:
@@ -526,10 +532,14 @@ class Account(models.Model):
             self.holding_set.create(security_id='CAD Cash', qty=Decimal('147.25'), startdate=start, enddate=None)
             self.holding_set.create(security_id='USD Cash', qty=Decimal('97.15'), startdate=start, enddate=None)
     
-
+import threading
 class Client(models.Model):
     username = models.CharField(max_length=100, primary_key=True)
     refresh_token = models.CharField(max_length=100)
+    access_token = models.CharField(max_length=100, null=True, blank=True)
+    api_server = models.CharField(max_length=100, null=True, blank=True)
+    token_expiry = models.DateTimeField(null=True, blank=True)
+    authorization_lock = threading.Lock()
 
     @classmethod 
     def CreateClient(cls, username, refresh_token):
@@ -542,26 +552,47 @@ class Client(models.Model):
     def Get(cls, username):
         client = Client.objects.get(username=username)
         client.Authorize()
-        client.SyncAccounts()
         return client
 
     def __str__(self):
         return self.username
+
+    def __enter__(self):
+        self.Authorize()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.CloseSession()     
+        
+    @property
+    def needs_refresh(self):
+        if not self.token_expiry: return True
+        if not self.access_token: return True
+        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 10))
     
-    def Authorize(self):		
+    def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
-        _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
-        r = requests.get(_URL_LOGIN + self.refresh_token)
-        r.raise_for_status()
-        j = r.json()
-        self.api_server = j['api_server'] + 'v1/'
-        self.refresh_token = j['refresh_token']
+
+        with self.authorization_lock:
+            if self.needs_refresh:
+                _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
+                r = requests.get(_URL_LOGIN + self.refresh_token)
+                r.raise_for_status()
+                json = r.json()
+                self.api_server = json['api_server'] + 'v1/'
+                self.refresh_token = json['refresh_token']
+                self.access_token = json['access_token']
+                self.token_expiry = datetime.datetime.now() + datetime.timedelta(seconds = json['expires_in'])
+                # Make sure to save out to DB
+                self.save()
 
         self.session = requests.Session()
-        self.session.headers.update({'Authorization': j['token_type'] + ' ' + j['access_token']})
+        self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
 
-        # Make sure to save out to DB
-        self.save()
+          
+        
+    def CloseSession(self):
+        self.session.close()
 
     def _GetRequest(self, url, params={}):
         r = self.session.get(self.api_server + url, params=params)
@@ -580,6 +611,9 @@ class Client(models.Model):
         for q in json['quotes']:
             price = q['lastTradePriceTrHrs']
             if not price: price = q['lastTradePrice']   
+            if not price: 
+                print('No price available for {}... zeroing out.', q['symbol'])
+                price = 100
             stock = Security.stocks.get(symbol=q['symbol'])
             stock.livePrice = Decimal(str(price))
             stock.save()
@@ -612,7 +646,7 @@ class Client(models.Model):
         return json['symbols']
     
     def SyncActivities(self, startDate='2011-02-01'):
-        for account in self.account_set.all():
+        for account in self.accounts.all():
             print ('Syncing all activities for {}: '.format(account), end='')
             start = account.GetMostRecentActivityDate()
             if start: start = arrow.get(start).shift(days=+1)
@@ -638,8 +672,12 @@ class Client(models.Model):
                     print('finding {}'.format(stock.symbolid))
                     stock.save()
 
-    def CloseSession(self):
-        self.session.close()
+    def SyncCurrentAccountBalances(self):
+        for a in self.accounts.all():
+            json = self._GetRequest('accounts/%s/balances'%(a.id))           
+            a.curBalanceSynced = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
+            a.sodBalanceSynced = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
+            a.save()
 
 
 def DoWork():
