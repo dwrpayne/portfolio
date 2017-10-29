@@ -1,4 +1,4 @@
-﻿{% load humanize %}
+﻿{% load mytags %}
 <div id="holdings">   
     Refresh Count: {{holding_refresh_count}}
     <pre>
@@ -10,18 +10,18 @@
                 <tr>
                     <td>{{symbol}}</td>
                     <td>{{price | floatformat:2}}&nbsp;&nbsp;</td>
-                    <td><font color="{{color}}">{{change | floatformat:2}} ({{percent_change|floatformat:2}}%)</font></td>
+                    <td>{{change | currency | colorize}} {{percent_change | percentage | colorize}}</td>
                     <td>{{shares | floatformat:0}}</td>
-                    <td><font color="{{color}}">{{gain}}</font></td>
-                    <td>{{total_val}}</td>
+                    <td>{{gain | currency | colorize}}</td>
+                    <td>{{total_val | currency}}</td>
                 </tr>
             {% endfor %}
-                <tr><td colspan="100">--------------------------------------</td></tr>
+                <tr><td colspan="100">------------------------------------------------------------</td></tr>
             {% for color, total_gain, percent_gain, total_value in total %}
                 <tr>
                     <td>Total</td>
                     <td></td>
-                    <td><font color="{{color}}">{{total_gain | floatformat:2}} ({{percent_gain|floatformat:2}}%)</font></td>
+                    <td>{{total_gain | currency | colorize}} {{percent_gain | percentage | colorize}}</td>
                     <td></td>
                     <td>{{total_value}}</td>
                 </tr>
@@ -29,6 +29,4 @@
         </table>
     <br />Current USD exchange: {{exchange|floatformat:4}}
     </pre>
-
-
 </div>

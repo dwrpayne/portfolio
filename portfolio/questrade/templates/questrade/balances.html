@@ -1,4 +1,4 @@
-{% load humanize %}
+{% load mytags %}
 <div id="balances">
     Refresh Count: {{balance_refresh_count}}
     <pre>
@@ -12,9 +12,9 @@
             {% for name, sod, cur, change in account_data %}
                 <tr>
                     <td>{{name}}</td>
-                    <td>${{sod | floatformat:0 | intcomma}}</td>
-                    <td>${{cur | floatformat:0 | intcomma}}</td>
-                    <td>${{change | floatformat:0 | intcomma}}</td>
+                    <td>{{sod | currency}}</td>
+                    <td>{{cur | currency}}</td>
+                    <td>{{change | currency | colorize}}</td>
                 </tr>
             {% endfor %}
         </table>

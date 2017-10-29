@@ -11,6 +11,7 @@ from .utils import as_currency,  strdate
 from contextlib import ExitStack
 import plotly
 import plotly.graph_objs as go
+import requests
 
 holding_refresh_count = 0
 def GetHoldingsContext():
@@ -31,34 +32,41 @@ def GetHoldingsContext():
         today_price_CAD = today_price * security.currency.livePrice
 
         price_delta = today_price - yesterday_price
-        percent_delta = 100 * price_delta / yesterday_price
+        percent_delta = price_delta / yesterday_price
         this_gain = qty * (today_price_CAD - yesterday_price_CAD)
         total_gain += this_gain
         value_CAD = qty * today_price_CAD
         total_value += value_CAD
         color = "green" if price_delta > 0 else "red"
-        security_data.append((symbol.split('.')[0], today_price, color, price_delta, percent_delta, qty,  as_currency(this_gain), as_currency(value_CAD)))
+        security_data.append((symbol.split('.')[0], today_price, color, price_delta, percent_delta, qty, this_gain, value_CAD))
 
 
     color = "green" if total_gain > 0 else "red"
-    total = [(color, total_gain, 100 * total_gain / total_value, as_currency(total_value))]
+    total = [(color, total_gain, total_gain / total_value, as_currency(total_value))]
     exchange = 1/Currency.objects.get(code='USD').livePrice
     context = {'security_data':security_data, 'total':total, 'exchange':exchange, 'holding_refresh_count':holding_refresh_count}
     return context
 
 def analyze(request):
-    if 'refresh-holdings' in request.GET:
-        with Client.objects.all()[0] as c:
-            c.UpdateMarketPrices()
+    if request.is_ajax():
+        if 'refresh-holdings' in request.GET:
+            with Client.objects.all()[0] as c:
+                try:
+                    c.UpdateMarketPrices()
+                except requests.exceptions.HTTPError as e:
+                    return HttpResponse(e.response.json(), content_type="application/json", status_code= e.response.status_code)
 
-        return render(request, 'questrade/holdings.html', GetHoldingsContext())
+            return render(request, 'questrade/holdings.html', GetHoldingsContext())
 
-    if 'refresh-balances' in request.GET:
-        with ExitStack() as stack:
-            clients = [stack.enter_context(c) for c in Client.objects.all()]
-            for c in clients:
-                c.SyncCurrentAccountBalances()
-        return render(request, 'questrade/balances.html', GetBalanceContext())
+        if 'refresh-balances' in request.GET:
+            with ExitStack() as stack:
+                clients = [stack.enter_context(c) for c in Client.objects.all()]
+                try:
+                    for c in clients:
+                        c.SyncCurrentAccountBalances()                
+                except requests.exceptions.HTTPError as e:
+                    return HttpResponse(e.response.json(), content_type="application/json", status= e.response.status_code)
+            return render(request, 'questrade/balances.html', GetBalanceContext())
 
     overall_context = {**GetHoldingsContext(), **GetBalanceContext()}
     return render(request, 'questrade/portfolio.html', overall_context)

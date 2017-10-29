@@ -1,4 +1,3 @@
-{% load humanize %}
 <meta http-equiv="Content-Language" content="en">
     <html>
     <body>
@@ -29,9 +28,9 @@
                         $('#balances').html(html);
                     },
                     error: function (data) {
-                        alert("Couldn't refresh!\n" + stringify(data))
+                        alert("Couldn't refresh!\n" + JSON.stringify(data))
                     },
-                    complete: function (data) {
+                    complete: function (jqXHR, textStatus) {
                         $("button.refresh-balances").prop("disabled", false);
                         $("button.refresh-balances").html("Refresh Balances");
                     }
@@ -50,13 +49,12 @@
                         $('#holdings').html(html);
                     },
                     error: function (data) {
-                        alert("Couldn't refresh!\n" + stringify(data))
+                        alert("Couldn't refresh!\n" + JSON.stringify(data))
                     },
                     complete: function (data) {
                         $("button.refresh-holdings").prop("disabled", false);
                         $("button.refresh-holdings").html("Refresh Holdings");
                     }
-
                 });
             });
         });
