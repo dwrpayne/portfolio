@@ -9,7 +9,7 @@ import datetime
 import arrow
 import pandas
 
-from questrade.models import Security, SecurityPrice
+from questrade.models import Security, SecurityPrice, Activity
 
 class ActivityRaw(models.Model):
     account = models.ForeignKey('Account', on_delete=models.CASCADE)
@@ -17,6 +17,12 @@ class ActivityRaw(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
+                
+    def CreateActivity(self): 
+        activity = Activity(account=account, tradeDate=day, security=security, description='', qty=qty, price=price, netAmount=0, type=Activity.Type.Buy, sourcejson_id=0)
+        activity.save()
+
+
 
 class Account(models.Model):
     client = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='accounts')

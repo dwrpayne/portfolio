@@ -313,7 +313,7 @@ class ActivityJson(models.Model):
 
                 json['tradeDate'] = tradeDate.replace(year=asof.year, month=asof.month, day=asof.day).isoformat()
 
-        for item in ['tradeDate', 'transactionDate', 'settlementDate']:
+        for item in ['tradeDate']:
             json[item] = str(parser.parse(json[item].date()))
 
         json['type'] = self.GetActivityType(json['type'], json['action'])
@@ -325,36 +325,12 @@ class ActivityJson(models.Model):
             
         self.cleaned = simplejson.dumps(json)
         self.save(update_fields=['cleaned'])
-
-class Activity(models.Model):
-    account = models.ForeignKey('Account', on_delete=models.CASCADE)
-    tradeDate = models.DateField()
-    transactionDate = models.DateField()
-    settlementDate = models.DateField()
-    action = models.CharField(null=True, max_length=1000)
-    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_security')
-    description = models.CharField(max_length=1000)
-    cash = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_cash')
-    qty = models.DecimalField(max_digits=16, decimal_places=6)
-    price = models.DecimalField(max_digits=16, decimal_places=6)
-    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
-    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal')
-    type = models.CharField(max_length=100, choices=Type)
-    sourcejson = models.ForeignKey(ActivityJson, on_delete=models.CASCADE)
-    
-    class Meta:
-        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
-        verbose_name_plural = 'Activities'
-        get_latest_by = 'tradeDate'
-        ordering = ['tradeDate']
         
-        
-    @classmethod
-    def CreateFromJson(cls, activityjson): 
-        json = simplejson.loads(activityjson.cleaned)
+    def CreateActivity(self): 
+        json = simplejson.loads(self.cleaned)
                 
-        create_args = {'account' : activityjson.account, 'sourcejson' : activityjson}
-        for item in ['description', 'tradeDate', 'transactionDate', 'settlementDate', 'type']:
+        create_args = {'account' : self.account, 'sourcejson' : self}
+        for item in ['description', 'tradeDate', 'type']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item])) 
@@ -373,6 +349,26 @@ class Activity(models.Model):
             
         activity = Activity(**create_args)
         return activity
+
+class Activity(models.Model):
+    account = models.ForeignKey('Account', on_delete=models.CASCADE)
+    tradeDate = models.DateField()
+    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_security')
+    description = models.CharField(max_length=1000)
+    cash = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_cash')
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    price = models.DecimalField(max_digits=16, decimal_places=6)
+    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal')
+    type = models.CharField(max_length=100, choices=Type)
+    sourcejson = models.ForeignKey(ActivityJson, on_delete=models.CASCADE)
+    
+    class Meta:
+        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
+        verbose_name_plural = 'Activities'
+        get_latest_by = 'tradeDate'
+        ordering = ['tradeDate']
+
 
     def __str__(self):
         return "{} - {} - {}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.security, self.qty, self.price, self.type, self.description)
@@ -503,11 +499,8 @@ class Account(models.Model):
             for activityjson in self.activityjson_set.all():
                 activityjson.CleanSourceData()
         self.activity_set.all().delete()
-        all_activities = [Activity.CreateFromJson(j) for j in self.activityjson_set.all()]
-
+        all_activities = [j.CreateActivity() for j in self.activityjson_set.all()]
         Activity.objects.bulk_create([a for a in all_activities if a is not None])
-        for activityjson in self.activityjson_set.all():
-            Activity.CreateFromJson(activityjson)
         
     def HackInitMyAccount(self):
         start = '2011-01-01'
