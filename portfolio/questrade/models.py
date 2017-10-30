@@ -29,60 +29,6 @@ logger = logging.getLogger(__name__)
 from finance.models import Holding, Security, SecurityPrice, Currency, ExchangeRate, Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient
 
-
-class DataProvider:
-    FAKED_VALS = {'DLR.U.TO':10., None:1., 'USD Cash':1., 'CAD Cash':1.}
-    
-    @classmethod
-    def _RetrieveData(cls, lookup):
-        """ Returns a list of tuples (day, price) """
-        start_date = lookup.GetLatestEntryDate() + datetime.timedelta(days=1)
-        end_date = datetime.date.today() - datetime.timedelta(days=1)
-        if start_date >= end_date:
-            print ('Already synced data for {}, skipping.'.format(lookup.lookupSymbol))
-            return []
-
-        if lookup.lookupSymbol in cls.FAKED_VALS:
-            index = pandas.date_range(start_date, end_date, freq='D').date
-            return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
-
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start_date, end_date))
-        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5)
-        if df.size == 0:
-            return []
-        ix = pandas.DatetimeIndex(start=min(df.index), end=end_date, freq='D')
-        df = df.reindex(ix).ffill()
-        return zip(ix, df[lookup.lookupColumn])
-
-        return []
-     
-    @classmethod
-    def SyncStockPrices(cls, security):
-        data = cls._RetrieveData(security)
-        security.rates.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in data])
-
-    @classmethod
-    def SyncExchangeRates(cls, currency):
-        data = cls._RetrieveData(currency)
-        currency.rates.bulk_create([ExchangeRate(currency=currency, day=day, price=price) for day, price in data])
-        
-    @classmethod
-    def Init(cls):        
-        Currency.objects.update_or_create(code='CAD')
-        Currency.objects.update_or_create(code='USD', lookupSymbol='DEXCAUS', lookupSource='fred', lookupColumn='DEXCAUS')
-        for currency in Currency.objects.all():
-            Security.objects.update_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
-            cls.SyncExchangeRates(currency)
-            
-    @classmethod
-    def SyncAllSecurities(cls):
-        for stock in Security.stocks.all():
-            cls.SyncStockPrices(stock)
-
-        # Just generate fake 1 entries so we can join these tables later.
-        for cash in Security.cash.all():
-            cls.SyncStockPrices(cash)
-
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
     cleaned = models.CharField(max_length=1000, null=True, blank=True)
@@ -129,7 +75,7 @@ class QuestradeRawActivity(BaseRawActivity):
         # Hack to support actual duplicate transactions (no disambiguation available)
         return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
 
-    def CleanSourceData(self):
+    def GetCleanedJson(self):
         json = simplejson.loads(self.jsonstr)
 
         if json['grossAmount'] == None:
@@ -180,11 +126,10 @@ class QuestradeRawActivity(BaseRawActivity):
         if json['currency'] == json['symbol']:
             json['symbol'] = None
             
-        self.cleaned = simplejson.dumps(json)
-        self.save(update_fields=['cleaned'])
+        return simplejson.dumps(json)
         
     def CreateActivity(self): 
-        json = simplejson.loads(self.cleaned)
+        json = self.GetCleanedJson()
                 
         create_args = {'account' : self.account, 'raw' : self}
         for item in ['description', 'tradeDate', 'type']:
@@ -212,7 +157,7 @@ class Account(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
             
-    def HackInitMyAccount(self):
+    def HackInit(self):
         start = '2011-01-01'
         if self.id == 51407958:
             self.holding_set.create(security_id='AGNC', qty=70, startdate=start, enddate=None)

@@ -151,6 +151,61 @@ class ExchangeRate(RateHistoryTableMixin):
     def __str__(self):
         return "{} {} {}".format(self.currency, self.day, self.price)    
 
+    
+
+class DataProvider:
+    FAKED_VALS = {'DLR.U.TO':10., None:1., 'USD Cash':1., 'CAD Cash':1.}
+    
+    @classmethod
+    def _RetrieveData(cls, lookup):
+        """ Returns a list of tuples (day, price) """
+        start_date = lookup.GetLatestEntryDate() + datetime.timedelta(days=1)
+        end_date = datetime.date.today() - datetime.timedelta(days=1)
+        if start_date >= end_date:
+            print ('Already synced data for {}, skipping.'.format(lookup.lookupSymbol))
+            return []
+
+        if lookup.lookupSymbol in cls.FAKED_VALS:
+            index = pandas.date_range(start_date, end_date, freq='D').date
+            return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
+
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start_date, end_date))
+        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5)
+        if df.size == 0:
+            return []
+        ix = pandas.DatetimeIndex(start=min(df.index), end=end_date, freq='D')
+        df = df.reindex(ix).ffill()
+        return zip(ix, df[lookup.lookupColumn])
+
+        return []
+     
+    @classmethod
+    def SyncStockPrices(cls, security):
+        data = cls._RetrieveData(security)
+        security.rates.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in data])
+
+    @classmethod
+    def SyncExchangeRates(cls, currency):
+        data = cls._RetrieveData(currency)
+        currency.rates.bulk_create([ExchangeRate(currency=currency, day=day, price=price) for day, price in data])
+        
+    @classmethod
+    def Init(cls):        
+        Currency.objects.update_or_create(code='CAD')
+        Currency.objects.update_or_create(code='USD', lookupSymbol='DEXCAUS', lookupSource='fred', lookupColumn='DEXCAUS')
+        for currency in Currency.objects.all():
+            Security.objects.update_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
+            cls.SyncExchangeRates(currency)
+            
+    @classmethod
+    def SyncAllSecurities(cls):
+        for stock in Security.stocks.all():
+            cls.SyncStockPrices(stock)
+
+        # Just generate fake 1 entries so we can join these tables later.
+        for cash in Security.cash.all():
+            cls.SyncStockPrices(cash)
+
 
 class BaseClient(PolymorphicModel):
     username = models.CharField(max_length=10, primary_key=True)
@@ -194,22 +249,19 @@ class BaseAccount(PolymorphicModel):
         return "{} {}".format(self.client.username, self.type)
 
     def RegenerateActivities(self):
-        with transaction.atomic():
-            for activityraw in self.rawactivities.all():
-                activityraw.CleanSourceData()
-        self.activities.all().delete()
+        self.activities.all().delete()      
         all_activities = [raw.CreateActivity() for raw in self.rawactivities.all()]
         Activity.objects.bulk_create([a for a in all_activities if a is not None])      
                     
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
-        self.HackInitMyAccount()
+        self.HackInit()
         for activity in self.activities.all():          
             for security, qty_delta in activity.GetHoldingEffect().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
 
-    def HackInitMyAccount(self):
+    def HackInit(self):
         pass
     
     def GetMostRecentActivityDate(self):
@@ -237,10 +289,7 @@ class BaseAccount(PolymorphicModel):
         
 class BaseRawActivity(PolymorphicModel):    
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
-    
-    def CleanSourceData(self):
-        pass
-                
+                    
     def CreateActivity(self): 
         pass
              

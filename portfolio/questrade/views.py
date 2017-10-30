@@ -2,8 +2,8 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from django.db.models.aggregates import Sum
 
-from .models import Client, Account, DataProvider, Holding, Security, Currency
-from finance.models import BaseAccount
+from .models import Account, Client
+from finance.models import BaseAccount, DataProvider, Holding, Security, Currency
 import arrow
 import datetime
 from collections import defaultdict

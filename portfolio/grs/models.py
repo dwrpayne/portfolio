@@ -17,9 +17,6 @@ class GrsRawActivity(BaseRawActivity):
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
-    def CleanSourceData(self):
-        pass
-                
     def CreateActivity(self): 
         return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty, 
                         price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
