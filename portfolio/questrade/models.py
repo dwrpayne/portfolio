@@ -87,10 +87,14 @@ class StockSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
 
+    def sync_all(self):
+        for stock in get_queryset(): 
+            DataProvider.SyncStockPrices(stock)
+
 class CashSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Cash)
-
+    
 class OptionSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Option)
@@ -216,8 +220,7 @@ class DataProvider:
             
     @classmethod
     def SyncAllSecurities(cls):
-        for stock in Security.stocks.all():
-            cls.SyncStockPrices(stock)
+        Security.stocks.sync_all()
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
