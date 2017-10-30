@@ -1,26 +1,41 @@
 from django.db import models
 from django import forms
 
-# Create your models here.
+import requests
+from bs4 import BeautifulSoup
+from dateutil import parser
+from decimal import Decimal
+import datetime
+import arrow
+import pandas
 
+from questrade.models import Security, SecurityPrice
+
+class ActivityRaw(models.Model):
+    account = models.ForeignKey('Account', on_delete=models.CASCADE)
+    day = models.DateField()
+    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    price = models.DecimalField(max_digits=16, decimal_places=6)
+
+class Account(models.Model):
+    client = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='accounts')
+    type = models.CharField(max_length=100)
+    id = models.IntegerField(default=0, primary_key = True)
+    plan_data = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.type
+    
 class Client(models.Model):
-    username = models.CharField(max_length=7, primary_key=True)
-    password = forms.CharField(widget=forms.PasswordInput)
-    plan_data = forms.CharField(max_length=100)
-
-
-
-    refresh_token = models.CharField(max_length=100)
-    access_token = models.CharField(max_length=100, null=True, blank=True)
-    api_server = models.CharField(max_length=100, null=True, blank=True)
-    token_expiry = models.DateTimeField(null=True, blank=True)
-    authorization_lock = threading.Lock()
-
+    username = models.CharField(max_length=10, primary_key=True)
+    password = models.CharField(max_length=100)
+    
     @classmethod 
-    def CreateClient(cls, username, refresh_token):
-        client = Client(username = username, refresh_token = refresh_token)
+    def Create(cls, username, password, plan_data, plan_id):
+        client = Client(username = username, password=password, plan_data=plan_data, plan_id=plan_id)
+        client.save()
         client.Authorize()
-        client.SyncAccounts()
         return client
     
     @classmethod 
@@ -31,7 +46,7 @@ class Client(models.Model):
 
     def __str__(self):
         return self.username
-
+        
     def __enter__(self):
         self.Authorize()
         return self
@@ -39,132 +54,69 @@ class Client(models.Model):
     def __exit__(self, type, value, traceback):
         self.CloseSession()     
         
-    @property
-    def needs_refresh(self):
-        if not self.token_expiry: return True
-        if not self.access_token: return True
-        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 10))
-    
     def Authorize(self):
-        assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
-
-        with self.authorization_lock:
-            if self.needs_refresh:
-                _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
-                r = requests.get(_URL_LOGIN + self.refresh_token)
-                r.raise_for_status()
-                json = r.json()
-                self.api_server = json['api_server'] + 'v1/'
-                self.refresh_token = json['refresh_token']
-                self.access_token = json['access_token']
-                self.token_expiry = timezone.now() + datetime.timedelta(seconds = json['expires_in'])
-                # Make sure to save out to DB
-                self.save()
-
         self.session = requests.Session()
-        self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
-
-          
+        self.session.post('https://ssl.grsaccess.com/Information/login.aspx', data={'username': self.username, 'password': self.password})         
         
     def CloseSession(self):
         self.session.close()
 
-    def _GetRequest(self, url, params={}):
-        r = self.session.get(self.api_server + url, params=params)
-        r.raise_for_status()
-        return r.json()
+    def _GetRawActivityData(self, account_id, start, end):
+        response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId':account_id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'})
+        soup = BeautifulSoup(response.text, 'html.parser')
+        trans_dates = [parser.parse(tag.contents[0]).date() for tag in soup.find_all('td', class_='activities-d-lit1')]    
+        units = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-unitnum')]
+        prices = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
+        return zip(trans_dates, units, prices)
 
-    def SyncAccounts(self):
-        json = self._GetRequest('accounts')
-        for a in json['accounts']:
-            Account.objects.update_or_create(type=json['type'], account_id=json['number'], client=self)
-            
-    def UpdateMarketPrices(self):
-        symbols = Holding.current.filter(account__client=self, security__type=Security.Type.Stock).values_list('security__symbol', flat=True).distinct()
-        securities = Security.stocks.filter(symbol__in=symbols)
-        json = self._GetRequest('markets/quotes', 'ids=' + ','.join([str(s.symbolid) for s in securities if s.symbolid > 0]))
-        for q in json['quotes']:
-            price = q['lastTradePriceTrHrs']
-            if not price: price = q['lastTradePrice']   
-            if not price: 
-                print('No price available for {}... zeroing out.', q['symbol'])
-                price = 100
-            stock = Security.stocks.get(symbol=q['symbol'])
-            stock.livePrice = Decimal(str(price))
-            stock.save()
-
-        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
-        price = Decimal(str(r.json()['rates']['CAD']))
-        Currency.objects.filter(code='USD').update(livePrice=price)
-                            
-    def _GetActivities(self, account_id, startTime, endTime):
-        json = self._GetRequest('accounts/{}/activities'.format(account_id), {'startTime': startTime.isoformat(), 'endTime': endTime.isoformat()})
-        logger.debug(json)
-        return json['activities']
-
-    def _FindSymbolId(self, symbol):
-        json = self._GetRequest('symbols/search', {'prefix':symbol})
-        for s in json['symbols']:
-            if s['isTradable'] and symbol == s['symbol']: 
-                logger.debug("Matching {} to {}".format(symbol, s))
-                return s['symbolId']
-        return 0
-
-    def _GetSecurityInfoList(self, symbolids):
-        if len(symbolids) == 0:
-            return []
-        if len(symbolids) == 1:
-            json = self._GetRequest('symbols/{}'.format(','.join(map(str,symbolids))))
-        else:     
-            json = self._GetRequest('symbols', 'ids='+','.join(map(str,symbolids)))
-        logger.debug(json)
-        return json['symbols']
-    
-    def SyncActivities(self, startDate='2011-02-01'):
+    def SyncActivities(self, start_date=arrow.get('2011-01-01'), end_date=arrow.now()):        
         for account in self.accounts.all():
-            print ('Syncing all activities for {}: '.format(account), end='')
-            start = account.GetMostRecentActivityDate()
-            if start: start = arrow.get(start).shift(days=+1)
-            else: start = arrow.get(startDate)
-            
-            date_range = arrow.Arrow.interval('day', start, arrow.now(), 30)
+            account.activityraw_set.all().delete()
+            date_range = arrow.Arrow.span_range('year', start_date, end_date)
             print('{} requests'.format(len(date_range)), end='')
+
             for start, end in date_range:
-                print('.',end='',flush=True)
-                logger.debug(account.id, start, end)
-                activities_list = self._GetActivities(account.id, start, end.replace(hour=0, minute=0, second=0))
-                for json in activities_list: 
-                    ActivityJson.Add(json, account)
-            print()
+                if end > end_date: end = end_date
+                print('.',end='', flush=True)
+                data = self._GetRawActivityData(account.id, start, end)
+                # TODO: Hacked in the only Security I buy - this needs to be done way better. Though... maybe good enough for my purposes now.
+                ActivityRaw.objects.bulk_create([ActivityRaw(account=account, day=day, qty=qty, price=price, security_id='ETP') for day, qty, price in data])
 
-    def UpdateSecurityInfo(self):
-        with transaction.atomic():
-            for stock in Security.stocks.all():
-                if stock.symbolid == 0:
-                    print('finding {}'.format(stock))
-                    stock.symbolid = self._FindSymbolId(stock.symbol)
-                    
-                    print('finding {}'.format(stock.symbolid))
-                    stock.save()
-
-    def SyncCurrentAccountBalances(self):
-        for a in self.accounts.all():
-            json = self._GetRequest('accounts/%s/balances'%(a.id))           
-            a.curBalanceSynced = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-            a.sodBalanceSynced = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-            a.save()
+    def _GetRawPrices(self, symbol, start, end):
+        response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 
+            data={'PlanFund': symbol, 'PlanDetail':'', 'BodyTitle':'', 
+                'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'},
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0' }
+            )
+        soup = BeautifulSoup(response.text, 'html.parser')
+        table_header = soup.find('tr', class_='table-header')
+        if not table_header: return []
+        dates = [tag.contents[0] for tag in table_header.find_all('td')[1:]]
+        values = [tag.contents[0] for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
+        return zip(dates, values)
 
 
-def DoWork():
-    DataProvider.Init()
-    for a in Account.objects.all():
-        a.RegenerateActivities()
-        a.RegenerateHoldings()
-    DataProvider.SyncAllSecurities()
+    def _SyncPrices(self, start_date=arrow.get('2010-07-01'), end_date=arrow.now()):
+        plan_data = accounts[0].plan_data
+        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info', accounts[0].plan_data})
+        for security in Security.objects.filter(type=Security.Type.MutualFund):
+            start_date = max(start_date, arrow.get(security.GetLatestEntryDate() + datetime.timedelta(days=1)))
+            date_range = arrow.Arrow.interval('day', start_date, end_date, 15)
+            print('{} requests'.format(len(date_range)), end='')
+            data = []
+            for start, end in date_range:
+                print('.',end='', flush=True)
+                try:
+                    data += self._GetRawPrices(security.symbol, start, end)
+                except requests.exceptions.ConnectionError:
+                    pass
 
-def All():
-    Currency.objects.all().delete()
-    for c in Client.objects.all():
-        c.Authorize()
-        c.SyncActivities()
-    DoWork()
+            print()         
+
+            cleaned_data = {parser.parse(date).date(): Decimal(value[1:]) for date, value in data if not 'Unknown' in value}
+
+            series = pandas.Series(cleaned_data)
+            index = pandas.DatetimeIndex(start = min(series.index), end=max(series.index), freq='D').date    
+            series = series.reindex(index).ffill()
+
+            security.rates.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in series.iteritems()])

@@ -96,7 +96,7 @@ class OptionSecurityManager(models.Manager):
         return super().get_queryset().filter(type=Security.Type.Option)
 
 class Security(RateLookupMixin):
-    Type = Choices('Stock', 'Option', 'Cash')
+    Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
 
     symbol = models.CharField(max_length=32, primary_key=True)
     symbolid = models.BigIntegerField(default=0)
