@@ -9,10 +9,9 @@ import datetime
 import arrow
 import pandas
 
-from questrade.models import Security, SecurityPrice, Activity
+from finance.models import BaseAccount, BaseClient, BaseRawActivity, Security, SecurityPrice, Activity
 
-class GrsActivityRaw(models.Model):
-    account = models.ForeignKey('GrsAccount', on_delete=models.CASCADE, related_name='rawactivities')
+class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
@@ -23,28 +22,11 @@ class GrsActivityRaw(models.Model):
                 
     def CreateActivity(self): 
         return Activity(account=account, tradeDate=day, security=security, description='', qty=qty, price=price, netAmount=0, type=Activity.Type.Buy, sourcejson_id=0)
-
-
-class GrsAccount(models.Model):
-    client = models.ForeignKey('GrsClient', on_delete=models.CASCADE, related_name='accounts')
-    type = models.CharField(max_length=100)
-    id = models.IntegerField(default=0, primary_key = True)
-    plan_data = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.type
-
-    def RegenerateActivities(self):
-        with transaction.atomic():
-            for activityraw in self.rawactivities.all():
-                activityraw.CleanSourceData()
-        self.activity_set.all().delete()
-        all_activities = [j.CreateActivity() for j in self.rawactivities.all()]
-        Activity.objects.bulk_create([a for a in all_activities if a is not None])
-
     
-class GrsClient(models.Model):
-    username = models.CharField(max_length=10, primary_key=True)
+class GrsAccount(BaseAccount):
+    plan_data = models.CharField(max_length=100)    
+    
+class GrsClient(BaseClient):
     password = models.CharField(max_length=100)
     
     @classmethod 
@@ -53,23 +35,7 @@ class GrsClient(models.Model):
         client.save()
         client.Authorize()
         return client
-    
-    @classmethod 
-    def Get(cls, username):
-        client = GrsClient.objects.get(username=username)
-        client.Authorize()
-        return client
-
-    def __str__(self):
-        return self.username
-        
-    def __enter__(self):
-        self.Authorize()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.CloseSession()     
-        
+            
     def Authorize(self):
         self.session = requests.Session()
         self.session.post('https://ssl.grsaccess.com/Information/login.aspx', data={'username': self.username, 'password': self.password})         
@@ -87,16 +53,17 @@ class GrsClient(models.Model):
 
     def SyncActivities(self, start_date=arrow.get('2011-01-01'), end_date=arrow.now()):        
         for account in self.accounts.all():
-            account.activityraw_set.all().delete()
+            account.rawactivities.all().delete()
             date_range = arrow.Arrow.span_range('year', start_date, end_date)
             print('{} requests'.format(len(date_range)), end='')
 
-            for start, end in date_range:
-                if end > end_date: end = end_date
-                print('.',end='', flush=True)
-                data = self._GetRawActivityData(account.id, start, end)
-                # TODO: Hacked in the only Security I buy - this needs to be done way better. Though... maybe good enough for my purposes now.
-                GrsActivityRaw.objects.bulk_create([ActivityRaw(account=account, day=day, qty=qty, price=price, security_id='ETP') for day, qty, price in data])
+            with transaction.atomic():
+                for start, end in date_range:
+                    if end > end_date: end = end_date
+                    print('.',end='', flush=True)
+                    # TODO: Hacked in the only Security I buy - this needs to be done way better. Though... maybe good enough for my purposes now.
+                    for day, qty, price in self._GetRawActivityData(account.id, start, end):
+                        GrsRawActivity.objects.create(account=account, day=day, qty=qty, price=price, security_id='ETP')
 
     def _GetRawPrices(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 

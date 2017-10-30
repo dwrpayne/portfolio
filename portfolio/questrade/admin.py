@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.template.defaultfilters import floatformat
 
-from .models import Client, Account, Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, ActivityJson
+from .models import Client, Account, Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, QuestradeRawActivity
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
@@ -19,10 +19,10 @@ class ActivityAdmin(admin.ModelAdmin):
     search_fields = ['description']
 admin.site.register(Activity, ActivityAdmin)
 
-class ActivityJsonAdmin(admin.ModelAdmin):
+class QuestradeRawActivityAdmin(admin.ModelAdmin):
     list_display = ['account', 'jsonstr', 'cleaned']
     list_filter = ['account']      
-admin.site.register(ActivityJson, ActivityJsonAdmin)
+admin.site.register(QuestradeRawActivity, QuestradeRawActivityAdmin)
 
 
 class AccountAdmin(admin.ModelAdmin):
@@ -32,11 +32,13 @@ admin.site.register(Account, AccountAdmin)
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     list_display = ['account', 'security', 'display_qty', 'startdate', 'enddate']
-    list_filter = ['account', 'security', 'enddate']        
-
+    list_filter = ['account', 'security', 'enddate']      
 admin.site.register(Holding, HoldingAdmin)
 
-admin.site.register(Client)
+class ClientAdmin(admin.ModelAdmin):
+    list_display = ['username']
+admin.site.register(Client, ClientAdmin)
+    
 
 class CurrencyAdmin(admin.ModelAdmin):
     list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn', 'livePrice']
