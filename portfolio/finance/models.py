@@ -1,8 +1,10 @@
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from polymorphic.models import PolymorphicModel
+from django.db.models import F, Max, Q, Sum
 
-
+from collections import defaultdict
+from decimal import Decimal
 import datetime
 from model_utils import Choices
 
@@ -65,11 +67,7 @@ class Currency(RateLookupMixin):
 class StockSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
-
-    def sync_all(self):
-        for stock in get_queryset(): 
-            DataProvider.SyncStockPrices(stock)
-
+    
 class CashSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Cash)
@@ -156,7 +154,7 @@ class ExchangeRate(RateHistoryTableMixin):
 
 class BaseClient(PolymorphicModel):
     username = models.CharField(max_length=10, primary_key=True)
-            
+
     @classmethod 
     def Get(cls, username):
         client = cls.objects.get(username=username)
@@ -184,9 +182,16 @@ class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.IntegerField(default=0, primary_key = True)
-    
+        
+    def __repr__(self):
+        return "BaseAccount({},{},{})".format(self.client, self.id, self.type)
+
     def __str__(self):
-        return self.type
+        return "{} {} {}".format(self.client, self.id, self.type)
+
+    @property
+    def display_name(self):
+        return "{} {}".format(self.client.username, self.type)
 
     def RegenerateActivities(self):
         with transaction.atomic():
@@ -195,7 +200,40 @@ class BaseAccount(PolymorphicModel):
         self.activities.all().delete()
         all_activities = [raw.CreateActivity() for raw in self.rawactivities.all()]
         Activity.objects.bulk_create([a for a in all_activities if a is not None])      
+                    
+    def RegenerateHoldings(self):
+        self.holding_set.all().delete()
+        self.HackInitMyAccount()
+        for activity in self.activities.all():          
+            for security, qty_delta in activity.GetHoldingEffect().items():
+                self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
+        self.holding_set.filter(qty=0).delete()
+
+    def HackInitMyAccount(self):
+        pass
     
+    def GetMostRecentActivityDate(self):
+        try:
+            return self.activities.latest().tradeDate
+        except:
+            return None
+            
+    def GetValueList(self):
+        val_list = SecurityPrice.objects.filter(
+            Q(security__holding__enddate__gte=F('day'))|Q(security__holding__enddate=None), 
+            security__holding__startdate__lte=F('day'),
+            security__holding__account_id=self.id, 
+            security__currency__rates__day=F('day')
+        ).values_list('day').annotate(
+            val=Sum(F('price') * F('security__holding__qty') * F('security__currency__rates__price'))
+        )
+        d = defaultdict(int)
+        d.update({date:val for date,val in val_list})
+        return d
+
+    def GetValueAtDate(self, date):
+        return self.GetValueList()[date]
+            
         
 class BaseRawActivity(PolymorphicModel):    
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
@@ -270,11 +308,12 @@ class Activity(models.Model):
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
-    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal')
+    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)
     raw = models.OneToOneField(BaseRawActivity, on_delete=models.CASCADE)
     
     class Meta:
+        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
         verbose_name_plural = 'Activities'
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']

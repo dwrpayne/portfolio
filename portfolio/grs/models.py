@@ -21,7 +21,8 @@ class GrsRawActivity(BaseRawActivity):
         pass
                 
     def CreateActivity(self): 
-        return Activity(account=account, tradeDate=day, security=security, description='', qty=qty, price=price, netAmount=0, type=Activity.Type.Buy, sourcejson_id=0)
+        return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty, 
+                        price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
     
 class GrsAccount(BaseAccount):
     plan_data = models.CharField(max_length=100)    
@@ -29,6 +30,9 @@ class GrsAccount(BaseAccount):
 class GrsClient(BaseClient):
     password = models.CharField(max_length=100)
     
+    def __repr__(self):
+        return 'GrsClient<{}>'.format(self.username)
+
     @classmethod 
     def Create(cls, username, password, plan_data, plan_id):
         client = GrsClient(username = username, password=password, plan_data=plan_data, plan_id=plan_id)
@@ -80,8 +84,7 @@ class GrsClient(BaseClient):
 
 
     def _SyncPrices(self, start_date=arrow.get('2010-07-01'), end_date=arrow.now()):
-        plan_data = accounts[0].plan_data
-        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info', accounts[0].plan_data})
+        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info': self.accounts.all()[0].plan_data})
         for security in Security.objects.filter(type=Security.Type.MutualFund):
             start_date = max(start_date, arrow.get(security.GetLatestEntryDate() + datetime.timedelta(days=1)))
             date_range = arrow.Arrow.interval('day', start_date, end_date, 15)

@@ -47,7 +47,7 @@ class DataProvider:
             return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start_date, end_date))
-        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5, pause=1.0)
+        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5)
         if df.size == 0:
             return []
         ix = pandas.DatetimeIndex(start=min(df.index), end=end_date, freq='D')
@@ -69,23 +69,27 @@ class DataProvider:
     @classmethod
     def Init(cls):        
         Currency.objects.update_or_create(code='CAD')
-        Currency.objects.update_or_create(code='USD', lookupSymbol='FXUSDCAD', lookupSource='bankofcanada', lookupColumn='FXUSDCAD')
+        Currency.objects.update_or_create(code='USD', lookupSymbol='DEXCAUS', lookupSource='fred', lookupColumn='DEXCAUS')
         for currency in Currency.objects.all():
             Security.objects.update_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             cls.SyncExchangeRates(currency)
             
     @classmethod
     def SyncAllSecurities(cls):
-        Security.stocks.sync_all()
+        for stock in Security.stocks.all():
+            cls.SyncStockPrices(stock)
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
             cls.SyncStockPrices(cash)
 
 class QuestradeRawActivity(BaseRawActivity):
-    jsonstr = models.CharField(max_length=1000, unique=True)
+    jsonstr = models.CharField(max_length=1000)
     cleaned = models.CharField(max_length=1000, null=True, blank=True)
     
+    class Meta:
+        unique_together = ('baserawactivity_ptr', 'jsonstr')
+        
     def __str__(self):
         return self.jsonstr
 
@@ -118,7 +122,7 @@ class QuestradeRawActivity(BaseRawActivity):
                    }
         if (type, action) in mapping: return mapping[(type, action)]
         print ('No action type mapping for "{}" "{}"'.format(type, action))
-        return None
+        return Activity.Type.NotImplemented
     
     @classmethod
     def AllowDuplicate(cls, s):        
@@ -182,7 +186,7 @@ class QuestradeRawActivity(BaseRawActivity):
     def CreateActivity(self): 
         json = simplejson.loads(self.cleaned)
                 
-        create_args = {'account' : self.account, 'sourcejson' : self}
+        create_args = {'account' : self.account, 'raw' : self}
         for item in ['description', 'tradeDate', 'type']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
@@ -207,46 +211,6 @@ class QuestradeRawActivity(BaseRawActivity):
 class Account(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
-        
-    def __repr__(self):
-        return "Account({},{},{})".format(self.client, self.id, self.type)
-
-    def __str__(self):
-        return "{} {} {}".format(self.client, self.id, self.type)
-
-    @property
-    def display_name(self):
-        return "{} {}".format(self.client.username, self.type)
-    
-    def GetMostRecentActivityDate(self):
-        try:
-            return self.activities.latest().tradeDate
-        except:
-            return None
-            
-    def RegenerateHoldings(self):
-        self.holding_set.all().delete()
-        self.HackInitMyAccount()
-        for activity in self.activities.all():          
-            for security, qty_delta in activity.GetHoldingEffect().items():
-                self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
-        self.holding_set.filter(qty=0).delete()
-
-    def GetValueList(self):
-        val_list = SecurityPrice.objects.filter(
-            Q(security__holding__enddate__gte=F('day'))|Q(security__holding__enddate=None), 
-            security__holding__startdate__lte=F('day'),
-            security__holding__account_id=self.id, 
-            security__currency__rates__day=F('day')
-        ).values_list('day').annotate(
-            val=Sum(F('price') * F('security__holding__qty') * F('security__currency__rates__price'))
-        )
-        d = defaultdict(int)
-        d.update({date:val for date,val in val_list})
-        return d
-
-    def GetValueAtDate(self, date):
-        return self.GetValueList()[date]
             
     def HackInitMyAccount(self):
         start = '2011-01-01'
@@ -323,7 +287,7 @@ class Client(BaseClient):
     def SyncAccounts(self):
         json = self._GetRequest('accounts')
         for account_json in json['accounts']:
-            self.accounts.update_or_create(type=account_json['type'], id=account_json['number'])
+            Account.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
             
     def UpdateMarketPrices(self):
         symbols = Holding.current.filter(account__client=self, security__type=Security.Type.Stock).values_list('security__symbol', flat=True).distinct()
