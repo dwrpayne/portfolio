@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django import forms
 
 import requests
@@ -12,13 +12,13 @@ import pandas
 from questrade.models import Security, SecurityPrice, Activity
 
 class GrsActivityRaw(models.Model):
-    account = models.ForeignKey('GrsAccount', on_delete=models.CASCADE)
+    account = models.ForeignKey('GrsAccount', on_delete=models.CASCADE, related_name='rawactivities')
     day = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
-    def CleanSourceData():
+    def CleanSourceData(self):
         pass
                 
     def CreateActivity(self): 
@@ -36,10 +36,10 @@ class GrsAccount(models.Model):
 
     def RegenerateActivities(self):
         with transaction.atomic():
-            for activityraw in self.activityraw_set.all():
+            for activityraw in self.rawactivities.all():
                 activityraw.CleanSourceData()
         self.activity_set.all().delete()
-        all_activities = [j.CreateActivity() for j in self.activityraw_set.all()]
+        all_activities = [j.CreateActivity() for j in self.rawactivities.all()]
         Activity.objects.bulk_create([a for a in all_activities if a is not None])
 
     
@@ -136,3 +136,4 @@ class GrsClient(models.Model):
             series = series.reindex(index).ffill()
 
             security.rates.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in series.iteritems()])
+
