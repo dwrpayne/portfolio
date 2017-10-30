@@ -11,42 +11,52 @@ import pandas
 
 from questrade.models import Security, SecurityPrice, Activity
 
-class ActivityRaw(models.Model):
-    account = models.ForeignKey('Account', on_delete=models.CASCADE)
+class GrsActivityRaw(models.Model):
+    account = models.ForeignKey('GrsAccount', on_delete=models.CASCADE)
     day = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
+
+    def CleanSourceData():
+        pass
                 
     def CreateActivity(self): 
-        activity = Activity(account=account, tradeDate=day, security=security, description='', qty=qty, price=price, netAmount=0, type=Activity.Type.Buy, sourcejson_id=0)
-        activity.save()
+        return Activity(account=account, tradeDate=day, security=security, description='', qty=qty, price=price, netAmount=0, type=Activity.Type.Buy, sourcejson_id=0)
 
 
-
-class Account(models.Model):
-    client = models.ForeignKey('Client', on_delete=models.CASCADE, related_name='accounts')
+class GrsAccount(models.Model):
+    client = models.ForeignKey('GrsClient', on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.IntegerField(default=0, primary_key = True)
     plan_data = models.CharField(max_length=100)
 
     def __str__(self):
         return self.type
+
+    def RegenerateActivities(self):
+        with transaction.atomic():
+            for activityraw in self.activityraw_set.all():
+                activityraw.CleanSourceData()
+        self.activity_set.all().delete()
+        all_activities = [j.CreateActivity() for j in self.activityraw_set.all()]
+        Activity.objects.bulk_create([a for a in all_activities if a is not None])
+
     
-class Client(models.Model):
+class GrsClient(models.Model):
     username = models.CharField(max_length=10, primary_key=True)
     password = models.CharField(max_length=100)
     
     @classmethod 
     def Create(cls, username, password, plan_data, plan_id):
-        client = Client(username = username, password=password, plan_data=plan_data, plan_id=plan_id)
+        client = GrsClient(username = username, password=password, plan_data=plan_data, plan_id=plan_id)
         client.save()
         client.Authorize()
         return client
     
     @classmethod 
     def Get(cls, username):
-        client = Client.objects.get(username=username)
+        client = GrsClient.objects.get(username=username)
         client.Authorize()
         return client
 
@@ -86,7 +96,7 @@ class Client(models.Model):
                 print('.',end='', flush=True)
                 data = self._GetRawActivityData(account.id, start, end)
                 # TODO: Hacked in the only Security I buy - this needs to be done way better. Though... maybe good enough for my purposes now.
-                ActivityRaw.objects.bulk_create([ActivityRaw(account=account, day=day, qty=qty, price=price, security_id='ETP') for day, qty, price in data])
+                GrsActivityRaw.objects.bulk_create([ActivityRaw(account=account, day=day, qty=qty, price=price, security_id='ETP') for day, qty, price in data])
 
     def _GetRawPrices(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 
