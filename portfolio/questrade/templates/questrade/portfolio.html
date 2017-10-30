@@ -1,64 +1,20 @@
+{% load static %}
 <meta http-equiv="Content-Language" content="en">
     <html>
     <body>
         <br />
         <div style="float:left;margin-left: 50px">
-            <button type="submit" class="refresh-holdings">Refresh Holdings</button>
             {% include "questrade/holdings.html" %}
         </div>
 
         <div style="float:left;margin-left: 50px">
-            <button type="submit" class="refresh-balances">Refresh Balances</button>
             {% include "questrade/balances.html" %}
         </div>
         
         <div id="foobar"></div>
 
-    <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
-    <script>
-        $(document).ready(function () {
-            $("button.refresh-balances").click(function () {
-                $(this).attr('disabled', 'disabled');
-                $(this).html("Refreshing...");
-                $.ajax({
-                    url: 'go',
-                    data: $(this).attr('class'),
-                    success: function (data) {
-                        var html = $(data).filter('#balances').html();
-                        $('#balances').html(html);
-                    },
-                    error: function (data) {
-                        alert("Couldn't refresh!\n" + JSON.stringify(data))
-                    },
-                    complete: function (jqXHR, textStatus) {
-                        $("button.refresh-balances").prop("disabled", false);
-                        $("button.refresh-balances").html("Refresh Balances");
-                    }
-                });
-            });
-        });
-        $(document).ready(function () {
-            $("button.refresh-holdings").click(function () {
-                $(this).attr('disabled', 'disabled');
-                $(this).html("Refreshing...");
-                $.ajax({
-                    url: 'go',
-                    data: $(this).attr('class'),
-                    success: function (data) {
-                        var html = $(data).filter('#holdings').html();
-                        $('#holdings').html(html);
-                    },
-                    error: function (data) {
-                        alert("Couldn't refresh!\n" + JSON.stringify(data))
-                    },
-                    complete: function (data) {
-                        $("button.refresh-holdings").prop("disabled", false);
-                        $("button.refresh-holdings").html("Refresh Holdings");
-                    }
-                });
-            });
-        });
-    </script>
+        <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
+        <script src="{% static "questrade/refresh_button.js"%}"></script>
 
     </body>
 </html>

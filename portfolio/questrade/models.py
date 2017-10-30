@@ -19,6 +19,7 @@ import datetime
 from decimal import Decimal
 import traceback
 import simplejson
+import threading
 
 import pandas
 from pandas_datareader import data as pdr
@@ -532,7 +533,6 @@ class Account(models.Model):
             self.holding_set.create(security_id='CAD Cash', qty=Decimal('147.25'), startdate=start, enddate=None)
             self.holding_set.create(security_id='USD Cash', qty=Decimal('97.15'), startdate=start, enddate=None)
     
-import threading
 class Client(models.Model):
     username = models.CharField(max_length=100, primary_key=True)
     refresh_token = models.CharField(max_length=100)
@@ -582,7 +582,7 @@ class Client(models.Model):
                 self.api_server = json['api_server'] + 'v1/'
                 self.refresh_token = json['refresh_token']
                 self.access_token = json['access_token']
-                self.token_expiry = datetime.datetime.now() + datetime.timedelta(seconds = json['expires_in'])
+                self.token_expiry = timezone.now() + datetime.timedelta(seconds = json['expires_in'])
                 # Make sure to save out to DB
                 self.save()
 

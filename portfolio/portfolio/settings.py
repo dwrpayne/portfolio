@@ -33,7 +33,9 @@ INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
 # Application definition
 
 INSTALLED_APPS = [
+    'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
+    'finance.apps.financeConfig',
     'debug_toolbar',
     'django_extensions',
     'django.contrib.admin',
