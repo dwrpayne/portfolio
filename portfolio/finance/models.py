@@ -25,9 +25,9 @@ class RateLookupMixin(models.Model):
     A mixin class that adds the necessary fields to support looking up historical rates from pandas-datareader
     Classes that use this must define a subclass of RateHistoryTableMixin and create a foreign key back to this class with related_name="rates"
     """
-    lookupSymbol = models.CharField(max_length=16, null=True, blank=True, default=None)
-    lookupSource = models.CharField(max_length=16, null=True, blank=True, default=None)
-    lookupColumn = models.CharField(max_length=10, null=True, blank=True, default=None)    
+    lookupSymbol = models.CharField(max_length=32, null=True, blank=True, default=None)
+    lookupSource = models.CharField(max_length=32, null=True, blank=True, default=None)
+    lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)    
     livePrice = models.DecimalField(max_digits=19, decimal_places=6, default=0)   
         
     def GetLatestEntryDate(self):

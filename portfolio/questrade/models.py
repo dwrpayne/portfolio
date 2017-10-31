@@ -38,6 +38,11 @@ class QuestradeRawActivity(BaseRawActivity):
         
     def __str__(self):
         return self.jsonstr
+      
+    @classmethod
+    def AllowDuplicate(cls, s):        
+        # Hack to support actual duplicate transactions (no disambiguation available)
+        return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
 
     @classmethod 
     def Add(cls, json, account):
@@ -69,12 +74,7 @@ class QuestradeRawActivity(BaseRawActivity):
         if (type, action) in mapping: return mapping[(type, action)]
         print ('No action type mapping for "{}" "{}"'.format(type, action))
         return Activity.Type.NotImplemented
-    
-    @classmethod
-    def AllowDuplicate(cls, s):        
-        # Hack to support actual duplicate transactions (no disambiguation available)
-        return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
-
+  
     def GetCleanedJson(self):
         json = simplejson.loads(self.jsonstr)
 
@@ -219,7 +219,6 @@ class Client(BaseClient):
 
         self.session = requests.Session()
         self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
-
         
     def CloseSession(self):
         self.session.close()
