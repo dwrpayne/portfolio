@@ -7,6 +7,7 @@ from collections import defaultdict
 from decimal import Decimal
 import datetime
 from model_utils import Choices
+import arrow
 
 class RateHistoryTableMixin(models.Model):
     """
@@ -216,6 +217,10 @@ class BaseClient(PolymorphicModel):
         client.Authorize()
         return client
 
+    @property
+    def activitySyncDateRange(self):
+        return 30
+
     def __str__(self):
         return self.username
         
@@ -231,6 +236,23 @@ class BaseClient(PolymorphicModel):
         
     def CloseSession(self):
         pass
+
+    def _CreateRawActivities(account_id, start, end):
+        pass
+        
+    def SyncActivities(self, startDate='2011-01-01'):
+        for account in self.accounts.all():            
+            print ('Syncing all activities for {}: '.format(account), end='')
+            start = account.GetMostRecentActivityDate()
+            if start: start = arrow.get(start).shift(days=+1)
+            else: start = arrow.get(startDate)
+            
+            account.rawactivities.all().delete()
+            date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
+            print('{} requests'.format(len(date_range)), end='')
+            for start, end in date_range:
+                print('.',end='', flush=True)
+                account._CreateRawActivities(start, end)
     
     
 class BaseAccount(PolymorphicModel):

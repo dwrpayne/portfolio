@@ -17,6 +17,12 @@ class GrsRawActivity(BaseRawActivity):
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
+    def __str__(self):
+        return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.security, self.price)
+    
+    def __repr__(self):
+        return 'GrsRawActivity<{}>'.format(self.username)
+
     def CreateActivity(self): 
         return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty, 
                         price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
@@ -29,6 +35,10 @@ class GrsClient(BaseClient):
     
     def __repr__(self):
         return 'GrsClient<{}>'.format(self.username)
+    
+    @property
+    def activitySyncDateRange(self):
+        return 360
 
     @classmethod 
     def Create(cls, username, password, plan_data, plan_id):
@@ -44,27 +54,15 @@ class GrsClient(BaseClient):
     def CloseSession(self):
         self.session.close()
 
-    def _GetRawActivityData(self, account_id, start, end):
+    def _CreateRawActivities(self, account_id, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId':account_id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'})
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date() for tag in soup.find_all('td', class_='activities-d-lit1')]    
         units = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-unitnum')]
         prices = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
-        return zip(trans_dates, units, prices)
-
-    def SyncActivities(self, start_date=arrow.get('2011-01-01'), end_date=arrow.now()):        
-        for account in self.accounts.all():
-            account.rawactivities.all().delete()
-            date_range = arrow.Arrow.span_range('year', start_date, end_date)
-            print('{} requests'.format(len(date_range)), end='')
-
-            with transaction.atomic():
-                for start, end in date_range:
-                    if end > end_date: end = end_date
-                    print('.',end='', flush=True)
-                    # TODO: Hacked in the only Security I buy - this needs to be done way better. Though... maybe good enough for my purposes now.
-                    for day, qty, price in self._GetRawActivityData(account.id, start, end):
-                        GrsRawActivity.objects.create(account=account, day=day, qty=qty, price=price, security_id='ETP')
+        with transaction.atomic():
+            for day, qty, price in zip(trans_dates, units, prices):
+                GrsRawActivity.objects.create(account_id=account_id, day=day, qty=qty, price=price, security_id='ETP')
 
     def _GetRawPrices(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 

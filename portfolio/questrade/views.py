@@ -81,18 +81,6 @@ def GetBalanceContext():
     context = {'account_data':account_data, 'balance_refresh_count':balance_refresh_count }
     return context
 
-# WOAH
-#for acc in a:
-#  x,y = list(zip(*acc.GetValueList().items()))
-#  t.append(go.Scatter(name=acc.client.username + ' ' +acc.type, x=x, y=y))
-
-#vals = defaultdict(Decimal)
-#for acc in a:
-#       for date, v in acc.GetValueList().items(): vals[date] += v
-#pair = list(zip(*sorted(vals.items())))
-#trace = go.Scatter(name='Total', x=pair[0], y=pair[1])
-#plotly.offline.plot(t+[trace])
-
 def DoWorkHistory():
     yield "<html><body><pre>"
     yield "<br>"

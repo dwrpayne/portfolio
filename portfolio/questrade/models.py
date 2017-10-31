@@ -252,10 +252,12 @@ class Client(BaseClient):
         price = Decimal(str(r.json()['rates']['CAD']))
         Currency.objects.filter(code='USD').update(livePrice=price)
                             
-    def _GetActivities(self, account_id, startTime, endTime):
-        json = self._GetRequest('accounts/{}/activities'.format(account_id), {'startTime': startTime.isoformat(), 'endTime': endTime.isoformat()})
+    def _CreateRawActivities(self, account_id, start, end):
+        end = end.replace(hour=0, minute=0, second=0)
+        json = self._GetRequest('accounts/{}/activities'.format(account_id), {'startTime': start.isoformat(), 'endTime': endTime.isoformat()})
         logger.debug(json)
-        return json['activities']
+        for activity_json in json['activities']:
+            QuestradeRawActivity.Add(activity_json, account)
 
     def _FindSymbolId(self, symbol):
         json = self._GetRequest('symbols/search', {'prefix':symbol})
@@ -274,23 +276,6 @@ class Client(BaseClient):
             json = self._GetRequest('symbols', 'ids='+','.join(map(str,symbolids)))
         logger.debug(json)
         return json['symbols']
-    
-    def SyncActivities(self, startDate='2011-02-01'):
-        for account in self.accounts.all():
-            print ('Syncing all activities for {}: '.format(account), end='')
-            start = account.GetMostRecentActivityDate()
-            if start: start = arrow.get(start).shift(days=+1)
-            else: start = arrow.get(startDate)
-            
-            date_range = arrow.Arrow.interval('day', start, arrow.now(), 30)
-            print('{} requests'.format(len(date_range)), end='')
-            for start, end in date_range:
-                print('.',end='',flush=True)
-                logger.debug(account.id, start, end)
-                activities_list = self._GetActivities(account.id, start, end.replace(hour=0, minute=0, second=0))
-                for json in activities_list: 
-                    QuestradeRawActivity.Add(json, account)
-            print()
 
     def UpdateSecurityInfo(self):
         with transaction.atomic():
