@@ -6,21 +6,21 @@ import unittest
 
 def setUpModule():
     Security.objects.all().delete()
-    Client.objects.all().delete()
+    QuestradeClient.objects.all().delete()
 
     Currency.objects.create(code='CAD', rateLookup='CADBASE')
     Currency.objects.create(code='USD', rateLookup='DEXCAUS')
-    #Client.CreateClient('test', '123457890')
+    #QuestradeClient.CreateClient('test', '123457890')
 
 def tearDownModule():
     pass
 
 
-@unittest.skip('No Client API support outside production')
+@unittest.skip('No QuestradeClient API support outside production')
 class ClientModelTests(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.client = Client.objects.get(username='David')
+        cls.client = QuestradeClient.objects.get(username='David')
         cls.client.Authorize()
 
     @classmethod
@@ -43,8 +43,8 @@ class ActivityModelTests(TestCase):
         cls.cad = Currency.objects.get(code='CAD')
         cls.vti = Security.objects.create(symbol='VTI', currency_id='USD')
         json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
-        c = Client.objects.create(username='test', refresh_token='test_token')
-        a = Account.objects.create(client=c, id=0, type='')
+        c = QuestradeClient.objects.create(username='test', refresh_token='test_token')
+        a = QuestradeAccount.objects.create(client=c, id=0, type='')
         cls.buy = Activity.CreateFromJson(json, a)
 
         json={'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23T00:00:00.000000-04:00', 'settlementDate': '2013-07-23T00:00:00.000000-04:00', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
@@ -53,7 +53,7 @@ class ActivityModelTests(TestCase):
     @classmethod
     def tearDownClass(cls):
         Currency.objects.all().delete()
-        Client.objects.all().delete()
+        QuestradeClient.objects.all().delete()
         Security.objects.all().delete()
         Activity.objects.all().delete()
         ExchangeRate.objects.all().delete()
@@ -98,8 +98,8 @@ class ActivityModelTests(TestCase):
 class AccountModelTests(TestCase):
     @classmethod
     def setUpClass(cls):
-        c = Client.objects.create(username='test', refresh_token='test_token')
-        cls.account = Account.objects.create(client=c, id=0, type='')        
+        c = QuestradeClient.objects.create(username='test', refresh_token='test_token')
+        cls.account = QuestradeAccount.objects.create(client=c, id=0, type='')        
         Security.objects.create(symbol='VTI', currency_id='USD')
         DataProvider.SyncAllSecurities()
         json={'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
@@ -114,7 +114,7 @@ class AccountModelTests(TestCase):
     def tearDownClass(cls):
         Currency.objects.all().delete()
         Security.objects.all().delete()
-        Client.objects.all().delete()
+        QuestradeClient.objects.all().delete()
         ExchangeRate.objects.all().delete()
 
     def test_recent_activity(self):

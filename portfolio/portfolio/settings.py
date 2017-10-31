@@ -79,7 +79,7 @@ TEMPLATES = [
 ]
 
 SHELL_PLUS_PRE_IMPORTS = [
-    ('questrade.models', 'DataProvider'),
+    ('finance.models', 'DataProvider'),
     ('questrade.models', 'DoWork'),
     ('questrade.models', 'All'),
     'datetime',

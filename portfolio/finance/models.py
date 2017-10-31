@@ -8,6 +8,9 @@ from decimal import Decimal
 import datetime
 from model_utils import Choices
 import arrow
+import pandas
+import requests
+from pandas_datareader import data as pdr
 
 class RateHistoryTableMixin(models.Model):
     """
@@ -28,30 +31,63 @@ class RateLookupMixin(models.Model):
     lookupSymbol = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupSource = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)    
-    livePrice = models.DecimalField(max_digits=19, decimal_places=6, default=0)   
         
-    def GetLatestEntryDate(self):
+    def GetShouldSyncRange(self):
+        """ Returns a pair (start,end) of datetime.dates that need to be synced."""
+        latest = datetime.date(2009,1,1)
         try:
-            return self.rates.latest().day
+            latest = self.rates.latest().day
         except ObjectDoesNotExist:
-            return datetime.date(2009,1,1)
+            pass
 
-    def GetLatestRate(self):
-        return self.rates.latest().price
-                
-    def GetRate(self, day):
-        return self.rates.get(day=day).price
+        if latest == datetime.date.today():
+            return (None, None)
+
+        start_date = latest - datetime.timedelta(days=7)
+        end_date = datetime.date.today()
+        return (start_date, end_date)
         
-    def save(self, *args, **kwargs):
-        if hasattr(self, 'symbol'): 
-            self.lookupSymbol = self.symbol
-            self.lookupSource = 'yahoo'
-            self.lookupColumn = 'Close'
-        super().save(*args, **kwargs)
+    @property
+    def live_price(self):
+        return self.rates.latest().price
+
+    @live_price.setter
+    def live_price(self, value):
+        t.rates.update_or_create(day=datetime.date.today(), defaults={'price':value})
+
+    def _ProcessRateData(self, data, end_date):
+        if isinstance(data, pandas.DataFrame):
+            data = pandas.Series(data[self.lookupColumn], data.index)
+        else:
+            # Expect iterator of day, price pairs
+            dates, prices = zip(*data)
+            data = pandas.Series(prices, index=dates)
+
+        index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
+        data = data.reindex(index).ffill()
+        return data.iteritems()
+
+    def SyncRates(self, retriever_fn):
+        """ 
+        retriever_fn is the function that will retrieve the rates.
+        It gets passed (lookup, start, end) and is expected to return an iterator of (day, price) pairs or a pandas dataframe
+        """
+        start, end = self.GetShouldSyncRange()
+        if start is None:
+            print ('Already synced data for {}, skipping.'.format(self.lookupSymbol))
+            return []
+
+        data = self._ProcessRateData(retriever_fn(self, start, end), end)
+        
+        with transaction.atomic():
+            for day, price in data:
+                self.rates.update_or_create(day=day, defaults={'price':price})      
+                    
+    def GetRateOnDay(self, day):
+        return self.rates.get(day=day).price
 
     class Meta:
         abstract = True
-
 
 class Currency(RateLookupMixin):
     code = models.CharField(max_length=3, primary_key=True)
@@ -64,7 +100,7 @@ class Currency(RateLookupMixin):
         
     def GetExchangeRate(self, day):
         return self.GetRate(day)
-    
+        
 class StockSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
@@ -76,6 +112,10 @@ class CashSecurityManager(models.Manager):
 class OptionSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Option)
+
+class MutualFundSecurityManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.MutualFund)
 
 class Security(RateLookupMixin):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
@@ -91,6 +131,7 @@ class Security(RateLookupMixin):
     stocks = StockSecurityManager()
     cash = CashSecurityManager()
     options = OptionSecurityManager()
+    mutualfunds = MutualFundSecurityManager()
 
     @classmethod
     def CreateFromJson(cls, json):
@@ -104,19 +145,17 @@ class Security(RateLookupMixin):
             )
       
     class Meta:
-        verbose_name_plural = 'Securities' 
+        verbose_name_plural = 'Securities'
+        
+    @property
+    def live_price_cad(self):
+        return self.live_price * self.currency.live_price
         
     def GetPrice(self, day):
-        return self.GetRate(day)
-
-    def GetLatestPrice(self):
-        return self.GetLatestRate()
+        return self.GetRateOnDay(day)
 
     def GetPriceCAD(self, day):
-        return self.GetRate(day) * self.currency.GetRate(day)
-
-    def GetLatestPriceCAD(self):
-        return self.GetLatestRate() * self.currency.GetLatestRate()
+        return self.GetRateOnDay(day) * self.currency.GetRateOnDay(day)
 
     def __str__(self):
         return "{} {}".format(self.symbol, self.currency)
@@ -152,60 +191,51 @@ class ExchangeRate(RateHistoryTableMixin):
     def __str__(self):
         return "{} {} {}".format(self.currency, self.day, self.price)    
 
-    
-
 class DataProvider:
-    FAKED_VALS = {'DLR.U.TO':10., None:1., 'USD Cash':1., 'CAD Cash':1.}
+    FAKED_VALS = {'DLR.U.TO':10.}
+
+    @classmethod
+    def _FakeData(cls, lookup, start, end):
+        for day in pandas.date_range(start, end).date:
+            yield day, 1.
     
     @classmethod
-    def _RetrieveData(cls, lookup):
+    def _RetrieveData(cls, lookup, start, end):
         """ Returns a list of tuples (day, price) """
-        start_date = lookup.GetLatestEntryDate() + datetime.timedelta(days=1)
-        end_date = datetime.date.today() - datetime.timedelta(days=1)
-        if start_date >= end_date:
-            print ('Already synced data for {}, skipping.'.format(lookup.lookupSymbol))
-            return []
-
         if lookup.lookupSymbol in cls.FAKED_VALS:
-            index = pandas.date_range(start_date, end_date, freq='D').date
+            index = pandas.date_range(start, end, freq='D').date
             return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
 
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start_date, end_date))
-        df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start_date, end_date, retry_count=5)
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        for retry in range(5):
+            try: df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
+            except: pass
         if df.size == 0:
             return []
-        ix = pandas.DatetimeIndex(start=min(df.index), end=end_date, freq='D')
+        ix = pandas.DatetimeIndex(start=min(df.index), end=end, freq='D')
         df = df.reindex(ix).ffill()
         return zip(ix, df[lookup.lookupColumn])
-
-        return []
-     
-    @classmethod
-    def SyncStockPrices(cls, security):
-        data = cls._RetrieveData(security)
-        security.rates.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in data])
-
-    @classmethod
-    def SyncExchangeRates(cls, currency):
-        data = cls._RetrieveData(currency)
-        currency.rates.bulk_create([ExchangeRate(currency=currency, day=day, price=price) for day, price in data])
+         
         
     @classmethod
-    def Init(cls):        
-        Currency.objects.update_or_create(code='CAD')
-        Currency.objects.update_or_create(code='USD', lookupSymbol='DEXCAUS', lookupSource='fred', lookupColumn='DEXCAUS')
+    def Init(cls):
         for currency in Currency.objects.all():
-            Security.objects.update_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
-            cls.SyncExchangeRates(currency)
+            Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
+            currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrieveData)
+
+    @classmethod
+    def UpdateLatestExchangeRates(cls):
+        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
+        Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
             
     @classmethod
     def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
-            cls.SyncStockPrices(stock)
+            stock.SyncRates(cls._RetrieveData)
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
-            cls.SyncStockPrices(cash)
+            cash.SyncRates(cls._FakeData)
 
 
 class BaseClient(PolymorphicModel):
@@ -237,6 +267,10 @@ class BaseClient(PolymorphicModel):
     def CloseSession(self):
         pass
 
+    @property
+    def currentSecurities(self):
+        return Security.objects.filter(holdings__account__client=self, holdings__enddate=None).distinct()
+
     def _CreateRawActivities(account_id, start, end):
         pass
         
@@ -253,6 +287,9 @@ class BaseClient(PolymorphicModel):
             for start, end in date_range:
                 print('.',end='', flush=True)
                 account._CreateRawActivities(start, end)
+
+    def SyncPrices(self):
+        pass
     
     
 class BaseAccount(PolymorphicModel):
@@ -354,7 +391,7 @@ class CurrentHoldingManager(HoldingManager):
 
 class Holding(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE)
-    security = models.ForeignKey(Security, on_delete=models.CASCADE)
+    security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='holdings')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     startdate = models.DateField()
     enddate = models.DateField(null=True)
@@ -410,4 +447,5 @@ class Activity(models.Model):
         elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
             effect[self.security] = self.qty
 
-        return effect                     
+        return effect                 
+    

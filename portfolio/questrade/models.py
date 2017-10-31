@@ -20,9 +20,6 @@ import traceback
 import simplejson
 import threading
 
-import pandas
-from pandas_datareader import data as pdr
-
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -153,7 +150,7 @@ class QuestradeRawActivity(BaseRawActivity):
         return activity
      
 
-class Account(BaseAccount):
+class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
             
@@ -181,7 +178,7 @@ class Account(BaseAccount):
             self.holding_set.create(security_id='CAD Cash', qty=Decimal('147.25'), startdate=start, enddate=None)
             self.holding_set.create(security_id='USD Cash', qty=Decimal('97.15'), startdate=start, enddate=None)
     
-class Client(BaseClient):
+class QuestradeClient(BaseClient):
     refresh_token = models.CharField(max_length=100)
     access_token = models.CharField(max_length=100, null=True, blank=True)
     api_server = models.CharField(max_length=100, null=True, blank=True)
@@ -190,7 +187,7 @@ class Client(BaseClient):
 
     @classmethod 
     def CreateClient(cls, username, refresh_token):
-        client = Client(username = username, refresh_token = refresh_token)
+        client = QuestradeClient(username = username, refresh_token = refresh_token)
         client.Authorize()
         client.SyncAccounts()
         return client
@@ -231,25 +228,17 @@ class Client(BaseClient):
     def SyncAccounts(self):
         json = self._GetRequest('accounts')
         for account_json in json['accounts']:
-            Account.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
+            QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
             
-    def UpdateMarketPrices(self):
-        symbols = Holding.current.filter(account__client=self, security__type=Security.Type.Stock).values_list('security__symbol', flat=True).distinct()
-        securities = Security.stocks.filter(symbol__in=symbols)
-        json = self._GetRequest('markets/quotes', 'ids=' + ','.join([str(s.symbolid) for s in securities if s.symbolid > 0]))
+    def SyncPrices(self):
+        ids = self.currentSecurities.filter(symbolid__gt=0).values_list('symbolid', flat=True)
+        json = self._GetRequest('markets/quotes', 'ids=' + ','.join(map(str,ids)))
         for q in json['quotes']:
-            price = q['lastTradePriceTrHrs']
-            if not price: price = q['lastTradePrice']   
+            price = q['lastTradePriceTrHrs'] or q['lastTradePrice'] or 0
             if not price: 
                 print('No price available for {}... zeroing out.', q['symbol'])
-                price = 100
-            stock = Security.stocks.get(symbol=q['symbol'])
-            stock.livePrice = Decimal(str(price))
-            stock.save()
-
-        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
-        price = Decimal(str(r.json()['rates']['CAD']))
-        Currency.objects.filter(code='USD').update(livePrice=price)
+            security = Security.stocks.get(symbol=q['symbol'])
+            security.live_price = Decimal(str(price))
                             
     def _CreateRawActivities(self, account_id, start, end):
         end = end.replace(hour=0, minute=0, second=0)
@@ -262,7 +251,6 @@ class Client(BaseClient):
         json = self._GetRequest('symbols/search', {'prefix':symbol})
         for s in json['symbols']:
             if s['isTradable'] and symbol == s['symbol']: 
-                logger.debug("Matching {} to {}".format(symbol, s))
                 return s['symbolId']
         return 0
 
@@ -296,14 +284,15 @@ class Client(BaseClient):
 
 def DoWork():
     DataProvider.Init()
-    for a in Account.objects.all():
+    for a in QuestradeAccount.objects.all():
         a.RegenerateActivities()
         a.RegenerateHoldings()
     DataProvider.SyncAllSecurities()
 
 def All():
     Currency.objects.all().delete()
-    for c in Client.objects.all():
+    for c in QuestradeClient.objects.all():
         c.Authorize()
         c.SyncActivities()
     DoWork()
+    

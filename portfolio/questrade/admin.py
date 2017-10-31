@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.template.defaultfilters import floatformat
 
-from .models import Client, Account, Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, QuestradeRawActivity
+from .models import QuestradeClient, QuestradeAccount, Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, QuestradeRawActivity
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
@@ -27,7 +27,7 @@ admin.site.register(QuestradeRawActivity, QuestradeRawActivityAdmin)
 
 class AccountAdmin(admin.ModelAdmin):
     list_display = ['client', 'type', 'id']
-admin.site.register(Account, AccountAdmin)
+admin.site.register(QuestradeAccount, AccountAdmin)
     
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
@@ -37,18 +37,18 @@ admin.site.register(Holding, HoldingAdmin)
 
 class ClientAdmin(admin.ModelAdmin):
     list_display = ['username']
-admin.site.register(Client, ClientAdmin)
+admin.site.register(QuestradeClient, ClientAdmin)
     
 
 class CurrencyAdmin(admin.ModelAdmin):
-    list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn', 'livePrice']
+    list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn', 'live_price']
 admin.site.register(Currency, CurrencyAdmin)
 
 class SecurityAdmin(admin.ModelAdmin):
-    def security_price_count(self, obj):
+    def latest_update_day(self, obj):
         return obj.rates.latest().day
-    security_price_count.short_description = "Latest Price"
-    list_display = ['symbol', 'symbolid', 'type', 'currency', 'livePrice', 'description', 'security_price_count']
+    latest_update_day.short_description = "Latest Price"
+    list_display = ['symbol', 'symbolid', 'type', 'currency', 'live_price', 'latest_update_day', 'description']
 admin.site.register(Security, SecurityAdmin)
 
 class SecurityPriceAdmin(admin.ModelAdmin):

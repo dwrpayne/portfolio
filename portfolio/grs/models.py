@@ -64,41 +64,24 @@ class GrsClient(BaseClient):
             for day, qty, price in zip(trans_dates, units, prices):
                 GrsRawActivity.objects.create(account_id=account_id, day=day, qty=qty, price=price, security_id='ETP')
 
-    def _GetRawPrices(self, symbol, start, end):
-        response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 
-            data={'PlanFund': symbol, 'PlanDetail':'', 'BodyTitle':'', 
-                'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'},
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0' }
-            )
-        soup = BeautifulSoup(response.text, 'html.parser')
-        table_header = soup.find('tr', class_='table-header')
-        if not table_header: return []
-        dates = [tag.contents[0] for tag in table_header.find_all('td')[1:]]
-        values = [tag.contents[0] for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
-        return zip(dates, values)
-
-
-    def _SyncPrices(self, start_date=arrow.get('2010-07-01'), end_date=arrow.now()):
-        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info': self.accounts.all()[0].plan_data})
-        for security in Security.objects.filter(type=Security.Type.MutualFund):
-            start_date = max(start_date, arrow.get(security.GetLatestEntryDate() + datetime.timedelta(days=1)))
-            date_range = arrow.Arrow.interval('day', start_date, end_date, 15)
-            print('{} requests'.format(len(date_range)), end='')
-            data = []
-            for start, end in date_range:
-                print('.',end='', flush=True)
-                try:
-                    data += self._GetRawPrices(security.symbol, start, end)
-                except requests.exceptions.ConnectionError:
-                    pass
-
-            print()         
-
-            cleaned_data = {parser.parse(date).date(): Decimal(value[1:]) for date, value in data if not 'Unknown' in value}
-
-            series = pandas.Series(cleaned_data)
-            index = pandas.DatetimeIndex(start = min(series.index), end=max(series.index), freq='D').date    
-            series = series.reindex(index).ffill()
-
-            security.rates.bulk_create([SecurityPrice(security=security, day=day, price=price) for day, price in series.iteritems()])
-
+    def _GetRawPrices(self, lookup, start_date, end_date):
+        for start, end in arrow.Arrow.interval('day', arrow.get(start_date), arrow.get(end_date), 15):
+            response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 
+                data={'PlanFund': lookup.lookupSymbol, 'PlanDetail':'', 'BodyTitle':'', 
+                    'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'},
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0' }
+                )
+            soup = BeautifulSoup(response.text, 'html.parser')
+            table_header = soup.find('tr', class_='table-header')
+            if table_header: 
+                dates = [tag.contents[0] for tag in table_header.find_all('td')[1:]]
+                values = [tag.contents[0] for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
+                for date, value in zip(dates, values):
+                    if not 'Unknown' in value:
+                        yield parser.parse(date).date(), Decimal(value[1:])
+        return
+    
+    def SyncPrices(self):
+        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info': self.accounts.first().plan_data})
+        for security in self.currentSecurities:
+            security.SyncRates(self._GetRawPrices)

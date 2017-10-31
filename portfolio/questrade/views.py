@@ -2,8 +2,8 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from django.db.models.aggregates import Sum
 
-from .models import Account, Client
-from finance.models import BaseAccount, DataProvider, Holding, Security, Currency
+from .models import QuestradeAccount, QuestradeClient
+from finance.models import BaseAccount, DataProvider, Holding, Security, Currency, BaseClient
 import arrow
 import datetime
 from collections import defaultdict
@@ -26,11 +26,12 @@ def GetHoldingsContext():
         
     for symbol, qty in all_holdings.exclude(security__type=Security.Type.Cash).values_list('security__symbol').distinct().annotate(Sum('qty')):
         security = Security.objects.get(symbol=symbol)
-        yesterday_price = security.GetLatestPrice()
-        yesterday_price_CAD = security.GetLatestPrice() * security.currency.GetLatestRate()
+        yesterday = datetime.date.today() - datetime.timedelta(days=1)
+        yesterday_price = security.GetPrice(yesterday)
+        yesterday_price_CAD = security.GetPriceCAD(yesterday)
 
-        today_price = security.livePrice
-        today_price_CAD = today_price * security.currency.livePrice
+        today_price = security.live_price
+        today_price_CAD = today_price * security.currency.live_price
 
         price_delta = today_price - yesterday_price
         percent_delta = price_delta / yesterday_price
@@ -41,29 +42,34 @@ def GetHoldingsContext():
         security_data.append((symbol.split('.')[0], today_price, price_delta, percent_delta, qty, this_gain, value_CAD))
 
     total = [(total_gain, total_gain / total_value, as_currency(total_value))]
-    exchange = 1/Currency.objects.get(code='USD').livePrice
+    exchange = 1/Currency.objects.get(code='USD').live_price
     context = {'security_data':security_data, 'total':total, 'exchange':exchange, 'holding_refresh_count':holding_refresh_count}
     return context
 
 def analyze(request):
     if request.is_ajax():
         if 'refresh-holdings' in request.GET:
-            with Client.objects.all()[0] as c:
-                try:
-                    c.UpdateMarketPrices()
-                except requests.exceptions.HTTPError as e:
-                    return HttpResponse(e.response.json(), content_type="application/json", status_code= e.response.status_code)
+            with ExitStack() as stack:
+                clients = [stack.enter_context(c) for c in BaseClient.objects.all()]
+                for c in clients:
+                    try:                    
+                        c.SyncPrices()
+                    except requests.exceptions.HTTPError as e:
+                        return HttpResponse(e.response.json(), content_type="application/json", status_code= e.response.status_code)
 
+            DataProvider.UpdateLatestExchangeRates()
             return render(request, 'questrade/holdings.html', GetHoldingsContext())
+        
+     
 
         if 'refresh-balances' in request.GET:
             with ExitStack() as stack:
-                clients = [stack.enter_context(c) for c in Client.objects.all()]
-                try:
-                    for c in clients:
+                clients = [stack.enter_context(c) for c in QuestradeClient.objects.all()]
+                for c in clients:
+                    try:
                         c.SyncCurrentAccountBalances()                
-                except requests.exceptions.HTTPError as e:
-                    return HttpResponse(e.response.json(), content_type="application/json", status= e.response.status_code)
+                    except requests.exceptions.HTTPError as e:
+                        return HttpResponse(e.response.json(), content_type="application/json", status= e.response.status_code)
             return render(request, 'questrade/balances.html', GetBalanceContext())
 
     overall_context = {**GetHoldingsContext(), **GetBalanceContext()}
@@ -74,7 +80,7 @@ balance_refresh_count = 0
 def GetBalanceContext():
     global balance_refresh_count
     balance_refresh_count+=1
-    account_data = [(a.display_name, a.sodBalanceSynced, a.curBalanceSynced, a.curBalanceSynced-a.sodBalanceSynced) for a in Account.objects.all() ]
+    account_data = [(a.display_name, a.sodBalanceSynced, a.curBalanceSynced, a.curBalanceSynced-a.sodBalanceSynced) for a in QuestradeAccount.objects.all() ]
     names,sod,cur,change = list(zip(*account_data))
     account_data.append(('Total', sum(sod), sum(cur), sum(change)))
 

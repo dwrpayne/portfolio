@@ -9,15 +9,17 @@ def colorize(amount, autoescape=True):
     s = str(amount)
     if autoescape:
         value = escape(s)
-    if '-' in s:
-        result = '<font color="red">{}</font>'.format(s)
+    if '0.00' in s:
+        color = 'black'
+    elif '-' in s:
+        color = 'red'
     else:
-        result = '<font color="green">{}</font>'.format(s)
-    return mark_safe(result)
+        color = 'green'
+    return mark_safe('<font color="{}">{}</font>'.format(color,s))
     
 @register.filter()
 def currency(dollars):
-    prefix = "" if dollars > 0 else "-"
+    prefix = "" if dollars > -0.004 else "-"
     return "{}${:,.2f}".format(prefix, abs(dollars))
 
 @register.filter()
