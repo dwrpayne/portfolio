@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'questrade.apps.QuestradeConfig',
     'finance.apps.financeConfig',
     'debug_toolbar',
+    'polymorphic',
     'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',

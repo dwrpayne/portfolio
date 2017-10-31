@@ -7,7 +7,7 @@
             <tr>
                 <th>Symbol</th><th>Price</th><th>Change</th><th>Shares</th><th>Gain (CAD)</th><th>Total Value (CAD)</th>
             </tr>
-            {% for symbol, price, color, change, percent_change, shares, gain, total_val in security_data %}
+            {% for symbol, price, change, percent_change, shares, gain, total_val in security_data %}
                 <tr>
                     <td>{{symbol}}</td>
                     <td>{{price | floatformat:2}}&nbsp;&nbsp;</td>
@@ -18,7 +18,7 @@
                 </tr>
             {% endfor %}
                 <tr><td colspan="100">------------------------------------------------------------</td></tr>
-            {% for color, total_gain, percent_gain, total_value in total %}
+            {% for total_gain, percent_gain, total_value in total %}
                 <tr>
                     <td>Total</td>
                     <td></td>

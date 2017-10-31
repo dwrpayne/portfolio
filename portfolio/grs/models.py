@@ -9,67 +9,44 @@ import datetime
 import arrow
 import pandas
 
-from questrade.models import Security, SecurityPrice, Activity
+from finance.models import BaseAccount, BaseClient, BaseRawActivity, Security, SecurityPrice, Activity
 
-class GrsActivityRaw(models.Model):
-    account = models.ForeignKey('GrsAccount', on_delete=models.CASCADE, related_name='rawactivities')
+class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
-    def CleanSourceData(self):
-        pass
-                
-    def CreateActivity(self): 
-        return Activity(account=account, tradeDate=day, security=security, description='', qty=qty, price=price, netAmount=0, type=Activity.Type.Buy, sourcejson_id=0)
-
-
-class GrsAccount(models.Model):
-    client = models.ForeignKey('GrsClient', on_delete=models.CASCADE, related_name='accounts')
-    type = models.CharField(max_length=100)
-    id = models.IntegerField(default=0, primary_key = True)
-    plan_data = models.CharField(max_length=100)
-
     def __str__(self):
-        return self.type
-
-    def RegenerateActivities(self):
-        with transaction.atomic():
-            for activityraw in self.rawactivities.all():
-                activityraw.CleanSourceData()
-        self.activity_set.all().delete()
-        all_activities = [j.CreateActivity() for j in self.rawactivities.all()]
-        Activity.objects.bulk_create([a for a in all_activities if a is not None])
-
+        return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.security, self.price)
     
-class GrsClient(models.Model):
-    username = models.CharField(max_length=10, primary_key=True)
+    def __repr__(self):
+        return 'GrsRawActivity<{}>'.format(self.username)
+
+    def CreateActivity(self): 
+        return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty, 
+                        price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
+    
+class GrsAccount(BaseAccount):
+    plan_data = models.CharField(max_length=100)    
+    
+class GrsClient(BaseClient):
     password = models.CharField(max_length=100)
     
+    def __repr__(self):
+        return 'GrsClient<{}>'.format(self.username)
+    
+    @property
+    def activitySyncDateRange(self):
+        return 360
+
     @classmethod 
     def Create(cls, username, password, plan_data, plan_id):
         client = GrsClient(username = username, password=password, plan_data=plan_data, plan_id=plan_id)
         client.save()
         client.Authorize()
         return client
-    
-    @classmethod 
-    def Get(cls, username):
-        client = GrsClient.objects.get(username=username)
-        client.Authorize()
-        return client
-
-    def __str__(self):
-        return self.username
-        
-    def __enter__(self):
-        self.Authorize()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.CloseSession()     
-        
+            
     def Authorize(self):
         self.session = requests.Session()
         self.session.post('https://ssl.grsaccess.com/Information/login.aspx', data={'username': self.username, 'password': self.password})         
@@ -77,26 +54,15 @@ class GrsClient(models.Model):
     def CloseSession(self):
         self.session.close()
 
-    def _GetRawActivityData(self, account_id, start, end):
+    def _CreateRawActivities(self, account_id, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId':account_id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'})
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date() for tag in soup.find_all('td', class_='activities-d-lit1')]    
         units = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-unitnum')]
         prices = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
-        return zip(trans_dates, units, prices)
-
-    def SyncActivities(self, start_date=arrow.get('2011-01-01'), end_date=arrow.now()):        
-        for account in self.accounts.all():
-            account.activityraw_set.all().delete()
-            date_range = arrow.Arrow.span_range('year', start_date, end_date)
-            print('{} requests'.format(len(date_range)), end='')
-
-            for start, end in date_range:
-                if end > end_date: end = end_date
-                print('.',end='', flush=True)
-                data = self._GetRawActivityData(account.id, start, end)
-                # TODO: Hacked in the only Security I buy - this needs to be done way better. Though... maybe good enough for my purposes now.
-                GrsActivityRaw.objects.bulk_create([ActivityRaw(account=account, day=day, qty=qty, price=price, security_id='ETP') for day, qty, price in data])
+        with transaction.atomic():
+            for day, qty, price in zip(trans_dates, units, prices):
+                GrsRawActivity.objects.create(account_id=account_id, day=day, qty=qty, price=price, security_id='ETP')
 
     def _GetRawPrices(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 
@@ -113,8 +79,7 @@ class GrsClient(models.Model):
 
 
     def _SyncPrices(self, start_date=arrow.get('2010-07-01'), end_date=arrow.now()):
-        plan_data = accounts[0].plan_data
-        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info', accounts[0].plan_data})
+        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info': self.accounts.all()[0].plan_data})
         for security in Security.objects.filter(type=Security.Type.MutualFund):
             start_date = max(start_date, arrow.get(security.GetLatestEntryDate() + datetime.timedelta(days=1)))
             date_range = arrow.Arrow.interval('day', start_date, end_date, 15)

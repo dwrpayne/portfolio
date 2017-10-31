@@ -2,7 +2,8 @@ from django.shortcuts import get_object_or_404, render
 from django.http import HttpResponse
 from django.db.models.aggregates import Sum
 
-from .models import Client, Account, DataProvider, Holding, Security, Currency
+from .models import Account, Client
+from finance.models import BaseAccount, DataProvider, Holding, Security, Currency
 import arrow
 import datetime
 from collections import defaultdict
@@ -37,12 +38,9 @@ def GetHoldingsContext():
         total_gain += this_gain
         value_CAD = qty * today_price_CAD
         total_value += value_CAD
-        color = "green" if price_delta > 0 else "red"
-        security_data.append((symbol.split('.')[0], today_price, color, price_delta, percent_delta, qty, this_gain, value_CAD))
+        security_data.append((symbol.split('.')[0], today_price, price_delta, percent_delta, qty, this_gain, value_CAD))
 
-
-    color = "green" if total_gain > 0 else "red"
-    total = [(color, total_gain, total_gain / total_value, as_currency(total_value))]
+    total = [(total_gain, total_gain / total_value, as_currency(total_value))]
     exchange = 1/Currency.objects.get(code='USD').livePrice
     context = {'security_data':security_data, 'total':total, 'exchange':exchange, 'holding_refresh_count':holding_refresh_count}
     return context
@@ -83,23 +81,11 @@ def GetBalanceContext():
     context = {'account_data':account_data, 'balance_refresh_count':balance_refresh_count }
     return context
 
-# WOAH
-#for acc in a:
-#  x,y = list(zip(*acc.GetValueList().items()))
-#  t.append(go.Scatter(name=acc.client.username + ' ' +acc.type, x=x, y=y))
-
-#vals = defaultdict(Decimal)
-#for acc in a:
-#       for date, v in acc.GetValueList().items(): vals[date] += v
-#pair = list(zip(*sorted(vals.items())))
-#trace = go.Scatter(name='Total', x=pair[0], y=pair[1])
-#plotly.offline.plot(t+[trace])
-
 def DoWorkHistory():
     yield "<html><body><pre>"
     yield "<br>"
     start = '2011-01-01'
-    all_accounts = Account.objects.all()
+    all_accounts = BaseAccount.objects.all()
     t = []    
     vals = defaultdict(Decimal)
     for a in all_accounts:
