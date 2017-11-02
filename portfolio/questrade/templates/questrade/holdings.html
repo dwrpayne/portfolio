@@ -28,6 +28,6 @@
                 </tr>
             {% endfor %}
         </table>
-    <br />Current USD exchange: {{exchange|floatformat:4}}
+    <br />Current USD exchange: {{exchange_live|floatformat:4}} {{exchange_delta | percentage | colorize}}
     </pre>
 </div>

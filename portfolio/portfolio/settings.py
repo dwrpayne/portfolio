@@ -33,9 +33,9 @@ INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
 # Application definition
 
 INSTALLED_APPS = [
+    'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
-    'finance.apps.financeConfig',
     'debug_toolbar',
     'polymorphic',
     'django_extensions',
@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_celery_results',
 ]
 
 MIDDLEWARE = [
@@ -144,3 +145,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
+
+# Celery configuration
+CELERY_FORKED_BY_MULTIPROCESSING = 1
+CELERY_TRACK_STARTED = True
+CELERY_RESULT_BACKEND = 'django-db'

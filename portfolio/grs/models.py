@@ -64,10 +64,10 @@ class GrsClient(BaseClient):
             for day, qty, price in zip(trans_dates, units, prices):
                 GrsRawActivity.objects.create(account_id=account_id, day=day, qty=qty, price=price, security_id='ETP')
 
-    def _GetRawPrices(self, lookup, start_date, end_date):
+    def _GetRawPrices(self, symbol, start_date, end_date):
         for start, end in arrow.Arrow.interval('day', arrow.get(start_date), arrow.get(end_date), 15):
             response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx', 
-                data={'PlanFund': lookup.lookupSymbol, 'PlanDetail':'', 'BodyTitle':'', 
+                data={'PlanFund': symbol, 'PlanDetail':'', 'BodyTitle':'', 
                     'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'},
                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0' }
                 )

@@ -44,6 +44,9 @@
     <Compile Include="finance\apps.py" />
     <Compile Include="finance\migrations\__init__.py" />
     <Compile Include="finance\models.py" />
+    <Compile Include="finance\tasks.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="finance\tests.py" />
     <Compile Include="finance\views.py" />
     <Compile Include="finance\__init__.py" />
@@ -55,6 +58,12 @@
     <Compile Include="grs\views.py" />
     <Compile Include="grs\__init__.py" />
     <Compile Include="manage.py" />
+    <Compile Include="portfolio\celery.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="portfolio\tasks.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="portfolio\__init__.py" />
     <Compile Include="portfolio\settings.py" />
     <Compile Include="portfolio\urls.py" />
@@ -101,6 +110,9 @@
     <Compile Include="questrade\migrations\0038_auto_20171024_0806.py" />
     <Compile Include="questrade\migrations\__init__.py" />
     <Compile Include="questrade\models.py" />
+    <Compile Include="questrade\tasks.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="questrade\templatetags\mytags.py">
       <SubType>Code</SubType>
     </Compile>

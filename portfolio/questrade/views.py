@@ -4,6 +4,7 @@ from django.db.models.aggregates import Sum
 
 from .models import QuestradeAccount, QuestradeClient
 from finance.models import BaseAccount, DataProvider, Holding, Security, Currency, BaseClient
+from finance.tasks import SyncClientPrices, SyncClientAccountBalances
 import arrow
 import datetime
 from collections import defaultdict
@@ -13,6 +14,7 @@ from contextlib import ExitStack
 import plotly
 import plotly.graph_objs as go
 import requests
+from celery import group
 
 holding_refresh_count = 0
 def GetHoldingsContext():
@@ -42,34 +44,25 @@ def GetHoldingsContext():
         security_data.append((symbol.split('.')[0], today_price, price_delta, percent_delta, qty, this_gain, value_CAD))
 
     total = [(total_gain, total_gain / total_value, as_currency(total_value))]
-    exchange = 1/Currency.objects.get(code='USD').live_price
-    context = {'security_data':security_data, 'total':total, 'exchange':exchange, 'holding_refresh_count':holding_refresh_count}
+    exchange_live = 1/Currency.objects.get(code='USD').live_price
+    exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
+    exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
+    context = {'security_data':security_data, 'total':total, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta, 'holding_refresh_count':holding_refresh_count}
     return context
 
 def analyze(request):
     if request.is_ajax():
         if 'refresh-holdings' in request.GET:
-            with ExitStack() as stack:
-                clients = [stack.enter_context(c) for c in BaseClient.objects.all()]
-                for c in clients:
-                    try:                    
-                        c.SyncPrices()
-                    except requests.exceptions.HTTPError as e:
-                        return HttpResponse(e.response.json(), content_type="application/json", status_code= e.response.status_code)
-
+            job = group([SyncClientPrices.s(c.pk) for c in QuestradeClient.objects.all()])
+            result = job.apply_async()
+            result.join()
             DataProvider.UpdateLatestExchangeRates()
-            return render(request, 'questrade/holdings.html', GetHoldingsContext())
-        
-     
+            return render(request, 'questrade/holdings.html', GetHoldingsContext())    
 
         if 'refresh-balances' in request.GET:
-            with ExitStack() as stack:
-                clients = [stack.enter_context(c) for c in QuestradeClient.objects.all()]
-                for c in clients:
-                    try:
-                        c.SyncCurrentAccountBalances()                
-                    except requests.exceptions.HTTPError as e:
-                        return HttpResponse(e.response.json(), content_type="application/json", status= e.response.status_code)
+            job = group([SyncClientAccountBalances.s(c.pk) for c in QuestradeClient.objects.all()])
+            result = job.apply_async()
+            result.join()
             return render(request, 'questrade/balances.html', GetBalanceContext())
 
     overall_context = {**GetHoldingsContext(), **GetBalanceContext()}
@@ -80,7 +73,7 @@ balance_refresh_count = 0
 def GetBalanceContext():
     global balance_refresh_count
     balance_refresh_count+=1
-    account_data = [(a.display_name, a.sodBalanceSynced, a.curBalanceSynced, a.curBalanceSynced-a.sodBalanceSynced) for a in QuestradeAccount.objects.all() ]
+    account_data = [(a.display_name, a.yesterday_balance, a.cur_balance, a.cur_balance-a.yesterday_balance) for a in BaseAccount.objects.all() ]
     names,sod,cur,change = list(zip(*account_data))
     account_data.append(('Total', sum(sod), sum(cur), sum(change)))
 
@@ -90,7 +83,7 @@ def GetBalanceContext():
 def DoWorkHistory():
     yield "<html><body><pre>"
     yield "<br>"
-    start = '2011-01-01'
+    start = '2009-06-01'
     all_accounts = BaseAccount.objects.all()
     t = []    
     vals = defaultdict(Decimal)

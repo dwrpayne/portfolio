@@ -9,6 +9,7 @@ import datetime
 from model_utils import Choices
 import arrow
 import pandas
+from dateutil import parser
 import requests
 from pandas_datareader import data as pdr
 
@@ -49,11 +50,14 @@ class RateLookupMixin(models.Model):
         
     @property
     def live_price(self):
-        return self.rates.latest().price
+        try:
+            return self.rates.get(day=datetime.date.today()).price
+        except:
+            return self.rates.latest().price
 
     @live_price.setter
     def live_price(self, value):
-        t.rates.update_or_create(day=datetime.date.today(), defaults={'price':value})
+        self.rates.update_or_create(day=datetime.date.today(), defaults={'price':value})
 
     def _ProcessRateData(self, data, end_date):
         if isinstance(data, pandas.DataFrame):
@@ -63,6 +67,7 @@ class RateLookupMixin(models.Model):
             dates, prices = zip(*data)
             data = pandas.Series(prices, index=dates)
 
+        data = data.sort_index()
         index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
         data = data.reindex(index).ffill()
         return data.iteritems()
@@ -189,7 +194,8 @@ class ExchangeRate(RateHistoryTableMixin):
         ]
 
     def __str__(self):
-        return "{} {} {}".format(self.currency, self.day, self.price)    
+        return "{} {} {}".format(self.currency, self.day, self.price)   
+  
 
 class DataProvider:
     FAKED_VALS = {'DLR.U.TO':10.}
@@ -201,41 +207,58 @@ class DataProvider:
     
     @classmethod
     def _RetrieveData(cls, lookup, start, end):
+    def _RetrievePandasData(cls, lookup, start, end):
         """ Returns a list of tuples (day, price) """
+        FAKED_VALS = {'DLR.U.TO':10.}
         if lookup.lookupSymbol in cls.FAKED_VALS:
             index = pandas.date_range(start, end, freq='D').date
             return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
         for retry in range(5):
-            try: df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
-            except: pass
-        if df.size == 0:
-            return []
-        ix = pandas.DatetimeIndex(start=min(df.index), end=end, freq='D')
-        df = df.reindex(ix).ffill()
-        return zip(ix, df[lookup.lookupColumn])
-         
-        
+            try: 
+                df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
+                if df.size == 0:
+                    return
+                ix = pandas.DatetimeIndex(start=min(df.index), end=end, freq='D')
+                df = df.reindex(ix).ffill()
+                return zip(ix, df[lookup.lookupColumn])
+            except: 
+                pass
+        return
+    
+    
     @classmethod
-    def Init(cls):
-        for currency in Currency.objects.all():
-            Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
-            currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrieveData)
+    def GetAlphaVantageData(cls, lookup, start, end):
+        fake = {'DLR.U.TO':10., 'CAD':1.}
+        if lookup.lookupSymbol in fake:
+            index = pandas.date_range(start, end, freq='D').date
+            return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
 
-    @classmethod
-    def UpdateLatestExchangeRates(cls):
-        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
-        Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
-            
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        params={'function':'TIME_SERIES_DAILY', 'symbol':symbol, 'apikey':'P38D2XH1GFHST85V', 'outputsize':'full'}
+        if parser.parse(end)  - parser.parse(start) > 100: params['outputsize'] = 'full'
+        r = requests.get('https://www.alphavantage.co/query', params=params)
+        series = r.json()['Time Series (Daily)']
+        return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day,vals in series.items() if str(start) <= day <= str(end)]        
+                    
     @classmethod
     def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
-            stock.SyncRates(cls._RetrieveData)
+            stock.SyncRates(cls.GetAlphaVantageData)
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
             cash.SyncRates(cls._FakeData)
+
+    @classmethod
+    def UpdateLatestExchangeRates(cls):
+        for currency in Currency.objects.all():
+            Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
+            currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
+
+        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
+        Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
 
 
 class BaseClient(PolymorphicModel):
@@ -296,6 +319,9 @@ class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.IntegerField(default=0, primary_key = True)
+
+    class Meta:
+        ordering = ['id']
         
     def __repr__(self):
         return "BaseAccount({},{},{})".format(self.client, self.id, self.type)
@@ -306,6 +332,14 @@ class BaseAccount(PolymorphicModel):
     @property
     def display_name(self):
         return "{} {}".format(self.client.username, self.type)
+
+    @property
+    def cur_balance(self):
+        return self.GetValueAtDate(datetime.date.today())
+
+    @property
+    def yesterday_balance(self):
+        return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
     def RegenerateActivities(self):
         self.activities.all().delete()      
@@ -331,12 +365,12 @@ class BaseAccount(PolymorphicModel):
             
     def GetValueList(self):
         val_list = SecurityPrice.objects.filter(
-            Q(security__holding__enddate__gte=F('day'))|Q(security__holding__enddate=None), 
-            security__holding__startdate__lte=F('day'),
-            security__holding__account_id=self.id, 
+            Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
+            security__holdings__startdate__lte=F('day'),
+            security__holdings__account_id=self.id, 
             security__currency__rates__day=F('day')
         ).values_list('day').annotate(
-            val=Sum(F('price') * F('security__holding__qty') * F('security__currency__rates__price'))
+            val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
         )
         d = defaultdict(int)
         d.update({date:val for date,val in val_list})
@@ -351,6 +385,30 @@ class BaseRawActivity(PolymorphicModel):
                     
     def CreateActivity(self): 
         pass
+             
+class ManualRawActivity(BaseRawActivity):    
+    day = models.DateField()
+    security = models.CharField(max_length=100)
+    description = models.CharField(max_length=1000)
+    cash = models.CharField(max_length=100)
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    price = models.DecimalField(max_digits=16, decimal_places=6)
+    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    type = models.CharField(max_length=100)
+                    
+    def CreateActivity(self): 
+        if self.security:
+            type = Security.Type.Stock if len(self.security) < 20 else Security.Type.Option
+            security, created = Security.objects.get_or_create(symbol=self.security, defaults={'currency_id':'USD', 'type':type})
+        else:
+            security = None
+
+        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash, qty=self.qty, 
+                        price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
+
+        if not a.cash_id:
+            a.cash = None
+        return a
              
 class HoldingManager(models.Manager):
     def at_date(self, date):
@@ -449,3 +507,6 @@ class Activity(models.Model):
 
         return effect                 
     
+
+
+
