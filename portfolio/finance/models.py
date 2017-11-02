@@ -206,7 +206,6 @@ class DataProvider:
             yield day, 1.
     
     @classmethod
-    def _RetrieveData(cls, lookup, start, end):
     def _RetrievePandasData(cls, lookup, start, end):
         """ Returns a list of tuples (day, price) """
         FAKED_VALS = {'DLR.U.TO':10.}
