@@ -68,6 +68,7 @@ class RateLookupMixin(models.Model):
             data = pandas.Series(prices, index=dates)
 
         data = data.sort_index()
+        data = data.replace(0,nan)
         index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
         data = data.reindex(index).ffill()
         return data.iteritems()
@@ -355,35 +356,35 @@ class BaseAccount(PolymorphicModel):
 
     def HackInit(self):
         pass
-    
-    def GetMostRecentActivityDate(self):
-        try:
-            return self.activities.latest().tradeDate
-        except:
-            return None
-            
-    def GetValueList(self):
+                     
+    def GetValueList():
         val_list = SecurityPrice.objects.filter(
             Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
             security__holdings__startdate__lte=F('day'),
-            security__holdings__account_id=self.id, 
+            security__holding__account=self,
             security__currency__rates__day=F('day')
         ).values_list('day').annotate(
             val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
         )
         d = defaultdict(int)
         d.update({date:val for date,val in val_list})
-        return d
+        return d  
+        
+    
+    def GetMostRecentActivityDate(self):
+        try:
+            return self.activities.latest().tradeDate
+        except:
+            return None
 
     def GetValueAtDate(self, date):
         return self.GetValueList()[date]
-            
-        
+    
 class BaseRawActivity(PolymorphicModel):    
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
                     
     def CreateActivity(self): 
-        pass
+        pass     
              
 class ManualRawActivity(BaseRawActivity):    
     day = models.DateField()

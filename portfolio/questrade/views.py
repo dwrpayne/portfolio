@@ -3,7 +3,7 @@ from django.http import HttpResponse
 from django.db.models.aggregates import Sum
 
 from .models import QuestradeAccount, QuestradeClient
-from finance.models import BaseAccount, DataProvider, Holding, Security, Currency, BaseClient
+from finance.models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, BaseClient
 from finance.tasks import SyncClientPrices, SyncClientAccountBalances
 import arrow
 import datetime
@@ -15,6 +15,20 @@ import plotly
 import plotly.graph_objs as go
 import requests
 from celery import group
+
+                 
+def GetAccountValueList():
+    val_list = SecurityPrice.objects.filter(
+        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
+        security__holdings__startdate__lte=F('day'),
+        security__currency__rates__day=F('day')
+    ).values_list('security__holdings__account_id', 'day').annotate(
+        val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
+    )
+    d = defaultdict(int)
+    d.update({date:val for date,val in val_list})
+    return d  
+        
 
 holding_refresh_count = 0
 def GetHoldingsContext():
@@ -87,8 +101,10 @@ def DoWorkHistory():
     all_accounts = BaseAccount.objects.all()
     t = []    
     vals = defaultdict(Decimal)
+    data = GetAccountValueList()
     for a in all_accounts:
-        pairs = a.GetValueList().items()
+        
+        pairs = data.filter(account_id=a.id).items()
         x,y = list(zip(*pairs))
         t.append(go.Scatter(name=a.display_name, x=x, y=y))
         for date, v in a.GetValueList().items(): vals[date] += v
