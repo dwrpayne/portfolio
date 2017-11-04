@@ -4,7 +4,8 @@ from django.db.models.aggregates import Sum
 
 from .models import QuestradeAccount, QuestradeClient
 from finance.models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, BaseClient
-from finance.tasks import SyncClientPrices, SyncClientAccountBalances
+from finance.models import GetValueDataFrame, GetHistoryValues
+from finance.tasks import GetDailyUpdateTaskGroup, GetLiveUpdateTaskGroup
 import arrow
 import datetime
 from collections import defaultdict
@@ -13,34 +14,20 @@ from .utils import as_currency,  strdate
 from contextlib import ExitStack
 import plotly
 import plotly.graph_objs as go
+
+import pandas
 import requests
 from celery import group
 
-                 
-def GetAccountValueList():
-    val_list = SecurityPrice.objects.filter(
-        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
-        security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')
-    ).values_list('security__holdings__account_id', 'day').annotate(
-        val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
-    )
-    d = defaultdict(int)
-    d.update({date:val for date,val in val_list})
-    return d  
-        
-
-holding_refresh_count = 0
 def GetHoldingsContext():
-    global holding_refresh_count
-    holding_refresh_count+=1
     all_holdings = Holding.current.all()
     total_gain = 0
     total_value = 0  
 
     security_data = []
+    cash_data = []
         
-    for symbol, qty in all_holdings.exclude(security__type=Security.Type.Cash).values_list('security__symbol').distinct().annotate(Sum('qty')):
+    for symbol, qty in all_holdings.exclude(security__type=Security.Type.Cash).values_list('security__symbol').annotate(Sum('qty')):
         security = Security.objects.get(symbol=symbol)
         yesterday = datetime.date.today() - datetime.timedelta(days=1)
         yesterday_price = security.GetPrice(yesterday)
@@ -57,74 +44,65 @@ def GetHoldingsContext():
         total_value += value_CAD
         security_data.append((symbol.split('.')[0], today_price, price_delta, percent_delta, qty, this_gain, value_CAD))
 
+    for symbol, qty in all_holdings.filter(security__type=Security.Type.Cash).values_list('security__symbol').annotate(Sum('qty')):
+        cash_data.append((symbol.split()[0], qty))
+
     total = [(total_gain, total_gain / total_value, as_currency(total_value))]
     exchange_live = 1/Currency.objects.get(code='USD').live_price
     exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
     exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
-    context = {'security_data':security_data, 'total':total, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta, 'holding_refresh_count':holding_refresh_count}
+    context = {'security_data':security_data, 'total':total, 'cash_data':cash_data, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta}
     return context
 
 def analyze(request):
-    if request.is_ajax():
-        if 'refresh-holdings' in request.GET:
-            job = group([SyncClientPrices.s(c.pk) for c in QuestradeClient.objects.all()])
-            result = job.apply_async()
-            result.join()
-            DataProvider.UpdateLatestExchangeRates()
-            return render(request, 'questrade/holdings.html', GetHoldingsContext())    
+    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="https://plot.ly/~cecilpl/2.embed?modebar=false&link=false" height="525" width="100%"/>'
+    if request.is_ajax():        
+        if 'refresh-live' in request.GET:
+            result = GetLiveUpdateTaskGroup()()
+            result.get()
 
-        if 'refresh-balances' in request.GET:
-            job = group([SyncClientAccountBalances.s(c.pk) for c in QuestradeClient.objects.all()])
-            result = job.apply_async()
-            result.join()
-            return render(request, 'questrade/balances.html', GetBalanceContext())
+        if 'refresh-daily' in request.GET:
+            result = GetDailyUpdateTaskGroup()()
+
+            pairs = GetHistoryValues(datetime.date.today() - datetime.timedelta(days=30))
+            dates, vals = list(zip(*pairs))
+            trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
+            plotly_url = plotly.plotly.plot([trace], filename='portfolio-values-short', auto_open=False)
+            plotly_html = plotly.tools.get_embed(plotly_url)
+
+            result.get()
+
+        if 'refresh-account' in request.GET:
+            for a in BaseAccount.objects.all():
+                a.RegenerateActivities()
+                a.RegenerateHoldings()
 
     overall_context = {**GetHoldingsContext(), **GetBalanceContext()}
+    overall_context['plotly_embed_html'] = plotly_html
     return render(request, 'questrade/portfolio.html', overall_context)
 
-
-balance_refresh_count = 0
 def GetBalanceContext():
-    global balance_refresh_count
-    balance_refresh_count+=1
     account_data = [(a.display_name, a.yesterday_balance, a.cur_balance, a.cur_balance-a.yesterday_balance) for a in BaseAccount.objects.all() ]
     names,sod,cur,change = list(zip(*account_data))
-    account_data.append(('Total', sum(sod), sum(cur), sum(change)))
 
-    context = {'account_data':account_data, 'balance_refresh_count':balance_refresh_count }
+    total_data = [('Total', sum(sod), sum(cur), sum(change))]
+
+    context = {'account_data':account_data, 'total_data':total_data }
     return context
 
-def DoWorkHistory():
-    yield "<html><body><pre>"
-    yield "<br>"
-    start = '2009-06-01'
-    all_accounts = BaseAccount.objects.all()
-    t = []    
-    vals = defaultdict(Decimal)
-    data = GetAccountValueList()
-    for a in all_accounts:
-        
-        pairs = data.filter(account_id=a.id).items()
-        x,y = list(zip(*pairs))
-        t.append(go.Scatter(name=a.display_name, x=x, y=y))
-        for date, v in a.GetValueList().items(): vals[date] += v
+def DoWorkHistory(request):
+    df = GetValueDataFrame()
+    traces = [go.Scatter(name=name, x=series.index, y=series.values) for name, series in df.iteritems()]    
+    plotly_url = plotly.plotly.plot(traces, filename='portfolio-values', auto_open=False)
+    plotly_embed_html=plotly.tools.get_embed(plotly_url)
 
-    total_x, total_y = list(zip(*sorted(vals.items())))
-    trace = go.Scatter(name='Total', x=total_x, y=total_y)
-    plotly.offline.plot(t+[trace])
+    context = {
+        'names': df.columns,
+        'rows': df.itertuples(),
+        'plotly_embed_html': plotly_embed_html
+    }
 
-    yield '<br>Date\t\t' + '\t'.join([name[0] + type for name, type in all_accounts.values_list('client__username', 'type')]) + '\tTotal'
-    value_lists = [a.GetValueList() for a in all_accounts]
-    for day in arrow.Arrow.range('day', arrow.get(start), arrow.now()):
-        d = day.date()
-        account_vals = [int(value[d]) for value in value_lists]
-        yield '<br>{}\t'.format(d) + '\t'.join([str(val) for val in account_vals]) + '\t' + str(sum(account_vals))
-    yield '</pre></body></html>'
-
-    
-def history(request): 
-    return HttpResponse(DoWorkHistory()) 
-
+    return render(request, 'questrade/history.html', context)
 
 def index(request):
     return HttpResponse("Hello world, you're at the questrade index.")

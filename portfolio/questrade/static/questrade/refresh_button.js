@@ -1,22 +1,24 @@
 $(document).ready(function () {
     $("button.refresh").click(function () {
         $(this).attr('disabled', 'disabled');
-        $(this).html("Refreshing...");
+        $(this).text($(this).text().replace("Refresh", "Refreshing"));
         $.ajax({
             url: 'go',
-            data: 'refresh-'+$(this).attr('data-refresh-type'),
+            data: 'refresh-' + $(this).attr('data-refresh-type'),
             context: this,
             success: function (data) {
-                div = $(this).attr('data-refresh-type')
-                var html = $(data).filter('#' + div).html();
-                $('#' + div).html(html);
+                divs = $(this).attr('data-refresh-div').split(';')
+                for (var i = 0; i < divs.length; i++) {
+                    var html = $(data).filter('#' + divs[i]).html();
+                    $('#' + divs[i]).html(html);
+                }
             },
             error: function (data) {
-                alert("Couldn't refresh!\n" + JSON.stringify(data))
+                alert("Couldn't refresh!\n" + data["responseText"]);
             },
             complete: function (jqXHR, textStatus) {
                 $(this).prop("disabled", false);
-                $(this).html("Refresh Balances");
+                $(this).text($(this).text().replace("Refreshing", "Refresh"));
             }
         });
     });

@@ -61,6 +61,7 @@ class RateLookupMixin(models.Model):
         self.rates.update_or_create(day=datetime.date.today(), defaults={'price':value})
 
     def _ProcessRateData(self, data, end_date):
+        if not data: return []
         if isinstance(data, pandas.DataFrame):
             data = pandas.Series(data[self.lookupColumn], data.index)
         else:
@@ -226,8 +227,7 @@ class DataProvider:
                 return zip(ix, df[lookup.lookupColumn])
             except: 
                 pass
-        return
-    
+        return    
     
     @classmethod
     def GetAlphaVantageData(cls, lookup, start, end):
@@ -237,23 +237,40 @@ class DataProvider:
             return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        params={'function':'TIME_SERIES_DAILY', 'symbol':lookup.lookupSymbol, 'apikey':'P38D2XH1GFHST85V', 'outputsize':'full'}
+        params={'function':'TIME_SERIES_DAILY', 'symbol':lookup.lookupSymbol, 'apikey':'P38D2XH1GFHST85V'}
         if (end - start).days > 100: params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
-        series = r.json()['Time Series (Daily)']
-        return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day,vals in series.items() if str(start) <= day <= str(end)]        
+        json = r.json()
+        if 'Time Series (Daily)' in json:
+            return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day,vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]        
+        return []
+
+    @classmethod
+    def GetLiveStockPrice(cls, symbol):
+        symbol = symbol.split('.')[0]
+        params={'function':'TIME_SERIES_INTRADAY', 'symbol':symbol, 'apikey':'P38D2XH1GFHST85V', 'interval':'1min'}        
+        r = requests.get('https://www.alphavantage.co/query', params=params)
+        json = r.json()
+        price = Decimal(0)
+        if 'Time Series (1min)' in json:
+            newest = json["Meta Data"]["3. Last Refreshed"]
+            price = Decimal(json['Time Series (1min)'][newest]['4. close'])
+        print('Getting live price for {}... {}'.format(symbol, price))        
+        return price
                     
     @classmethod
     def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
             stock.SyncRates(cls.GetAlphaVantageData)
+            if Holding.current.filter(security=stock).exists():
+                stock.live_price = cls.GetLiveStockPrice(stock.symbol)
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
             cash.SyncRates(cls._FakeData)
 
     @classmethod
-    def UpdateLatestExchangeRates(cls):
+    def SyncAllExchangeRates(cls):
         for currency in Currency.objects.all():
             Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
@@ -315,7 +332,7 @@ class BaseClient(PolymorphicModel):
     def SyncPrices(self):
         pass
 
-    def SyncClientAccountBalances(self):
+    def SyncCurrentAccountBalances(self):
         pass
     
     
@@ -339,11 +356,13 @@ class BaseAccount(PolymorphicModel):
 
     @property
     def cur_balance(self):
-        return self.GetValueAtDate(datetime.date.today())
+        return 0
+        #return self.GetValueAtDate(datetime.date.today())
 
     @property
     def yesterday_balance(self):
-        return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
+        return 0
+        #return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
     def RegenerateActivities(self):
         self.activities.all().delete()      
@@ -360,21 +379,19 @@ class BaseAccount(PolymorphicModel):
 
     def HackInit(self):
         pass
-                     
-    def GetValueList():
-        val_list = SecurityPrice.objects.filter(
-            Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
-            security__holdings__startdate__lte=F('day'),
-            security__holding__account=self,
-            security__currency__rates__day=F('day')
-        ).values_list('day').annotate(
-            val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
-        )
-        d = defaultdict(int)
-        d.update({date:val for date,val in val_list})
-        return d  
-        
     
+    def GetValueList(self, date):
+        Holding.objects.filter(
+            Q(enddate__gte=date)|Q(enddate=None), 
+            account=self,
+            startdate__lte=date, 
+            security__rates__day=date, 
+            security__currency__rates__day=date).aggregate(
+                val=Sum(F('qty')*F('security__rates__price')*F('security__currency__rates__price')
+            )
+        )['val']        
+        
+                     
     def GetMostRecentActivityDate(self):
         try:
             return self.activities.latest().tradeDate
@@ -511,6 +528,46 @@ class Activity(models.Model):
 
         return effect                 
     
+    
+def GetHistoryValues(startdate=None):
+    """ Returns an (date, value) tuple for each date where the value of that account is > 0 """
+    if startdate is None: 
+        pricequery = SecurityPrice.objects.all()
+    else:
+        pricequery = SecurityPrice.objects.filter(day__gte=startdate)
+    
+    val_list = pricequery.filter(
+        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
+        security__holdings__startdate__lte=F('day'),
+        security__currency__rates__day=F('day')
+    ).order_by('day').values_list('day').annotate( val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price')) )
+    
+    return val_list
 
+def GetValueDataFrame(startdate=None):
+    """ Returns an (account, date, value) tuple for each date where the value of that account is > 0 """
+    if startdate is None: 
+        pricequery = SecurityPrice.objects.all()
+    else:
+        pricequery = SecurityPrice.objects.filter(day__gte=startdate)
+    
+    val_list = pricequery.filter(
+        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
+        security__holdings__startdate__lte=F('day'),
+        security__currency__rates__day=F('day')
+    ).values_list('day', 'security__holdings__account_id').annotate(
+        val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
+    )
 
+    all_accounts = BaseAccount.objects.all()
+    dates = sorted(list({d for d,a,v in val_list}))
 
+    vals = defaultdict(dict)
+    for d,a,v in val_list:
+        vals[a][pandas.Timestamp(d)] = v
+    
+    s = [pandas.Series(vals[a.id], name=a.display_name) for a in all_accounts]
+    df = pandas.DataFrame(s).T.fillna(0).astype(int).iloc[::-1]
+    df = df.assign(Total=pandas.Series(df.sum(1)))
+    df.index = df.index.date
+    return df

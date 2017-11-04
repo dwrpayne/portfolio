@@ -86,6 +86,9 @@ SHELL_PLUS_PRE_IMPORTS = [
     'datetime',
     'arrow',
     'simplejson',
+     'plotly',
+    ('plotly', 'graph_objs'),
+    ('collections', 'defaultdict'),
     ('dateutil', 'parser'),
     ('decimal', 'Decimal')
 ]
@@ -150,3 +153,6 @@ STATIC_URL = '/static/'
 CELERY_FORKED_BY_MULTIPROCESSING = 1
 CELERY_TRACK_STARTED = True
 CELERY_RESULT_BACKEND = 'django-db'
+CELERY_IMPORTS = (
+    'questrade.tasks'
+)

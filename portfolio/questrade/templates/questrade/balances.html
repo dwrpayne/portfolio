@@ -1,15 +1,16 @@
 {% load mytags %}
-<button type="submit" class="refresh" data-refresh-type="balances">Refresh Balances</button>
 <div id="balances">
-    Refresh Count: {{balance_refresh_count}}
     <pre>
-        <table cellspacing="10">
-            <tr>
-                <th>Account</th>
-                <th>SOD</th>
-                <th>Current</th>
-                <th>Change</th>
-            </tr>
+        <table cellspacing="10" id="balances-table">
+            <thead>           
+                <tr>
+                    <th>Account</th>
+                    <th>SOD</th>
+                    <th>Current</th>
+                    <th>Change</th>
+                </tr>
+            </thead>
+            <tbody>
             {% for name, sod, cur, change in account_data %}
                 <tr>
                     <td>{{name}}</td>
@@ -18,6 +19,18 @@
                     <td>{{change | currency | colorize}}</td>
                 </tr>
             {% endfor %}
+            </tbody>
+            <tfoot>
+            {% for name, sod, cur, change in total_data %}
+                <tr>
+                    <td>{{name}}</td>
+                    <td>{{sod | currency}}</td>
+                    <td>{{cur | currency}}</td>
+                    <td>{{change | currency | colorize}}</td>
+                </tr>
+            {% endfor %}
+            </tfoot>
+
         </table>
     </pre>
 </div>
