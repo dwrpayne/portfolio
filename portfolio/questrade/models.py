@@ -123,7 +123,7 @@ class QuestradeRawActivity(BaseRawActivity):
         if json['currency'] == json['symbol']:
             json['symbol'] = None
             
-        return simplejson.dumps(json)
+        return json
         
     def CreateActivity(self): 
         json = self.GetCleanedJson()
@@ -187,9 +187,11 @@ class QuestradeClient(BaseClient):
             
     @property
     def needs_refresh(self):
+        """ Check if we should refresh this questrade token. At time of writing their API docs state the access token is good for 30 minutes."""
         if not self.token_expiry: return True
         if not self.access_token: return True
-        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 60))
+        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 600)) # We need refresh if we are less than 10 minutes from expiry.
+
     
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
@@ -223,15 +225,15 @@ class QuestradeClient(BaseClient):
         for account_json in json['accounts']:
             QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
             
-    def SyncPrices(self):
-        ids = self.currentSecurities.filter(symbolid__gt=0).values_list('symbolid', flat=True)
-        json = self._GetRequest('markets/quotes', 'ids=' + ','.join(map(str,ids)))
-        for q in json['quotes']:
-            price = q['lastTradePriceTrHrs'] or q['lastTradePrice'] or 0
-            if not price: 
-                print('No price available for {}... zeroing out.', q['symbol'])
-            security = Security.stocks.get(symbol=q['symbol'])
-            security.live_price = Decimal(str(price))
+    #def SyncPrices(self):
+    #    ids = self.currentSecurities.filter(symbolid__gt=0).values_list('symbolid', flat=True)
+    #    json = self._GetRequest('markets/quotes', 'ids=' + ','.join(map(str,ids)))
+    #    for q in json['quotes']:
+    #        price = q['lastTradePriceTrHrs'] or q['lastTradePrice'] or 0
+    #        if not price: 
+    #            print('No price available for {}... zeroing out.', q['symbol'])
+    #        security = Security.stocks.get(symbol=q['symbol'])
+    #        security.live_price = Decimal(str(price))
                             
     def _CreateRawActivities(self, account_id, start, end):
         end = end.replace(hour=0, minute=0, second=0)
@@ -262,8 +264,7 @@ class QuestradeClient(BaseClient):
             for stock in Security.stocks.all():
                 if stock.symbolid == 0:
                     print('finding {}'.format(stock))
-                    stock.symbolid = self._FindSymbolId(stock.symbol)
-                    
+                    stock.symbolid = self._FindSymbolId(stock.symbol)                    
                     print('finding {}'.format(stock.symbolid))
                     stock.save()
 
