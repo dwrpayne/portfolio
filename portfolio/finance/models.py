@@ -9,6 +9,7 @@ import datetime
 from model_utils import Choices
 import arrow
 import pandas
+import numpy
 from dateutil import parser
 import requests
 from pandas_datareader import data as pdr
@@ -68,7 +69,7 @@ class RateLookupMixin(models.Model):
             data = pandas.Series(prices, index=dates)
 
         data = data.sort_index()
-        data = data.replace(0,nan)
+        data = data.replace(0,numpy.nan)
         index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
         data = data.reindex(index).ffill()
         return data.iteritems()
@@ -236,8 +237,8 @@ class DataProvider:
             return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        params={'function':'TIME_SERIES_DAILY', 'symbol':symbol, 'apikey':'P38D2XH1GFHST85V', 'outputsize':'full'}
-        if parser.parse(end)  - parser.parse(start) > 100: params['outputsize'] = 'full'
+        params={'function':'TIME_SERIES_DAILY', 'symbol':lookup.lookupSymbol, 'apikey':'P38D2XH1GFHST85V', 'outputsize':'full'}
+        if (end - start).days > 100: params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
         series = r.json()['Time Series (Daily)']
         return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day,vals in series.items() if str(start) <= day <= str(end)]        
@@ -312,6 +313,9 @@ class BaseClient(PolymorphicModel):
                 account._CreateRawActivities(start, end)
 
     def SyncPrices(self):
+        pass
+
+    def SyncClientAccountBalances(self):
         pass
     
     

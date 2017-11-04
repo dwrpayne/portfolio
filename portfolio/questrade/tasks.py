@@ -2,5 +2,6 @@ from celery import shared_task
 from .models import QuestradeClient
 
 @shared_task
-def RefreshAccessToken(client_id):
-    QuestradeClient.objects.get(pk=client_id).Authorize()
+def RefreshAccessTokens():
+    for c in QuestradeClient.objects.all():
+        c.Authorize()
