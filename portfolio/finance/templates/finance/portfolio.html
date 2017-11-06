@@ -2,8 +2,8 @@
 <html>
     <body>
         <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
-        <script src="{% static "questrade/jquery.tablesorter.min.js" %}"></script>
-        <script src="{% static "questrade/refresh_button.js" %}"></script>        
+        <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
+        <script src="{% static "finance/refresh_button.js" %}"></script>        
         <script>
             $(function(){
                 $(".tablesorter").tablesorter();
@@ -11,22 +11,21 @@
         </script>
         <link rel="stylesheet" type="text/css" href="{% static "questrade/style.css" %}">
 
-        <br />
         <div style="float:left;margin: 0 0 10px 10px;">
-            {% include "questrade/holdings.html" %}
+            {% include "finance/holdings.html" %}
         </div>
 
         <div style="float:left;margin: 0 10px 10px 10px;">
-            {% include "questrade/balances.html" %}
+            {% include "finance/balances.html" %}
         </div>
         
         <div style="float:left;margin: 0 10px 10px 10px;">   
             <br /><br /> <button type="submit" class="refresh" data-refresh-type="live" data-refresh-div="holdings;balances">Refresh Live Data</button> 
-            <br /><br /> <button type="submit" class="refresh" data-refresh-type="daily" data-refresh-div="holdings;balances">Refresh Daily Data</button>
+            <br /><br /> <button type="submit" class="refresh" data-refresh-type="plot" data-refresh-div="history-plot">Refresh Plot Data</button>
             <br /><br /> <button type="submit" class="refresh" data-refresh-type="account" data-refresh-div="holdings;balances">Refresh Account Data</button>
         </div>
 
-        <div style="clear:both;width:800px">
+        <div style="clear:both;width:800px" id="history-plot">
             {{plotly_embed_html | safe}}
         </div>
     </body>

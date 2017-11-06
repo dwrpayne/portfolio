@@ -1,31 +1,34 @@
 {% load mytags %}
 <div id="balances">
     <pre>
-        <table cellspacing="10" id="balances-table" class="tablesorter">
+        <table style="border-spacing: 20px 5px;" id="balances-table" class="tablesorter">
             <thead>           
                 <tr>
                     <th>Account</th>
                     <th>SOD</th>
                     <th>Current</th>
+                    <th>Cash</th>
                     <th>Change</th>
                 </tr>
             </thead>
             <tbody>
-            {% for name, sod, cur, change in account_data %}
+            {% for name, sod, cur, cadcash, change in account_data %}
                 <tr>
                     <td>{{name}}</td>
-                    <td>{{sod | currency}}</td>
-                    <td>{{cur | currency}}</td>
+                    <td>{{sod | currencyround}}</td>
+                    <td>{{cur | currencyround}}</td>
+                    <td>{{cadcash | currencyround}}</td>
                     <td>{{change | currency | colorize}}</td>
                 </tr>
             {% endfor %}
             </tbody>
             <tfoot>
-            {% for name, sod, cur, change in total_data %}
+            {% for name, sod, cur, cadcash, change in total_data %}
                 <tr>
                     <td>{{name}}</td>
-                    <td>{{sod | currency}}</td>
-                    <td>{{cur | currency}}</td>
+                    <td>{{sod | currencyround}}</td>
+                    <td>{{cur | currencyround}}</td>
+                    <td>{{cadcash | currencyround}}</td>
                     <td>{{change | currency | colorize}}</td>
                 </tr>
             {% endfor %}

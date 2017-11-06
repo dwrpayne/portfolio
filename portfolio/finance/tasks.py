@@ -36,14 +36,10 @@ def LiveUpdateTask():
 
 def GetLiveUpdateTaskGroup():
     tasks = [UpdateExchange.si()]
-    tasks += [UpdatePrices.si(symbol) for symbol in Security.stocks.filter(holdings__enddate=None).distinct().values_list('symbol', flat=True)]
+    tasks += [UpdatePrices.si(symbol) for symbol in Security.stocks.filter(holdings__enddate=None).distinct().values_list('symbol', flat=True)]    
+    tasks += [SyncClientAccountBalances.s(client.username) for client in BaseClient.objects.all()]
     return group(tasks)
     
 def GetDailyUpdateTaskGroup():    
-    livegroup = GetLiveUpdateTaskGroup()
-
     tasks = [SyncClientPrices.s(client.username) for client in BaseClient.objects.all()]
-    tasks += [SyncClientAccountBalances.s(client.username) for client in BaseClient.objects.all()]
-    tasks += [SyncPrices.s(stock.symbol) for stock in Security.stocks.all()]
-
     return group(tasks)

@@ -17,6 +17,9 @@ class GrsRawActivity(BaseRawActivity):
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
+    class Meta:        
+        unique_together = ('baserawactivity_ptr', 'day', 'security', 'qty', 'price')
+
     def __str__(self):
         return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.security, self.price)
     
@@ -54,15 +57,19 @@ class GrsClient(BaseClient):
     def CloseSession(self):
         self.session.close()
 
-    def _CreateRawActivities(self, account_id, start, end):
-        response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId':account_id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'})
+    def _CreateRawActivities(self, account, start, end):
+        response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId':account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'})
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date() for tag in soup.find_all('td', class_='activities-d-lit1')]    
         units = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-unitnum')]
         prices = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
+        count = 0
         with transaction.atomic():
             for day, qty, price in zip(trans_dates, units, prices):
-                GrsRawActivity.objects.create(account_id=account_id, day=day, qty=qty, price=price, security_id='ETP')
+                obj, created = GrsRawActivity.objects.get_or_create(account=account, day=day, qty=qty, price=price, security_id='ETP')
+                if created: count += 1
+        return count
+
 
     def _GetRawPrices(self, lookup, start_date, end_date):
         print("_GetRawPrices... {} {} {}".format(lookup.lookupSymbol, start_date, end_date))

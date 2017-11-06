@@ -29,7 +29,6 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '192.168.0.11', '96.48.177.151']
 
 INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -52,9 +51,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -84,8 +83,6 @@ TEMPLATES = [
 
 SHELL_PLUS_PRE_IMPORTS = [
     ('finance.models', 'DataProvider'),
-    ('questrade.models', 'DoWork'),
-    ('questrade.models', 'All'),
     'datetime',
     'arrow',
     'simplejson',
@@ -131,6 +128,8 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+LOGIN_REDIRECT_URL = '/finance/'
 
 
 # Internationalization

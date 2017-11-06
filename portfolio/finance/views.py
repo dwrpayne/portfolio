@@ -1,5 +1,5 @@
-from django.shortcuts import get_object_or_404, render
-from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, render, redirect
+from django.http import HttpResponse, Http404
 from django.db.models.aggregates import Sum
 
 from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, BaseClient
@@ -19,7 +19,7 @@ import requests
 from celery import group
 
 def GetHoldingsContext():
-    all_holdings = Holding.current.all()
+    all_holdings = Holding.objects.current()
     total_gain = 0
     total_value = 0  
 
@@ -53,41 +53,40 @@ def GetHoldingsContext():
     context = {'security_data':security_data, 'total':total, 'cash_data':cash_data, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta}
     return context
 
+def GetBalanceContext():
+    account_data = [(a.display_name, a.yesterday_balance, a.cur_balance, a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in BaseAccount.objects.all() ]
+    names,sod,cur,cur_cash,change = list(zip(*account_data))
+
+    total_data = [('Total', sum(sod), sum(cur), sum(cur_cash), sum(change))]
+
+    context = {'account_data':account_data, 'total_data':total_data }
+    return context
+
 def analyze(request):
-    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="https://plot.ly/~cecilpl/2.embed?modebar=false&link=false" height="525" width="100%"/>'
+    if not request.user.is_authenticated:
+        raise Http404("No User!")
+    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="https://plot.ly/~cecilpl/2.embed?modebar=false&link=false" height="525" width="100%"/></iframe>'
     if request.is_ajax():        
         if 'refresh-live' in request.GET:
             result = GetLiveUpdateTaskGroup()()
             result.get()
 
-        if 'refresh-daily' in request.GET:
-            result = GetDailyUpdateTaskGroup()()
-
-            pairs = GetHistoryValues(datetime.date.today() - datetime.timedelta(days=30))
+        elif 'refresh-plot' in request.GET:
+            pairs = GetHistoryValues()
             dates, vals = list(zip(*pairs))
             trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
             plotly_url = plotly.plotly.plot([trace], filename='portfolio-values-short', auto_open=False)
             plotly_html = plotly.tools.get_embed(plotly_url)
 
-            result.get()
-
-        if 'refresh-account' in request.GET:
-            for a in BaseAccount.objects.all():
-                a.RegenerateActivities()
-                a.RegenerateHoldings()
+        elif 'refresh-account' in request.GET:
+            for client in BaseClient.objects.all():
+                with client:
+                    client.Refresh()
+            DataProvider.SyncAllSecurities()
 
     overall_context = {**GetHoldingsContext(), **GetBalanceContext()}
     overall_context['plotly_embed_html'] = plotly_html
-    return render(request, 'questrade/portfolio.html', overall_context)
-
-def GetBalanceContext():
-    account_data = [(a.display_name, a.yesterday_balance, a.cur_balance, a.cur_balance-a.yesterday_balance) for a in BaseAccount.objects.all() ]
-    names,sod,cur,change = list(zip(*account_data))
-
-    total_data = [('Total', sum(sod), sum(cur), sum(change))]
-
-    context = {'account_data':account_data, 'total_data':total_data }
-    return context
+    return render(request, 'finance/portfolio.html', overall_context)
 
 def DoWorkHistory(request):
     df = GetValueDataFrame()
@@ -101,7 +100,10 @@ def DoWorkHistory(request):
         'plotly_embed_html': plotly_embed_html
     }
 
-    return render(request, 'questrade/history.html', context)
+    return render(request, 'finance/history.html', context)
 
 def index(request):
-    return HttpResponse("Hello world, you're at the questrade index.")
+    if request.user.is_authenticated:
+        return render(request, 'finance/index.html')
+    else:
+        return redirect('/login/')

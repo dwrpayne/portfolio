@@ -28,10 +28,10 @@ from finance.models import BaseRawActivity, BaseAccount, BaseClient
 
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
-    cleaned = models.CharField(max_length=1000, null=True, blank=True)
     
     class Meta:
         unique_together = ('baserawactivity_ptr', 'jsonstr')
+        verbose_name_plural = 'Questrade Raw Activities'
         
     def __str__(self):
         return self.jsonstr
@@ -43,11 +43,15 @@ class QuestradeRawActivity(BaseRawActivity):
 
     @classmethod 
     def Add(cls, json, account):
+        """ Returns true if we added a new activity to the DB, false if it already existed. """
         s = simplejson.dumps(json)        
-        obj, created = QuestradeRawActivity.objects.update_or_create(jsonstr=s, account=account)
+        obj, created = QuestradeRawActivity.objects.get_or_create(jsonstr=s, account=account)
         if not created and cls.AllowDuplicate(s):
             s = s.replace('YOUR ACCOUNT   ', 'YOUR ACCOUNT X2')
             QuestradeRawActivity.objects.create(jsonstr=s, account=account)
+            return True
+
+        return created
 
     @classmethod
     def GetActivityType(cls, type, action):
@@ -80,11 +84,10 @@ class QuestradeRawActivity(BaseRawActivity):
             
         # Handle Options cleanup
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
-            type, symbol, expiry, strike = json['description'].split()[:4]
-            symbol = symbol.strip('.7')
-            expiry = datetime.datetime.strptime(expiry, '%m/%d/%y').strftime('%y%m%d')
-            optionsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry, type[0], Decimal(strike)*1000)
-            json['symbol'] = optionsymbol
+            callput, symbol, expiry, strike = json['description'].split()[:4]
+            expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
+            security = Security.CreateOption(callput, symbol, expiry, strike, json['currency'])
+            json['symbol'] = security.symbol
 
         # Hack to fix invalid Questrade data just for me   
         if not json['symbolId'] and not json['symbol']:
@@ -99,11 +102,10 @@ class QuestradeRawActivity(BaseRawActivity):
             elif 'VANGUARD MID-CAP GROWTH' in json['description']:         json['symbol']='VOT'
             elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol']='XBB.TO'
             elif 'ELECTRONIC ARTS INC' in json['description']:             json['symbol']='EA'
-            elif 'WESTJET AIRLINES' in json['description']:                json['symbol']='WJA.TO'         
+            elif 'WESTJET AIRLINES' in json['description']:                json['symbol']='WJA.TO'   
             
-        if json['symbol'] == 'TWMJF':
-            json['currency'] = 'USD'
-
+        if json['symbol'] == 'TWMJF': json['symbol'] = 'WEED.TO'
+            
         if json['action'] =='FXT':
             if 'AS OF ' in json['description']:
                 tradeDate = arrow.get(json['tradeDate'])
@@ -122,6 +124,15 @@ class QuestradeRawActivity(BaseRawActivity):
                         
         if json['currency'] == json['symbol']:
             json['symbol'] = None
+
+            
+        if json['symbol']:
+            try: 
+                json['security'] = Security.objects.get(symbol=json['symbol'])
+            except:
+                json['security'] = Security.CreateStock(json['symbol'], json['currency'])
+        else:
+            json['security'] = None
             
         return json
         
@@ -129,26 +140,15 @@ class QuestradeRawActivity(BaseRawActivity):
         json = self.GetCleanedJson()
                 
         create_args = {'account' : self.account, 'raw' : self}
-        for item in ['description', 'tradeDate', 'type']:
+        for item in ['description', 'tradeDate', 'type', 'security']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item])) 
             
-        if json['symbol']: 
-            try:
-                type = Security.Type.Stock if len(json['symbol']) < 20 else Security.Type.Option
-                create_args['security'], created = Security.objects.get_or_create(symbol=json['symbol'], currency_id=json['currency'], type=type)
-            except:
-                print ("Couldn't create {} {}".format(json['symbol'], json['currency']))
-            
-        else:
-            create_args['security'] = None
-
         create_args['cash_id'] = json['currency']+' Cash'
             
         activity = Activity(**create_args)
-        return activity
-     
+        return activity     
 
 class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
@@ -224,49 +224,16 @@ class QuestradeClient(BaseClient):
         json = self._GetRequest('accounts')
         for account_json in json['accounts']:
             QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
-            
-    #def SyncPrices(self):
-    #    ids = self.currentSecurities.filter(symbolid__gt=0).values_list('symbolid', flat=True)
-    #    json = self._GetRequest('markets/quotes', 'ids=' + ','.join(map(str,ids)))
-    #    for q in json['quotes']:
-    #        price = q['lastTradePriceTrHrs'] or q['lastTradePrice'] or 0
-    #        if not price: 
-    #            print('No price available for {}... zeroing out.', q['symbol'])
-    #        security = Security.stocks.get(symbol=q['symbol'])
-    #        security.live_price = Decimal(str(price))
-                            
-    def _CreateRawActivities(self, account_id, start, end):
+        
+    def _CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0)
-        json = self._GetRequest('accounts/{}/activities'.format(account_id), {'startTime': start.isoformat(), 'endTime': endTime.isoformat()})
-        logger.debug(json)
+        json = self._GetRequest('accounts/{}/activities'.format(account.id), {'startTime': start.isoformat(), 'endTime': end.isoformat()})
+        print( "Get activities from source returned: " + simplejson.dumps(json))
+        count = 0
         for activity_json in json['activities']:
-            QuestradeRawActivity.Add(activity_json, account)
-
-    def _FindSymbolId(self, symbol):
-        json = self._GetRequest('symbols/search', {'prefix':symbol})
-        for s in json['symbols']:
-            if s['isTradable'] and symbol == s['symbol']: 
-                return s['symbolId']
-        return 0
-
-    def _GetSecurityInfoList(self, symbolids):
-        if len(symbolids) == 0:
-            return []
-        if len(symbolids) == 1:
-            json = self._GetRequest('symbols/{}'.format(','.join(map(str,symbolids))))
-        else:     
-            json = self._GetRequest('symbols', 'ids='+','.join(map(str,symbolids)))
-        logger.debug(json)
-        return json['symbols']
-
-    def UpdateSecurityInfo(self):
-        with transaction.atomic():
-            for stock in Security.stocks.all():
-                if stock.symbolid == 0:
-                    print('finding {}'.format(stock))
-                    stock.symbolid = self._FindSymbolId(stock.symbol)                    
-                    print('finding {}'.format(stock.symbolid))
-                    stock.save()
+            if QuestradeRawActivity.Add(activity_json, account):
+                count += 1
+        return count
 
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
@@ -274,22 +241,6 @@ class QuestradeClient(BaseClient):
             a.curBalanceSynced = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             a.sodBalanceSynced = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
             a.save()
-
-
-def DoWork():
-    DataProvider.Init()
-    for a in QuestradeAccount.objects.all():
-        a.RegenerateActivities()
-        a.RegenerateHoldings()
-    DataProvider.SyncAllSecurities()
-
-def All():
-    Currency.objects.all().delete()
-    for c in QuestradeClient.objects.all():
-        c.Authorize()
-        c.SyncActivities()
-    DoWork()
-    
 
 
 tfsa_activity_data = [

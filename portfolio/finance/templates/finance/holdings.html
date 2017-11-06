@@ -1,0 +1,40 @@
+{% load mytags %}
+<div id="holdings">
+    <pre>
+        <table style="border-spacing: 20px 0;" id="holdings-table" class="tablesorter">
+            <thead>
+            <tr><th>Symbol</th><th>Price</th><th>Change</th><th>Shares</th><th>Gain</th><th>Total Value</th></tr>
+            </thead>
+            <tfoot>
+            <tr><td colspan="100">----------------------------------------------------------------</td></tr>
+            {% for symbol, value in cash_data %}
+                <tr>
+                    <td>{{symbol}}</td>
+                    <td></td><td></td><td></td><td></td>
+                    <td>{{value | currency}}</td>
+                </tr>
+            {% endfor %}
+            {% for total_gain, percent_gain, total_value in total %}
+                <tr>
+                    <td>Total</td>
+                    <td></td>
+                    <td>{{total_gain | currency | colorize}} {{percent_gain | percentage | colorize}}</td>
+                    <td></td><td></td>
+                    <td>{{total_value}}</td>
+                </tr>
+            {% endfor %}
+            </tfoot>
+            <tbody>{% for symbol, price, change, percent_change, shares, gain, total_val in security_data %}
+                <tr>
+                    <td>{{symbol}}</td>
+                    <td>{{price | floatformat:2}}</td>
+                    <td>{{change | floatformat:2 | colorize}} {{percent_change | percentage | colorize}}</td>
+                    <td>{{shares | floatformat:0}}</td>
+                    <td>{{gain | currency | colorize}}</td>
+                    <td>{{total_val | currency}}</td>
+                </tr>
+            {% endfor %}</tbody>
+        </table>
+        Current USD exchange: {{exchange_live|floatformat:4}} {{exchange_delta | percentage | colorize}}
+    </pre>
+</div>

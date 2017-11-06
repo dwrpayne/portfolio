@@ -2,6 +2,7 @@ from django.db import models, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from polymorphic.models import PolymorphicModel
 from django.db.models import F, Max, Q, Sum
+from django.utils.functional import cached_property
 
 from collections import defaultdict
 from decimal import Decimal
@@ -32,19 +33,28 @@ class RateLookupMixin(models.Model):
     """
     lookupSymbol = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupSource = models.CharField(max_length=32, null=True, blank=True, default=None)
-    lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)    
+    lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)
+
+    @property
+    def earliest_price_needed(self):
+        return datetime.date(2009,1,1)
         
     def GetShouldSyncRange(self):
         """ Returns a pair (start,end) of datetime.dates that need to be synced."""
-        latest = datetime.date(2009,1,1)
+        earliest = None
+        latest = None
         try:
+            earliest = self.rates.earliest().day
             latest = self.rates.latest().day
         except ObjectDoesNotExist:
-            pass
+            return (self.earliest_price_needed, datetime.date.today())
+        
+        if earliest > self.earliest_price_needed:
+            return (self.earliest_price_needed, datetime.date.today())
 
         if latest == datetime.date.today():
             return (None, None)
-
+        
         start_date = latest - datetime.timedelta(days=7)
         end_date = datetime.date.today()
         return (start_date, end_date)
@@ -142,19 +152,59 @@ class Security(RateLookupMixin):
     mutualfunds = MutualFundSecurityManager()
 
     @classmethod
-    def CreateFromJson(cls, json):
-        Security.objects.update_or_create(
-            symbolid = json['symbolId']
-            , symbol = json['symbol']
-            , description = json['description']
-            , type = json['securityType']
-            , listingExchange = json['listingExchange']
-            , currency_id = json['currency']
-            )
-      
+    def CreateStock(cls, symbol, currency_str):
+        return Security.objects.create(
+            symbol = symbol,
+            type = cls.Type.Stock,
+            currency_id = currency_str,
+            lookupSymbol = symbol
+        )
+        return security
+        
+    @classmethod
+    def CreateOptionRaw(cls, optsymbol, currency_str):
+        """
+        callput is either 'call' or 'put'.
+        symbol is the base symbol of the underlying
+        expiry is a datetime.date
+        strike is a Decimal
+        currency_str is the 3 digit currency code
+        """
+        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime('%y%m%d'), callput[0], Decimal(strike)*1000)
+        return Security.objects.create(
+            symbol = optsymbol, 
+            type = cls.Type.Option,
+            currency_id = currency_str
+            )              
+
+    @classmethod
+    def CreateOption(cls, callput, symbol, expiry, strike, currency_str):
+        """
+        callput is either 'call' or 'put'.
+        symbol is the base symbol of the underlying
+        expiry is a datetime.date
+        strike is a Decimal
+        currency_str is the 3 digit currency code
+        """
+        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime('%y%m%d'), callput[0], Decimal(strike)*1000)
+        option, created = Security.objects.get_or_create(
+            symbol = optsymbol, 
+            defaults = {
+            'description' : "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
+            'type' : cls.Type.Option,
+            'currency_id' : currency_str
+            })
+        return option
+
     class Meta:
         verbose_name_plural = 'Securities'
         
+    @cached_property
+    def earliest_price_needed(self):
+        if not self.activities.exists():
+            return super().earliest_price_needed
+        return self.activities.earliest().tradeDate
+            
     @property
     def live_price_cad(self):
         return self.live_price * self.currency.live_price
@@ -163,14 +213,15 @@ class Security(RateLookupMixin):
         return self.GetRateOnDay(day)
 
     def GetPriceCAD(self, day):
-        return self.GetRateOnDay(day) * self.currency.GetRateOnDay(day)
+        return self.GetPrice(day) * self.currency.GetRateOnDay(day)
 
     def __str__(self):
         return "{} {}".format(self.symbol, self.currency)
 
     def __repr(self):
         return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
-
+    
+    
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
 
@@ -320,22 +371,34 @@ class BaseClient(PolymorphicModel):
     def currentSecurities(self):
         return Security.objects.filter(holdings__account__client=self, holdings__enddate=None).distinct()
 
-    def _CreateRawActivities(account_id, start, end):
-        pass
+    def _CreateRawActivities(self, account, start, end):
+        """ 
+        Retrieve raw activity data from your client source for the specified account and start/end period.
+        Store it in the DB as a subclass of BaseRawActivity.
+        Return the number of new raw activities created.
+        """
+        return 0
         
-    def SyncActivities(self, startDate='2011-01-01'):
-        for account in self.accounts.all():            
-            print ('Syncing all activities for {}: '.format(account), end='')
-            start = account.GetMostRecentActivityDate()
-            if start: start = arrow.get(start).shift(days=+1)
-            else: start = arrow.get(startDate)
+    def SyncActivities(self, account):
+        """
+        Syncs all raw activities for the specified account from data source.
+        Returns the number of new raw activities created.
+        """
+        start = account.GetMostRecentActivityDate()
+        if start: start = arrow.get(start).shift(days=+1)
+        else: start = arrow.get('2011-02-01')
             
-            account.rawactivities.all().delete()
-            date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
-            print('{} requests'.format(len(date_range)), end='')
-            for start, end in date_range:
-                print('.',end='', flush=True)
-                account._CreateRawActivities(start, end)
+        date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
+        
+        print ('Syncing all activities for {} in {} chunks.'.format(account, len(date_range)))
+        return sum([self._CreateRawActivities(account, start, end) for start, end in date_range])
+
+    def Refresh(self):
+        for account in self.accounts.all():
+            new_activities = self.SyncActivities(account)
+            if new_activities > 0:
+                account.RegenerateActivities()
+                account.RegenerateHoldings()
 
     def SyncPrices(self):
         pass
@@ -363,12 +426,16 @@ class BaseAccount(PolymorphicModel):
         return "{} {}".format(self.client.username, self.type)
 
     @property
+    def cur_cash_balance(self):
+        return self.holding_set.current().cash().value_as_of(datetime.date.today())
+
+    @property
     def cur_balance(self):
-        return 0#self.GetValueAtDate(datetime.date.today())
+        return self.GetValueToday()
 
     @property
     def yesterday_balance(self):
-        return 0#self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
+        return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
     def RegenerateActivities(self):
         self.activities.all().delete()      
@@ -382,21 +449,9 @@ class BaseAccount(PolymorphicModel):
             for security, qty_delta in activity.GetHoldingEffect().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
-
-    def HackInit(self):
-        pass
-    
-    def GetValueList(self, date):
-        Holding.objects.filter(
-            Q(enddate__gte=date)|Q(enddate=None), 
-            account=self,
-            startdate__lte=date, 
-            security__rates__day=date, 
-            security__currency__rates__day=date).aggregate(
-                val=Sum(F('qty')*F('security__rates__price')*F('security__currency__rates__price')
-            )
-        )['val']        
         
+    def HackInit(self):
+        pass        
                      
     def GetMostRecentActivityDate(self):
         try:
@@ -405,42 +460,12 @@ class BaseAccount(PolymorphicModel):
             return None
 
     def GetValueAtDate(self, date):
-        return self.GetValueList(date)
-    
-class BaseRawActivity(PolymorphicModel):    
-    account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
-                    
-    def CreateActivity(self): 
-        pass     
-             
-class ManualRawActivity(BaseRawActivity):    
-    day = models.DateField()
-    security = models.CharField(max_length=100)
-    description = models.CharField(max_length=1000)
-    cash = models.CharField(max_length=100)
-    qty = models.DecimalField(max_digits=16, decimal_places=6)
-    price = models.DecimalField(max_digits=16, decimal_places=6)
-    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
-    type = models.CharField(max_length=100)
-                    
-    def CreateActivity(self): 
-        if self.security:
-            type = Security.Type.Stock if len(self.security) < 20 else Security.Type.Option
-            security, created = Security.objects.get_or_create(symbol=self.security, defaults={'currency_id':'USD', 'type':type})
-        else:
-            security = None
+        return self.holding_set.at_date(date).value_as_of(date)
 
-        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash, qty=self.qty, 
-                        price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
-
-        if not a.cash_id:
-            a.cash = None
-        return a
-             
+    def GetValueToday(self):
+        return self.holding_set.current().value_as_of(datetime.date.today())
+                 
 class HoldingManager(models.Manager):
-    def at_date(self, date):
-        return self.filter(startdate__lte=date).exclude(enddate__lt=date).exclude(qty=0)
-
     def add_effect(self, account, security, qty_delta, date):                       
         previous_qty = 0
         try:
@@ -470,10 +495,25 @@ class HoldingManager(models.Manager):
             print ("Creating {} {} {} {}".format(security, new_qty, date, None))
             self.create(account=account,security=security, qty=new_qty, startdate=date, enddate=None)
             
-class CurrentHoldingManager(HoldingManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(enddate=None)
+class HoldingQuerySet(models.query.QuerySet):
+    def current(self):
+        return self.filter(enddate=None)
+    
+    def at_date(self, date):
+        return self.filter(startdate__lte=date).exclude(enddate__lt=date)
 
+    def cash(self):
+        return self.filter(security__type=Security.Type.Cash)
+
+    def value_as_of(self, date):
+        if not self:
+            return 0
+        filtered = self.filter(security__rates__day=date, security__currency__rates__day=date)
+        if not filtered:
+            print("HoldingQuerySet filtered out because of missing price data")
+            return 0
+        return filtered.aggregate( val = Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price')) )['val']
+    
 class Holding(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE)
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='holdings')
@@ -481,8 +521,8 @@ class Holding(models.Model):
     startdate = models.DateField()
     enddate = models.DateField(null=True)
     
-    objects = HoldingManager()
-    current = CurrentHoldingManager()
+    objects = HoldingManager.from_queryset(HoldingQuerySet)()
+    objects.use_for_related_fields = True
 
     class Meta:
         unique_together = ('account', 'security', 'startdate')
@@ -492,10 +532,47 @@ class Holding(models.Model):
         return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
 
     
+class BaseRawActivity(PolymorphicModel):    
+    account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
+                    
+    def CreateActivity(self): 
+        pass     
+             
+class ManualRawActivity(BaseRawActivity):    
+    day = models.DateField()
+    security = models.CharField(max_length=100)
+    description = models.CharField(max_length=1000)
+    cash = models.CharField(max_length=100)
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    price = models.DecimalField(max_digits=16, decimal_places=6)
+    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    type = models.CharField(max_length=100)
+
+    class Meta:
+        verbose_name_plural = 'Base Raw Activities'
+                    
+    def CreateActivity(self): 
+        security = None
+        if self.security:
+            try: 
+                security = Security.objects.get(symbol=self.security)
+            except:
+                if len(self.security) >= 20:
+                    security = Security.CreateOptionRaw(self.security, self.cash.split()[0])
+                else:
+                    security = Security.CreateStock(self.security, self.cash.split()[0])
+
+        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash, qty=self.qty, 
+                        price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
+
+        if not a.cash_id:
+            a.cash = None
+        return a
+    
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
     tradeDate = models.DateField()
-    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_security')
+    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='activities')
     description = models.CharField(max_length=1000)
     cash = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_cash')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
