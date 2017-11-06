@@ -1,11 +1,16 @@
 {% load static %}
-<script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
-<script src="{% static "questrade/jquery.tablesorter.min.js" %}"></script>
-<script src="{% static "questrade/refresh_button.js" %}"></script>
-<link rel="stylesheet" type="text/css" href="{% static "questrade/style.css" %}">
-<meta http-equiv="Content-Language" content="en">
-    <html>
+<html>
     <body>
+        <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+        <script src="{% static "questrade/jquery.tablesorter.min.js" %}"></script>
+        <script src="{% static "questrade/refresh_button.js" %}"></script>        
+        <script>
+            $(function(){
+                $(".tablesorter").tablesorter();
+            });
+        </script>
+        <link rel="stylesheet" type="text/css" href="{% static "questrade/style.css" %}">
+
         <br />
         <div style="float:left;margin: 0 0 10px 10px;">
             {% include "questrade/holdings.html" %}
@@ -21,14 +26,18 @@
             <br /><br /> <button type="submit" class="refresh" data-refresh-type="account" data-refresh-div="holdings;balances">Refresh Account Data</button>
         </div>
 
+        <table class="tablesorter">
+            <thead>
+                <tr><th>a</th><th>nth</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>nth</td><td>nthnt</td></tr>
+                <tr><td>dhtdht</td><td>ntdhtgghnt</td></tr>
+            </tbody>
+        </table>
+
         <div style="clear:both;width:800px">
             {{plotly_embed_html | safe}}
         </div>
-    <script>
-        $(function(){
-            $("#balances-table").tablesorter();
-            $("#holdings-table").tablesorter();
-        });
-    </script>
     </body>
 </html>

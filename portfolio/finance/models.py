@@ -255,6 +255,9 @@ class DataProvider:
         if 'Time Series (1min)' in json:
             newest = json["Meta Data"]["3. Last Refreshed"]
             price = Decimal(json['Time Series (1min)'][newest]['4. close'])
+        else:
+            print(symbol, json)
+            print(r, r.content)
         print('Getting live price for {}... {}'.format(symbol, price))        
         return price
                     
@@ -263,7 +266,9 @@ class DataProvider:
         for stock in Security.stocks.all():
             stock.SyncRates(cls.GetAlphaVantageData)
             if Holding.current.filter(security=stock).exists():
-                stock.live_price = cls.GetLiveStockPrice(stock.symbol)
+                price = cls.GetLiveStockPrice(symbol)
+                if price:
+                    stock.live_price = price
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
@@ -356,13 +361,11 @@ class BaseAccount(PolymorphicModel):
 
     @property
     def cur_balance(self):
-        return 0
-        #return self.GetValueAtDate(datetime.date.today())
+        return 0#self.GetValueAtDate(datetime.date.today())
 
     @property
     def yesterday_balance(self):
-        return 0
-        #return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
+        return 0#self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
     def RegenerateActivities(self):
         self.activities.all().delete()      
@@ -399,7 +402,7 @@ class BaseAccount(PolymorphicModel):
             return None
 
     def GetValueAtDate(self, date):
-        return self.GetValueList()[date]
+        return self.GetValueList(date)
     
 class BaseRawActivity(PolymorphicModel):    
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')

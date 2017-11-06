@@ -24,8 +24,10 @@ def UpdateExchange():
 
 @shared_task
 def UpdatePrices(symbol):
-    s = Security.stocks.get(symbol=symbol)
-    s.live_price = DataProvider.GetLiveStockPrice(symbol)
+    price = DataProvider.GetLiveStockPrice(symbol)
+    if price:
+        s = Security.stocks.get(symbol=symbol)
+        s.live_price = price
 
 def GetLiveUpdateTaskGroup():
     tasks = [UpdateExchange.si()]
@@ -39,4 +41,4 @@ def GetDailyUpdateTaskGroup():
     tasks += [SyncClientAccountBalances.s(client.username) for client in BaseClient.objects.all()]
     tasks += [SyncPrices.s(stock.symbol) for stock in Security.stocks.all()]
 
-    return group(tasks | livegroup)
+    return group(tasks)
