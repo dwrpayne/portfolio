@@ -28,7 +28,7 @@ def show404(request):
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
     url(r'^hello/', hello),
-    url(r'^finance/', include('questrade.urls'))
+    url(r'^finance/', include('finance.urls'))
 ]
 
 if settings.DEBUG:

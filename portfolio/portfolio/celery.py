@@ -29,6 +29,10 @@ app.conf.beat_schedule = {
     },
     'refresh-questrade-tokens': {
         'task': 'questrade.tasks.RefreshAccessTokens',
-        'schedule': 10, # Every 20 minutes
+        'schedule': 10*60, # Every 10 minutes
+    },
+    'sync-live-prices': {
+        'task': 'finance.tasks.LiveUpdateTask',
+        'schedule': 30, # Every 30 seconds
     },
 }

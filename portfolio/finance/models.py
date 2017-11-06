@@ -260,15 +260,18 @@ class DataProvider:
             print(r, r.content)
         print('Getting live price for {}... {}'.format(symbol, price))        
         return price
+
+    @classmethod
+    def SyncLiveSecurities(cls):
+        for security in Security.stocks.filter(holdings__enddate=None).distinct():
+            price = cls.GetLiveStockPrice(security.symbol)
+            if price:
+                security.live_price = price
                     
     @classmethod
     def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
             stock.SyncRates(cls.GetAlphaVantageData)
-            if Holding.current.filter(security=stock).exists():
-                price = cls.GetLiveStockPrice(symbol)
-                if price:
-                    stock.live_price = price
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():

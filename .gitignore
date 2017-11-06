@@ -103,3 +103,4 @@ ENV/
 
 # Custom stuff
 private/
+celerybeat-*

@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
+    #'channels',
     'debug_toolbar',
     'polymorphic',
     'django_extensions',

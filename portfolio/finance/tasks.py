@@ -29,6 +29,11 @@ def UpdatePrices(symbol):
         s = Security.stocks.get(symbol=symbol)
         s.live_price = price
 
+@shared_task
+def LiveUpdateTask():
+    DataProvider.SyncAllExchangeRates()
+    DataProvider.SyncLiveSecurities()
+
 def GetLiveUpdateTaskGroup():
     tasks = [UpdateExchange.si()]
     tasks += [UpdatePrices.si(symbol) for symbol in Security.stocks.filter(holdings__enddate=None).distinct().values_list('symbol', flat=True)]
