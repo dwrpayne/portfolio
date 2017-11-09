@@ -153,7 +153,13 @@ class QuestradeRawActivity(BaseRawActivity):
 class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
-        
+            
+    def __str__(self):
+        return "{} {} {}".format(self.client, self.id, self.type)
+    
+    def __repr__(self):
+        return 'QuestradeAccount<{},{},{}>'.format(self.client, self.id, self.type)
+
     @property
     def cur_balance(self):
         return self.curBalanceSynced
@@ -161,37 +167,28 @@ class QuestradeAccount(BaseAccount):
     @property
     def yesterday_balance(self):
         return self.sodBalanceSynced
-            
-    def HackInit(self):
-        start = '2011-01-01'
-        if self.id == 51419220:     
-            self.holding_set.create(security_id='VBR', qty=90, startdate=start, enddate=None)
-            self.holding_set.create(security_id='XSB.TO', qty=85, startdate=start, enddate=None)
-            self.holding_set.create(security_id='XIN.TO', qty=140, startdate=start, enddate=None)
-            self.holding_set.create(security_id='CAD Cash', qty=Decimal('147.25'), startdate=start, enddate=None)
-            self.holding_set.create(security_id='USD Cash', qty=Decimal('97.15'), startdate=start, enddate=None)
-    
-class QuestradeClient(BaseClient):
+                
+class QuestradeClient(BaseClient):    
+    username = models.CharField(max_length=32)
     refresh_token = models.CharField(max_length=100)
     access_token = models.CharField(max_length=100, null=True, blank=True)
     api_server = models.CharField(max_length=100, null=True, blank=True)
     token_expiry = models.DateTimeField(null=True, blank=True)
     authorization_lock = threading.Lock()
+                    
+    def __repr__(self):
+        return "QuestradeClient<{}>".format(self.display_name)
 
-    @classmethod 
-    def CreateClient(cls, username, refresh_token):
-        client = QuestradeClient(username = username, refresh_token = refresh_token)
-        client.Authorize()
-        client.SyncAccounts()
-        return client
-            
+    @property
+    def activitySyncDateRange(self):
+        return 28
+
     @property
     def needs_refresh(self):
         """ Check if we should refresh this questrade token. At time of writing their API docs state the access token is good for 30 minutes."""
         if not self.token_expiry: return True
         if not self.access_token: return True
         return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 600)) # We need refresh if we are less than 10 minutes from expiry.
-
     
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
@@ -224,6 +221,8 @@ class QuestradeClient(BaseClient):
         json = self._GetRequest('accounts')
         for account_json in json['accounts']:
             QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
+
+        AddManualRawActivity()
         
     def _CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0)
@@ -332,7 +331,16 @@ rrsp_activity_data = [
 ('1/12/2011', 'Sell', 'EA  110219C00017000', 'USD', '40', '-3', '107.04', ''),
 ('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
 ('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', ''),
+('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '300', '5413.94', ''),
 ]
+
+sarah_tfsa_data= [
+    ('1/1/2011', 'Deposit', 'VBR', 'USD', '0', '90', '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'XSB.TO', 'CAD', '0', '85', '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'XIN.TO', 'CAD', '0', '140', '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Transfer', '', 'CAD', '', '', '147.25', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Transfer', '', 'USD', '', '', '97.15', 'Faked past history - fix this with real data'),
+    ]
 
 from finance.models import ManualRawActivity
 
@@ -340,13 +348,14 @@ def AddManualRawActivity():
     ManualRawActivity.objects.all().delete()
     for account_id, data in [
         (51407958, tfsa_activity_data),
+        (51419220, sarah_tfsa_data),
         (51424829, rrsp_activity_data)]:
         account = BaseAccount.objects.get(id=account_id)
         for date, type, security, cash, price, qty, netAmount, description in data:
             act=ManualRawActivity(day=parser.parse(date), 
                 security=security, 
                 type=type, 
-                cash=cash + ' Cash', 
+                cash=cash,
                 qty=qty if qty else '0', 
                 price=price if price else '0', 
                 netAmount=netAmount if netAmount else '0', 

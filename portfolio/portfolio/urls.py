@@ -28,7 +28,7 @@ def show404(request):
     raise Http404("Page does not exist")
 
 urlpatterns = [
-    url(r'^login/$', auth_views.login, name='login'),
+    url('^', include('django.contrib.auth.urls')),
     url(r'^logout/$', auth_views.logout, name='logout'),
     url(r'^admin/', admin.site.urls),
     url(r'^hello/', hello),

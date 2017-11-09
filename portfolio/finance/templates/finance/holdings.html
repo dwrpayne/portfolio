@@ -1,12 +1,12 @@
 {% load mytags %}
 <div id="holdings">
     <pre>
-        <table style="border-spacing: 20px 0;" id="holdings-table" class="tablesorter">
+        <table style="border-spacing: 20px 0;" id="holdings-table" class="tablesorter compact">
             <thead>
-            <tr><th>Symbol</th><th>Price</th><th>Change</th><th>Shares</th><th>Gain</th><th>Total Value</th></tr>
+            <tr><th>Symbol</th><th>Price</th><th>Change</th><th>Shares</th><th>Gain</th><th>Total Value</th><th>%</th></tr>
             </thead>
             <tfoot>
-            <tr><td colspan="100">----------------------------------------------------------------</td></tr>
+            <tr><td colspan="100">----------------------------------------------------------------------</td></tr>
             {% for symbol, value in cash_data %}
                 <tr>
                     <td>{{symbol}}</td>
@@ -24,7 +24,7 @@
                 </tr>
             {% endfor %}
             </tfoot>
-            <tbody>{% for symbol, price, change, percent_change, shares, gain, total_val in security_data %}
+            <tbody>{% for symbol, price, change, percent_change, shares, gain, total_val, percent in security_data %}
                 <tr>
                     <td>{{symbol}}</td>
                     <td>{{price | floatformat:2}}</td>
@@ -32,6 +32,7 @@
                     <td>{{shares | floatformat:0}}</td>
                     <td>{{gain | currency | colorize}}</td>
                     <td>{{total_val | currency}}</td>
+                    <td>{{percent | floatformat:1}}</td>
                 </tr>
             {% endfor %}</tbody>
         </table>

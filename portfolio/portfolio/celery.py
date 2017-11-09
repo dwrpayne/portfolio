@@ -2,8 +2,9 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-# set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'portfolio.settings')
+
+# set the default Django settings module for the 'celery' program.
 
 app = Celery('portfolio')
 
@@ -23,16 +24,16 @@ def debug_task(self):
     print('Request: {0!r}'.format(self.request))
 
 app.conf.beat_schedule = {
-    'sync-daily-prices': {
-        'task': 'finance.tasks.UpdateDailyPrices',
-        'schedule': crontab(minute=0, hour=2),
+    'sync-daily-client-prices': {
+        'task': 'finance.tasks.DailyUpdateTask',
+        'schedule': crontab(minute=0, hour=4),
     },
-    'refresh-questrade-tokens': {
-        'task': 'questrade.tasks.RefreshAccessTokens',
-        'schedule': 10*60, # Every 10 minutes
-    },
+    #'refresh-questrade-tokens': {
+    #    'task': 'questrade.tasks.RefreshAccessTokens',
+    #    'schedule': 20*60, # Every 20 minutes
+    #},
     'sync-live-prices': {
         'task': 'finance.tasks.LiveUpdateTask',
-        'schedule': 30, # Every 30 seconds
+        'schedule': crontab(minute='*', hour='6-15', day_of_week='mon-fri')
     },
 }

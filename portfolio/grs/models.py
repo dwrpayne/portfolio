@@ -24,7 +24,7 @@ class GrsRawActivity(BaseRawActivity):
         return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.security, self.price)
     
     def __repr__(self):
-        return 'GrsRawActivity<{}>'.format(self.username)
+        return 'GrsRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.security, self.qty, self.price)
 
     def CreateActivity(self): 
         return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty, 
@@ -32,23 +32,23 @@ class GrsRawActivity(BaseRawActivity):
     
 class GrsAccount(BaseAccount):
     plan_data = models.CharField(max_length=100)    
-    
-class GrsClient(BaseClient):
-    password = models.CharField(max_length=100)
+
+    def __str__(self):
+        return '{} {} {}'.format(self.client, self.id, self.type)
     
     def __repr__(self):
-        return 'GrsClient<{}>'.format(self.username)
+        return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
+    
+class GrsClient(BaseClient):
+    username = models.CharField(max_length=32)
+    password = models.CharField(max_length=100)
+        
+    def __repr__(self):
+        return 'GrsClient<{}>'.format(self.display_name)
     
     @property
     def activitySyncDateRange(self):
         return 360
-
-    @classmethod 
-    def Create(cls, username, password, plan_data, plan_id):
-        client = GrsClient(username = username, password=password, plan_data=plan_data, plan_id=plan_id)
-        client.save()
-        client.Authorize()
-        return client
             
     def Authorize(self):
         self.session = requests.Session()

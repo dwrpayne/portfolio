@@ -3,6 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from polymorphic.models import PolymorphicModel
 from django.db.models import F, Max, Q, Sum
 from django.utils.functional import cached_property
+from django.conf import settings
 
 from collections import defaultdict
 from decimal import Decimal
@@ -38,6 +39,10 @@ class RateLookupMixin(models.Model):
     @property
     def earliest_price_needed(self):
         return datetime.date(2009,1,1)
+
+    @property
+    def latest_price_needed(self):
+        return datetime.date.today()
         
     def GetShouldSyncRange(self):
         """ Returns a pair (start,end) of datetime.dates that need to be synced."""
@@ -47,17 +52,15 @@ class RateLookupMixin(models.Model):
             earliest = self.rates.earliest().day
             latest = self.rates.latest().day
         except ObjectDoesNotExist:
-            return (self.earliest_price_needed, datetime.date.today())
+            return (self.earliest_price_needed, self.latest_price_needed)
         
         if earliest > self.earliest_price_needed:
-            return (self.earliest_price_needed, datetime.date.today())
+            return (self.earliest_price_needed, self.latest_price_needed)
 
-        if latest == datetime.date.today():
-            return (None, None)
-        
-        start_date = latest - datetime.timedelta(days=7)
-        end_date = datetime.date.today()
-        return (start_date, end_date)
+        if latest < self.latest_price_needed:
+            return (latest - datetime.timedelta(days=7), self.latest_price_needed)
+
+        return (None, None)        
         
     @property
     def live_price(self):
@@ -77,12 +80,11 @@ class RateLookupMixin(models.Model):
         else:
             # Expect iterator of day, price pairs
             dates, prices = zip(*data)
-            data = pandas.Series(prices, index=dates)
+            data = pandas.Series(prices, index=dates, dtype='float64')
 
         data = data.sort_index()
-        data = data.replace(0,numpy.nan)
         index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
-        data = data.reindex(index).ffill()
+        data = data.reindex(index).interpolate()
         return data.iteritems()
 
     def SyncRates(self, retriever_fn):
@@ -170,7 +172,6 @@ class Security(RateLookupMixin):
         strike is a Decimal
         currency_str is the 3 digit currency code
         """
-        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime('%y%m%d'), callput[0], Decimal(strike)*1000)
         return Security.objects.create(
             symbol = optsymbol, 
             type = cls.Type.Option,
@@ -204,6 +205,12 @@ class Security(RateLookupMixin):
         if not self.activities.exists():
             return super().earliest_price_needed
         return self.activities.earliest().tradeDate
+        
+    @cached_property
+    def latest_price_needed(self):
+        if not self.activities.exists() or self.holdings.current().exists():
+            return super().latest_price_needed
+        return self.activities.latest().tradeDate
             
     @property
     def live_price_cad(self):
@@ -314,7 +321,7 @@ class DataProvider:
 
     @classmethod
     def SyncLiveSecurities(cls):
-        for security in Security.stocks.filter(holdings__enddate=None).distinct():
+        for security in Security.stocks.filter(holdings__isnull=False, holdings__enddate=None).distinct():
             price = cls.GetLiveStockPrice(security.symbol)
             if price:
                 security.live_price = price
@@ -323,6 +330,9 @@ class DataProvider:
     def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
             stock.SyncRates(cls.GetAlphaVantageData)
+
+        for option in Security.options.all():
+            option.SyncRates(lambda l,s,e: option.activities.values_list('tradeDate', 'price').distinct('tradeDate'))
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
@@ -334,26 +344,24 @@ class DataProvider:
             Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
 
-        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
-        Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
+        #r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
+        #Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
+        
 
-
-class BaseClient(PolymorphicModel):
-    username = models.CharField(max_length=10, primary_key=True)
-
-    @classmethod 
-    def Get(cls, username):
-        client = cls.objects.get(username=username)
-        client.Authorize()
-        return client
-
+class BaseClient(PolymorphicModel):    
+    user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clients')
+    display_name = models.CharField(max_length=100, null=True)
+    
     @property
     def activitySyncDateRange(self):
         return 30
-
+    
     def __str__(self):
-        return self.username
-        
+        return "{}".format(self.display_name)
+    
+    def __repr__(self):
+        return 'BaseClient<{}>'.format(self.display_name)
+            
     def __enter__(self):
         self.Authorize()
         return self
@@ -378,6 +386,9 @@ class BaseClient(PolymorphicModel):
         Return the number of new raw activities created.
         """
         return 0
+
+    def SyncAccounts(self):
+        pass
         
     def SyncActivities(self, account):
         """
@@ -394,6 +405,7 @@ class BaseClient(PolymorphicModel):
         return sum([self._CreateRawActivities(account, start, end) for start, end in date_range])
 
     def Refresh(self):
+        self.SyncAccounts()
         for account in self.accounts.all():
             new_activities = self.SyncActivities(account)
             if new_activities > 0:
@@ -405,12 +417,11 @@ class BaseClient(PolymorphicModel):
 
     def SyncCurrentAccountBalances(self):
         pass
-    
-    
+        
 class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
-    id = models.IntegerField(default=0, primary_key = True)
+    id = models.CharField(max_length=100, default=0, primary_key = True)
 
     class Meta:
         ordering = ['id']
@@ -423,7 +434,7 @@ class BaseAccount(PolymorphicModel):
 
     @property
     def display_name(self):
-        return "{} {}".format(self.client.username, self.type)
+        return "{} {}".format(self.client, self.type)
 
     @property
     def cur_cash_balance(self):
@@ -558,11 +569,11 @@ class ManualRawActivity(BaseRawActivity):
                 security = Security.objects.get(symbol=self.security)
             except:
                 if len(self.security) >= 20:
-                    security = Security.CreateOptionRaw(self.security, self.cash.split()[0])
+                    security = Security.CreateOptionRaw(self.security, self.cash)
                 else:
-                    security = Security.CreateStock(self.security, self.cash.split()[0])
+                    security = Security.CreateStock(self.security, self.cash)
 
-        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash, qty=self.qty, 
+        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash+' Cash', qty=self.qty, 
                         price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
 
         if not a.cash_id:
@@ -611,46 +622,4 @@ class Activity(models.Model):
 
         return effect                 
     
-    
-def GetHistoryValues(startdate=None):
-    """ Returns an (date, value) tuple for each date where the value of that account is > 0 """
-    if startdate is None: 
-        pricequery = SecurityPrice.objects.all()
-    else:
-        pricequery = SecurityPrice.objects.filter(day__gte=startdate)
-    
-    val_list = pricequery.filter(
-        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
-        security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')
-    ).order_by('day').values_list('day').annotate( val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price')) )
-    
-    return val_list
-
-def GetValueDataFrame(startdate=None):
-    """ Returns an (account, date, value) tuple for each date where the value of that account is > 0 """
-    if startdate is None: 
-        pricequery = SecurityPrice.objects.all()
-    else:
-        pricequery = SecurityPrice.objects.filter(day__gte=startdate)
-    
-    val_list = pricequery.filter(
-        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
-        security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')
-    ).values_list('day', 'security__holdings__account_id').annotate(
-        val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
-    )
-
-    all_accounts = BaseAccount.objects.all()
-    dates = sorted(list({d for d,a,v in val_list}))
-
-    vals = defaultdict(dict)
-    for d,a,v in val_list:
-        vals[a][pandas.Timestamp(d)] = v
-    
-    s = [pandas.Series(vals[a.id], name=a.display_name) for a in all_accounts]
-    df = pandas.DataFrame(s).T.fillna(0).astype(int).iloc[::-1]
-    df = df.assign(Total=pandas.Series(df.sum(1)))
-    df.index = df.index.date
-    return df
+  

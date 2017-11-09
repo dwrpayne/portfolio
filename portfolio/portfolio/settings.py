@@ -32,16 +32,17 @@ INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
 # Application definition
 
 INSTALLED_APPS = [
+    'django.contrib.contenttypes',
+    'polymorphic',
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
+    'tangerine.apps.tangerineConfig',
     #'channels',
     'debug_toolbar',
-    'polymorphic',
     'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
-    'django.contrib.contenttypes',
     'django.contrib.humanize',
     'django.contrib.sessions',
     'whitenoise.runserver_nostatic',
@@ -129,6 +130,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/finance/'
 
 
@@ -158,5 +160,5 @@ CELERY_FORKED_BY_MULTIPROCESSING = 1
 CELERY_TRACK_STARTED = True
 CELERY_RESULT_BACKEND = 'django-db'
 CELERY_IMPORTS = (
-    'questrade.tasks'
+#    'finance.tasks'
 )

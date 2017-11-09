@@ -6,8 +6,9 @@ from requests.exceptions import ConnectionError
 
 @shared_task(max_retries=5, default_retry_delay=5, autoretry_for=(ConnectionError,))
 def SyncClientPrices(client_id):
-    with BaseClient.objects.get(pk=client_id) as client:
-        client.SyncPrices()
+    for client in BaseClient.objects.all():
+        with client:
+            client.SyncPrices()
 
 @shared_task(max_retries=5, default_retry_delay=5, autoretry_for=(ConnectionError,))
 def SyncClientAccountBalances(client_id):
@@ -16,30 +17,21 @@ def SyncClientAccountBalances(client_id):
 
 @shared_task
 def SyncPrices(symbol):
-    Security.stocks.get(symbol=symbol).SyncRates(DataProvider.GetAlphaVantageData)
+    DataProvider.SyncAllSecurities()
     
-@shared_task
-def UpdateExchange():
-    DataProvider.SyncAllExchangeRates()
-
-@shared_task
-def UpdatePrices(symbol):
-    price = DataProvider.GetLiveStockPrice(symbol)
-    if price:
-        s = Security.stocks.get(symbol=symbol)
-        s.live_price = price
-
 @shared_task
 def LiveUpdateTask():
     DataProvider.SyncAllExchangeRates()
     DataProvider.SyncLiveSecurities()
+    
+@shared_task
+def DailyUpdateTask():
+    for client in BaseClient.objects.all():
+        SyncClientPrices(client.id)
+    DataProvider.SyncAllSecurities()
 
-def GetLiveUpdateTaskGroup():
-    tasks = [UpdateExchange.si()]
-    tasks += [UpdatePrices.si(symbol) for symbol in Security.stocks.filter(holdings__enddate=None).distinct().values_list('symbol', flat=True)]    
-    tasks += [SyncClientAccountBalances.s(client.username) for client in BaseClient.objects.all()]
+def GetLiveUpdateTaskGroup(user):
+    tasks = [LiveUpdateTask.si()]
+    tasks += [SyncClientAccountBalances.s(client.id) for client in user.clients.all()]
     return group(tasks)
     
-def GetDailyUpdateTaskGroup():    
-    tasks = [SyncClientPrices.s(client.username) for client in BaseClient.objects.all()]
-    return group(tasks)
