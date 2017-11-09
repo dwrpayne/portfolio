@@ -1,5 +1,4 @@
 from django.db import models, transaction
-from django import forms
 
 import requests
 from bs4 import BeautifulSoup

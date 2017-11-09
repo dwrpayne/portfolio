@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
+    'tangerine.apps.tangerineConfig',
     'debug_toolbar',
     'polymorphic',
     'django_extensions',
