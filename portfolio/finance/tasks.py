@@ -1,7 +1,6 @@
 from .models import BaseClient, Security, DataProvider
 from celery import shared_task
 from celery import group
-from celery.result import allow_join_result
 from requests.exceptions import ConnectionError
 
 @shared_task(max_retries=5, default_retry_delay=5, autoretry_for=(ConnectionError,))

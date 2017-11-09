@@ -32,17 +32,17 @@ INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14']
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.contenttypes',
-    'polymorphic',
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
     'tangerine.apps.tangerineConfig',
     #'channels',
     'debug_toolbar',
+    'polymorphic',
     'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
+    'django.contrib.contenttypes',
     'django.contrib.humanize',
     'django.contrib.sessions',
     'whitenoise.runserver_nostatic',
