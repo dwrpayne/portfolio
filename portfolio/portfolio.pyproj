@@ -119,17 +119,13 @@
     <Compile Include="finance\templatetags\__init__.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="questrade\tasks.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="questrade\tests.py" />
     <Compile Include="questrade\utils.py" />
     <Compile Include="questrade\views.py" />
     <Compile Include="questrade\__init__.py" />
-    <Compile Include="tangerine\admin.py" />
-    <Compile Include="tangerine\apps.py" />
-    <Compile Include="tangerine\migrations\__init__.py" />
-    <Compile Include="tangerine\models.py" />
-    <Compile Include="tangerine\tests.py" />
-    <Compile Include="tangerine\views.py" />
-    <Compile Include="tangerine\__init__.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="finance\" />
@@ -150,9 +146,6 @@
     <Folder Include="questrade\migrations\" />
     <Folder Include="questrade\migrations\__pycache__\" />
     <Folder Include="questrade\__pycache__\" />
-    <Folder Include="tangerine\" />
-    <Folder Include="tangerine\migrations\" />
-    <Folder Include="tangerine\templates\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="finance\templates\finance\index.html" />
@@ -199,7 +192,6 @@
     <Content Include="questrade\__pycache__\views.cpython-36.pyc" />
     <Content Include="questrade\__pycache__\__init__.cpython-36.pyc" />
     <Content Include="requirements.txt" />
-    <Content Include="tangerine\templates\index.html" />
   </ItemGroup>
   <ItemGroup>
     <None Include="readme.html">

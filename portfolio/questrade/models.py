@@ -225,8 +225,11 @@ class QuestradeClient(BaseClient):
         AddManualRawActivity()
         
     def _CreateRawActivities(self, account, start, end):
-        end = end.replace(hour=0, minute=0, second=0)
-        json = self._GetRequest('accounts/{}/activities'.format(account.id), {'startTime': start.isoformat(), 'endTime': end.isoformat()})
+        end = end.replace(hour=0, minute=0, second=0, microsecond=0)
+        try:
+            json = self._GetRequest('accounts/{}/activities'.format(account.id), {'startTime': start.isoformat(), 'endTime': end.isoformat()})
+        except:
+            return 0
         print( "Get activities from source returned: " + simplejson.dumps(json))
         count = 0
         for activity_json in json['activities']:
@@ -331,7 +334,7 @@ rrsp_activity_data = [
 ('1/12/2011', 'Sell', 'EA  110219C00017000', 'USD', '40', '-3', '107.04', ''),
 ('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
 ('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', ''),
-('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '300', '5413.94', ''),
+('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', ''),
 ]
 
 sarah_tfsa_data= [

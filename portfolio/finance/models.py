@@ -16,6 +16,9 @@ from dateutil import parser
 import requests
 from pandas_datareader import data as pdr
 
+class ActivitySyncException(Exception):
+    pass
+
 class RateHistoryTableMixin(models.Model):
     """
     A mixin class for rate history.
@@ -405,10 +408,11 @@ class BaseClient(PolymorphicModel):
         return sum([self._CreateRawActivities(account, start, end) for start, end in date_range])
 
     def Refresh(self):
-        self.SyncAccounts()
+        #self.SyncAccounts()
         for account in self.accounts.all():
             new_activities = self.SyncActivities(account)
-            if new_activities > 0:
+            # TODO: Better error handling when we can't actually sync new activities from server. Should we still regen here?
+            if new_activities >= 0:
                 account.RegenerateActivities()
                 account.RegenerateHoldings()
 

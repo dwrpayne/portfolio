@@ -35,8 +35,6 @@ INSTALLED_APPS = [
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
-    'tangerine.apps.tangerineConfig',
-    #'channels',
     'debug_toolbar',
     'polymorphic',
     'django_extensions',
@@ -160,5 +158,5 @@ CELERY_FORKED_BY_MULTIPROCESSING = 1
 CELERY_TRACK_STARTED = True
 CELERY_RESULT_BACKEND = 'django-db'
 CELERY_IMPORTS = (
-#    'finance.tasks'
+    'questrade.tasks'
 )
