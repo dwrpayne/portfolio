@@ -11,17 +11,6 @@
                     <th>Change</th>
                 </tr>
             </thead>
-            <tbody>
-            {% for name, sod, cur, cadcash, change in account_data %}
-                <tr>
-                    <td>{{name}}</td>
-                    <td>{{sod | currencyround}}</td>
-                    <td>{{cur | currencyround}}</td>
-                    <td>{{cadcash | currencyround}}</td>
-                    <td>{{change | currency | colorize}}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
             <tfoot>
             {% for name, sod, cur, cadcash, change in total_data %}
                 <tr>
@@ -33,7 +22,17 @@
                 </tr>
             {% endfor %}
             </tfoot>
-
+            <tbody>
+            {% for name, id, sod, cur, cadcash, change in account_data %}
+                <tr>
+                    <td><a href="{% url 'finance:accountdetail' id %}">{{name}}</a></td>
+                    <td>{{sod | currencyround}}</td>
+                    <td>{{cur | currencyround}}</td>
+                    <td>{{cadcash | currencyround}}</td>
+                    <td>{{change | currency | colorize}}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
         </table>
     </pre>
 </div>

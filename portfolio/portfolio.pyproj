@@ -167,6 +167,8 @@
     <Folder Include="utils\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="finance\templates\finance\security.html" />
+    <Content Include="finance\templates\finance\account.html" />
     <Content Include="finance\templates\finance\index.html" />
     <Content Include="grs\templates\index.html" />
     <Content Include="finance\templates\registration\login.html" />
@@ -194,7 +196,7 @@
     <Content Include="questrade\migrations\__pycache__\0020_auto_20171019_0809.cpython-36.pyc" />
     <Content Include="questrade\migrations\__pycache__\__init__.cpython-36.pyc" />
     <Content Include="finance\static\finance\jquery.tablesorter.min.js" />
-    <Content Include="finance\static\finance\refresh_button.js" />
+    <Content Include="finance\static\finance\finance.js" />
     <Content Include="finance\static\finance\style.css" />
     <Content Include="finance\templates\finance\balances.html" />
     <Content Include="finance\templates\finance\portfolio.html" />

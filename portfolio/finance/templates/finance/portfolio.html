@@ -4,12 +4,7 @@
     <body>
         <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
         <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
-        <script src="{% static "finance/refresh_button.js" %}"></script>       
-        <script>
-            $(function(){
-                $(".tablesorter").tablesorter();
-            });
-        </script>
+        <script src="{% static "finance/finance.js" %}"></script>       
         <link rel="stylesheet" type="text/css" href="{% static "questrade/style.css" %}">
         <br />
         <h3><center>Portfolio info for {{username}}.</center></h3>

@@ -451,6 +451,7 @@ class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.CharField(max_length=100, primary_key = True)
+    taxable = models.BooleanField()
 
     class Meta:
         ordering = ['id']
@@ -460,7 +461,7 @@ class BaseAccount(PolymorphicModel):
 
     def __str__(self):
         return "{} {} {}".format(self.client, self.id, self.type)
-
+    
     @property
     def display_name(self):
         return "{} {}".format(self.client, self.type)
@@ -505,6 +506,8 @@ class BaseAccount(PolymorphicModel):
     def GetValueToday(self):
         return self.holding_set.current().value_as_of(datetime.date.today())
 
+    def GetDividendsInYear(self, year):
+        sum(account.activities.dividends().in_year(year).values_list('netAmount',flat=True))
 
                  
 class HoldingManager(models.Manager):
@@ -611,6 +614,13 @@ class ManualRawActivity(BaseRawActivity):
             a.cash = None
         return a
     
+class ActivityQuerySet(models.query.QuerySet):
+    def dividends(self):
+        return self.filter(type = Activity.Type.Dividend)
+
+    def in_year(self, year):
+        return self.filter(tradeDate__year=year)
+
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
     tradeDate = models.DateField()
@@ -623,6 +633,9 @@ class Activity(models.Model):
     Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)
     raw = models.OneToOneField(BaseRawActivity, on_delete=models.CASCADE)
+
+    objects = ActivityQuerySet.as_manager()
+    objects.use_for_related_fields = True
     
     class Meta:
         unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
@@ -658,5 +671,3 @@ class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
 
-
-class TaxInfo

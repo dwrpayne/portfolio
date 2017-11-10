@@ -23,3 +23,7 @@ $(document).ready(function () {
         });
     });
 });
+
+$(function () {
+    $(".tablesorter").tablesorter();
+});

@@ -26,7 +26,7 @@
             </tfoot>
             <tbody>{% for symbol, price, change, percent_change, shares, gain, total_val, percent in security_data %}
                 <tr>
-                    <td>{{symbol}}</td>
+                    <td><a href="{% url 'finance:securitydetail' symbol %}">{{symbol}}</a></td>
                     <td>{{price | floatformat:2}}</td>
                     <td>{{change | floatformat:2 | colorize}} {{percent_change | percentage | colorize}}</td>
                     <td>{{shares | floatformat:0}}</td>

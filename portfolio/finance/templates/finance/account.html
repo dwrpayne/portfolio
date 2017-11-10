@@ -1,0 +1,45 @@
+{% load mytags %}
+{% load static %}
+<html>
+<head>
+    <title>{{account.display_name}}</title>
+</head>
+<body>
+    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+    <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
+    <script src="{% static "finance/finance.js" %}"></script>       
+    <br />
+
+    <center><h3>{{account.display_name}}</h3></center>
+    <div id="activities">
+        <pre>
+            <table style="border-spacing: 20px 5px;" id="activties-table" class="tablesorter compact">
+                <thead>           
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Security</th>
+                        <th>Units</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for activity in activities %}
+                    <tr>
+                        <td>{{activity.tradeDate}}</td>
+                        <td>{{activity.type}}</td>
+                        <td>{{activity.security_id}}</td>
+                        <td>{{activity.qty}}</td>
+                        <td>{{activity.price}}</td>
+                        <td>{{activity.netAmount}}</td>
+                        <td>{{activity.description}}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </pre>
+    </div>
+</body>
+</html>

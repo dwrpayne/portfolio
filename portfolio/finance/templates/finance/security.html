@@ -1,0 +1,53 @@
+{% load mytags %}
+{% load static %}
+<html>
+<head>
+    <title>{{symbol}}</title>
+</head>
+<body>
+    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
+    <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
+    <script src="{% static "finance/finance.js" %}"></script>       
+    <br />
+    
+    <center><h2>{{symbol}}</h2><br /><h3>All values converted to Canadian dollars.</h3></center>
+    <div id="security_info">
+        <pre>
+            <table style="border-spacing: 20px 5px;" id="security_info-table" class="tablesorter compact">
+                <thead>           
+                    <tr>
+
+
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Units</th>
+                        <th>Price</th>
+                        <th>Commission</th>
+                        <th>Cap Gain</th>
+                        <th>Total Units</th>
+                        <th>ACB change</th>
+                        <th>New ACB</th>
+                        <th>ACB / Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for activity in activities %}
+                    <tr>
+                        <td>{{activity.tradeDate}}</td>
+                        <td>{{activity.type}}</td>
+                        <td>{{activity.qty | floatformat:0}}</td>
+                        <td>{{activity.cadprice | floatformat:2}}</td>
+                        <td>{{activity.commission | floatformat:2}}</td>
+                        <td>{{activity.capgain | currency}}</td>
+                        <td>{{activity.totalqty | floatformat:0}}</td>
+                        <td>{{activity.acbchange | currency }}</td>
+                        <td>{{activity.totalacb | currency}}</td>
+                        <td>{{activity.acbpershare | currency}}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </pre>
+    </div>
+</body>
+</html>
