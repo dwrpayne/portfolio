@@ -19,6 +19,7 @@ from decimal import Decimal
 import traceback
 import simplejson
 import threading
+from utils.api import api_response
 
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -216,10 +217,13 @@ class QuestradeClient(BaseClient):
         r = self.session.get(self.api_server + url, params=params)
         r.raise_for_status()
         return r.json()
+        
+    @api_response('accounts')
+    def GetAccounts(self):
+        return self._GetRequest('accounts')
 
     def SyncAccounts(self):
-        json = self._GetRequest('accounts')
-        for account_json in json['accounts']:
+        for account_json in self.GetAccounts():
             QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
 
         AddManualRawActivity()

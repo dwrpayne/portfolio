@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
     'tangerine.apps.tangerineConfig',
+    'utils',
     'debug_toolbar',
     'polymorphic',
     'django_extensions',
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.messages',
     'django_celery_results',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [

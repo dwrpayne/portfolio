@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse, Http404
 from django.db.models.aggregates import Sum
-from django.db.models import F, Q, Sum
+from django.db.models import F, Q, Sum, When, Case
 from django.contrib.auth.decorators import login_required
 
 from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency
@@ -10,7 +10,6 @@ import arrow
 import datetime
 from collections import defaultdict
 from decimal import Decimal
-from questrade.utils import as_currency,  strdate
 from contextlib import ExitStack
 import plotly
 import plotly.graph_objs as go
@@ -21,22 +20,17 @@ from celery import group
 
 
 def GetHistoryValues(user, startdate=None):
-    """ Returns an (date, value) tuple for each date where the value of that account is > 0 """
-    pricequery = SecurityPrice.objects.filter(security__holdings__account__client__user=user)
-    if startdate: 
-        pricequery = SecurityPrice.objects.filter(day__gte=startdate)
-    
-    val_list = pricequery.filter(
+    return SecurityPrice.objects.filter(
         Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
+        security__holdings__account__client__user=user, 
         security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')
-    ).order_by('day').values_list('day').annotate( val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price')) )
-    
-    return val_list
+        security__currency__rates__day=F('day')).values('day').order_by('day').annotate(
+            val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
+            ).values_list('day', 'val')
 
-def GetValueDataFrame(startdate=None):
+def GetValueDataFrame(user, startdate=None):
     """ Returns an (account, date, value) tuple for each date where the value of that account is > 0 """
-    pricequery = SecurityPrice.objects.filter(security__holdings__account__client__user=user)
+    pricequery = SecurityPrice.objects.filter(security__holdings__account__client__user=user).distinct()
     if startdate: 
         pricequery = SecurityPrice.objects.filter(day__gte=startdate)
     
@@ -96,7 +90,7 @@ def GetHoldingsContext(user):
     for symbol, qty in all_holdings.filter(security__type=Security.Type.Cash).values_list('security__symbol').annotate(Sum('qty')):
         cash_data.append((symbol.split()[0], qty))
 
-    total = [(total_gain, total_gain / total_value, as_currency(total_value))]
+    total = [(total_gain, total_gain / total_value, total_value)]
     exchange_live = 1/Currency.objects.get(code='USD').live_price
     exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
     exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
@@ -116,20 +110,28 @@ def GetBalanceContext(user):
     context = {'account_data':account_data, 'total_data':total_data }
     return context
 
+def GeneratePlot(user):
+    pairs = GetHistoryValues(user, datetime.date.today() - datetime.timedelta(days=30))
+    dates, vals = list(zip(*pairs))
+    trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
+    plotly_url = plotly.plotly.plot([trace], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
+    user.userprofile.plotly_url = plotly_url    
+    user.userprofile.save()
+
 @login_required
 def analyze(request):
-    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="https://plot.ly/~cecilpl/2.embed?modebar=false&link=false" height="525" width="100%"/></iframe>'
+    if not request.user.userprofile.plotly_url:
+        GeneratePlot(request.user)
+
+    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(request.user.userprofile.plotly_url)
     if request.is_ajax():        
         if 'refresh-live' in request.GET:
             result = GetLiveUpdateTaskGroup(request.user)()
             result.get()
 
         elif 'refresh-plot' in request.GET:
-            pairs = GetHistoryValues(request.user, datetime.date.today() - datetime.timedelta(days=30))
-            dates, vals = list(zip(*pairs))
-            trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
-            plotly_url = plotly.plotly.plot([trace], filename='portfolio-values-short', auto_open=False)
-            plotly_html = plotly.tools.get_embed(plotly_url)
+            GeneratePlot(request.user)
+            plotly_html = plotly.tools.get_embed(request.user.userprofile.plotly_url)
 
         elif 'refresh-account' in request.GET:
             for client in request.user.clients.all():
@@ -139,11 +141,12 @@ def analyze(request):
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
     overall_context['plotly_embed_html'] = plotly_html
+    overall_context['username'] = request.user.username
     return render(request, 'finance/portfolio.html', overall_context)
 
 @login_required
 def DoWorkHistory(request):
-    df = GetValueDataFrame()
+    df = GetValueDataFrame(request.user)
     traces = [go.Scatter(name=name, x=series.index, y=series.values) for name, series in df.iteritems()]    
     plotly_url = plotly.plotly.plot(traces, filename='portfolio-values', auto_open=False)
     plotly_embed_html=plotly.tools.get_embed(plotly_url)
@@ -155,6 +158,14 @@ def DoWorkHistory(request):
     }
 
     return render(request, 'finance/history.html', context)
+
+
+
+
+
+
+
+
 
 def index(request):
     if request.user.is_authenticated:

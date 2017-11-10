@@ -6,26 +6,11 @@ import datetime
 import contextlib
 import requests
 import logging
-
+from utils.api import api_response
 
 logger = logging.getLogger(__name__)
 
-
 DEFAULT_LOCALE = 'en_CA'
-
-
-def api_response(root_key='', check_response_status=True):
-    def decorator(fn):
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            response_json = fn(*args, **kwargs)
-            if check_response_status and response_json['response_status']['status_code'] != 'SUCCESS':
-                raise exceptions.APIResponseError(response_json)
-            if not root_key:
-                return response_json
-            return response_json[root_key]
-        return wrapper
-    return decorator
 
 
 class TangerineClient(object):

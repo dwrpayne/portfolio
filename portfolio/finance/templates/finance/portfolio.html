@@ -1,5 +1,6 @@
 {% load static %}
 <html>
+    <title>{{username}}</title>
     <body>
         <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
         <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
@@ -10,6 +11,8 @@
             });
         </script>
         <link rel="stylesheet" type="text/css" href="{% static "questrade/style.css" %}">
+        <br />
+        <h3><center>Portfolio info for {{username}}.</center></h3>
 
         <div style="float:left;margin: 0 0 10px 0;">
             {% include "finance/holdings.html" %}

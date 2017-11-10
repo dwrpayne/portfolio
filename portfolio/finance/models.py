@@ -165,6 +165,16 @@ class Security(RateLookupMixin):
             lookupSymbol = symbol
         )
         return security
+    
+    @classmethod
+    def CreateMutualFund(cls, symbol, currency_str):
+        return Security.objects.create(
+            symbol = symbol,
+            type = cls.Type.MutualFund,
+            currency_id = currency_str,
+            lookupSymbol = symbol
+        )
+        return security
         
     @classmethod
     def CreateOptionRaw(cls, optsymbol, currency_str):
@@ -306,6 +316,18 @@ class DataProvider:
             return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day,vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]        
         return []
 
+        
+    @classmethod
+    def GetMorningstarData(cls, lookup, start, end):
+        RAW_URL = 'https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}'
+        url = RAW_URL.format(lookup.lookupSymbol, str(start), str(end))
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        r = requests.get(url)
+        json = r.json()
+        if 'data' in json and 'Prices' in json['data']:
+            return [(parser.parse(item['d']).date(), Decimal(item['v'])) for item in json['data']['Prices']]
+        return []
+
     @classmethod
     def GetLiveStockPrice(cls, symbol):
         symbol = symbol.split('.')[0]
@@ -336,6 +358,9 @@ class DataProvider:
 
         for option in Security.options.all():
             option.SyncRates(lambda l,s,e: option.activities.values_list('tradeDate', 'price').distinct('tradeDate'))
+
+        for fund in Security.mutualfunds.all():
+            fund.SyncRates(cls.GetMorningstarData)
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():
@@ -425,7 +450,7 @@ class BaseClient(PolymorphicModel):
 class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
-    id = models.CharField(max_length=100, default=0, primary_key = True)
+    id = models.CharField(max_length=100, primary_key = True)
 
     class Meta:
         ordering = ['id']
@@ -479,6 +504,8 @@ class BaseAccount(PolymorphicModel):
 
     def GetValueToday(self):
         return self.holding_set.current().value_as_of(datetime.date.today())
+
+
                  
 class HoldingManager(models.Manager):
     def add_effect(self, account, security, qty_delta, date):                       
@@ -627,3 +654,9 @@ class Activity(models.Model):
         return effect                 
     
   
+class UserProfile(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    plotly_url = models.CharField(max_length=500, null=True, blank=True)
+
+
+class TaxInfo
