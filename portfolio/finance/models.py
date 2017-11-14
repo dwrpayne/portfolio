@@ -87,7 +87,7 @@ class RateLookupMixin(models.Model):
 
         data = data.sort_index()
         index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
-        data = data.reindex(index).interpolate()
+        data = data.reindex(index).ffill()
         return data.iteritems()
 
     def SyncRates(self, retriever_fn):

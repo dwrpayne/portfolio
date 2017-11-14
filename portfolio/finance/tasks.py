@@ -14,11 +14,6 @@ def SyncClientAccountBalances(client_id):
     from .models import BaseClient
     with BaseClient.objects.get(pk=client_id) as client:
         client.SyncCurrentAccountBalances()
-
-@shared_task
-def SyncPrices(symbol):
-    from .models import DataProvider
-    DataProvider.SyncAllSecurities()
     
 @shared_task
 def LiveUpdateTask():
