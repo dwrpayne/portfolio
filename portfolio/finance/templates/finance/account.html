@@ -1,15 +1,9 @@
+{% extends "finance/base.html" %}
 {% load mytags %}
 {% load static %}
-<html>
-<head>
-    <title>{{account.display_name}}</title>
-</head>
-<body>
-    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
-    <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
-    <script src="{% static "finance/finance.js" %}"></script>       
+{% block title %} {{account.display_name}} {% endblock title %}
+{% block content %}  
     <br />
-
     <center><h3>{{account.display_name}}</h3></center>
     <div id="activities">
         <pre>
@@ -31,9 +25,9 @@
                         <td>{{activity.tradeDate}}</td>
                         <td>{{activity.type}}</td>
                         <td>{{activity.security_id}}</td>
-                        <td>{{activity.qty}}</td>
-                        <td>{{activity.price}}</td>
-                        <td>{{activity.netAmount}}</td>
+                        <td>{{activity.qty | floatformat:0}}</td>
+                        <td>{{activity.price | currency}}</td>
+                        <td>{{activity.netAmount | currency}}</td>
                         <td>{{activity.description}}</td>
                     </tr>
                 {% endfor %}
@@ -41,5 +35,4 @@
             </table>
         </pre>
     </div>
-</body>
-</html>
+{% endblock content %}

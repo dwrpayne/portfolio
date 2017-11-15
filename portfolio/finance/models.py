@@ -212,6 +212,10 @@ class Security(RateLookupMixin):
 
     class Meta:
         verbose_name_plural = 'Securities'
+        indexes = [
+            models.Index(fields=['symbol']),
+            models.Index(fields=['currency_id'])
+        ]
         
     @cached_property
     def earliest_price_needed(self):
@@ -249,6 +253,7 @@ class SecurityPrice(RateHistoryTableMixin):
         unique_together = ('security', 'day')
         get_latest_by = 'day'
         indexes = [
+            models.Index(fields=['security']),
             models.Index(fields=['security', 'day']),
             models.Index(fields=['day'])
         ]
@@ -263,6 +268,7 @@ class ExchangeRate(RateHistoryTableMixin):
         unique_together = ('currency', 'day')
         get_latest_by = 'day'
         indexes = [
+            models.Index(fields=['currency']),
             models.Index(fields=['currency', 'day']),
             models.Index(fields=['day'])
         ]
@@ -290,12 +296,7 @@ class DataProvider:
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
         for retry in range(5):
             try: 
-                df = pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
-                if df.size == 0:
-                    return
-                ix = pandas.DatetimeIndex(start=min(df.index), end=end, freq='D')
-                df = df.reindex(ix).ffill()
-                return zip(ix, df[lookup.lookupColumn])
+                return pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
             except: 
                 pass
         return    
@@ -350,6 +351,12 @@ class DataProvider:
             price = cls.GetLiveStockPrice(security.symbol)
             if price:
                 security.live_price = price
+        
+        for fund in Security.mutualfunds.all():
+            if fund.GetShouldSyncRange()[1]:
+                for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
+                    with c:
+                        c.SyncPrices()
                     
     @classmethod
     def SyncAllSecurities(cls):
@@ -361,6 +368,10 @@ class DataProvider:
 
         for fund in Security.mutualfunds.all():
             fund.SyncRates(cls.GetMorningstarData)
+            if fund.GetShouldSyncRange()[1]:
+                for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
+                    with c:
+                        c.SyncPrices()
 
         # Just generate fake 1 entries so we can join these tables later.
         for cash in Security.cash.all():

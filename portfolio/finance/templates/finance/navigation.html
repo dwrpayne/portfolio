@@ -1,0 +1,19 @@
+﻿{% load base_extras %}
+<nav class="navbar navbar-default">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="#">Financial Analysis</a>
+        </div>
+        <ul class="nav navbar-nav">                        
+            {% if user.is_authenticated %}
+                <li class="{% navactive request 'finance:portfolio' %}">
+                    <a href="{% url 'finance:portfolio' %}">Portfolio</a></li>
+                <li class="{% navactive request 'finance:history' %}">
+                    <a href="{% url 'finance:history' %}">History</a></li>
+                <li><a href="{% url 'logout' %}">Logout</a></li>
+            {% else %}
+                <a href="{% url 'login' %}">Login</a>
+            {% endif %}
+        </ul>
+    </div>
+</nav>

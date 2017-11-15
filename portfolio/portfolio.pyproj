@@ -47,6 +47,9 @@
     <Compile Include="finance\tasks.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="finance\templatetags\base_extras.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="finance\tests.py" />
     <Compile Include="finance\urls.py">
       <SubType>Code</SubType>
@@ -167,9 +170,11 @@
     <Folder Include="utils\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="finance\templates\finance\base.html" />
     <Content Include="finance\templates\finance\security.html" />
     <Content Include="finance\templates\finance\account.html" />
     <Content Include="finance\templates\finance\index.html" />
+    <Content Include="finance\templates\finance\navigation.html" />
     <Content Include="grs\templates\index.html" />
     <Content Include="finance\templates\registration\login.html" />
     <Content Include="questrade\fixtures\initialholdings.json" />

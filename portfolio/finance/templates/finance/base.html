@@ -1,0 +1,52 @@
+﻿{# HTML5 declaration #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+    {# Make modifiable head elements #}
+    <head>
+        <title>{% block title %}Home{% endblock title %}</title>
+            <link rel="icon" type="image/png"
+                  href="{% static "images/favicon.ico" %}">
+                <meta http-equiv="Content-Type"
+                      content="text/html; charset=utf-8" />
+                <meta http-equiv="Content-Language" value="en" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        {% block head_css %}
+            {% block head_css_site %}
+                <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+                <link rel="stylesheet" href="{% static "finance/style.css" %}" media="screen">
+            {% endblock head_css_site %}
+            {% block head_css_section %}{% endblock head_css_section %}
+            {% block head_css_page %}{% endblock head_css_page %}
+        {% endblock head_css %}
+    </head>
+    <body>
+        {# Navigation Menu #}
+        <header>
+            {% include "finance/navigation.html" %}
+        </header>
+        {# The Document Body #}
+        <div id="site-wrapper" class="container-fluid">
+            {% block content %}
+                if you see this, something is wrong!
+            {% endblock content %}
+        </>
+        {# The Footer #}
+        <div class="footer">
+            <div class="container">
+                <p>Copyright 2017 David Payne</p>
+            </div>
+        </div>
+    </body>
+    {# Set of blocks that can be used to display JavaScript files #}
+    {% block footer_javascript %}
+        {% block footer_javascript_site %}
+            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+            <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+            <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
+            <script src="{% static "finance/finance.js" %}"></script>       
+        {% endblock footer_javascript_site %}
+        {% block footer_javascript_section %}{% endblock footer_javascript_section %}
+        {% block footer_javascript_page %}{% endblock footer_javascript_page %}
+    {% endblock footer_javascript %}
+</html>

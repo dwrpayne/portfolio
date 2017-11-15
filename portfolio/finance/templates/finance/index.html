@@ -1,10 +1,7 @@
-<html>
-<head><title></title></head>
-
-<body>
-    <br />
-    <h2><a href="go">Portfolio Dashboard</a></h2>
-    <h2><a href="history">Full Account History</a></h2>
-
-</body>
-</html>
+{% extends "finance/base.html" %}
+{% load mytags %}
+{% load static %}
+{% block title %}Finance home{% endblock title %}
+{% block content %}  
+<br /><br />Welcome to the home page for my financial analysis tool.
+{% endblock content %}

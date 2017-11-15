@@ -23,9 +23,7 @@ def LiveUpdateTask():
     
 @shared_task
 def DailyUpdateTask():
-    from .models import BaseClient, DataProvider
-    for client in BaseClient.objects.all():
-        SyncClientPrices(client.id)
+    from .models import DataProvider
     DataProvider.SyncAllSecurities()
 
 def GetLiveUpdateTaskGroup(user):

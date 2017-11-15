@@ -30,22 +30,24 @@ def GetHistoryValues(user, startdate=None):
         security__holdings__startdate__lte=F('day'),
         security__currency__rates__day=F('day')).values('day').order_by('day').annotate(
             val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
-            ).values_list()
+            ).values_list('day', 'val')
 
-def GetValueDataFrame(user, startdate=None):
-    """ Returns an (account, date, value) tuple for each date where the value of that account is > 0 """
-    pricequery = SecurityPrice.objects.all()
-    if startdate: 
-        pricequery = SecurityPrice.objects.filter(day__gte=startdate)
-    
-    val_list = pricequery.filter(
+def GetHistoryValuesByAccount(user, startdate=None):
+    query = SecurityPrice.objects.all()
+    if startdate:
+        query = query.filter(day__gte=startdate)
+
+    return query.filter(
         Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
         security__holdings__account__client__user=user, 
         security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')
-    ).values('day', 'security__holdings__account_id').annotate(
-        val=Sum(F('price') * F('security__holdings__qty') * F('security__currency__rates__price'))
-    ).values_list('day', 'security__holdings__account_id', 'val')
+        security__currency__rates__day=F('day')).values('day', 'security__holdings__account').order_by('day').annotate(
+            val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
+            ).values_list('day', 'security__holdings__account', 'val')
+
+def GetValueDataFrame(user, startdate=None):
+    """ Returns an (account, date, value) tuple for each date where the value of that account is > 0 """
+    val_list = GetHistoryValuesByAccount(user, startdate)
 
     dates = val_list.dates('day', 'day')
 
@@ -62,13 +64,23 @@ def GetValueDataFrame(user, startdate=None):
 
 def GetHoldingsContext(user):
     all_holdings = Holding.objects.filter(account__client__user=user).current()
-    if not all_holdings.exists():
+    if not all_holdings:
         return {}
     total_gain = 0
     total_value = 0  
 
     security_data = []
     cash_data = []
+    all_holdings.exclude(security__type=Security.Type.Cash).filter(security__rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
+                                                                   security__currency__rates__day=F('security__rates__day')
+                                                                   ).values_list('security__symbol','security__rates__day').annotate(Sum('qty')
+                                                                   ).values_list(
+                                                                       'security__symbol', 
+                                                                       'security__rates__day',
+                                                                       F('security__rates__price'),
+                                                                       F('security__rates__price')*F('security__currency__rates__price'),
+                                                                       F('qty__sum')
+                                                                   )
         
     for symbol, qty in all_holdings.exclude(security__type=Security.Type.Cash).values_list('security__symbol').annotate(Sum('qty')):
         security = Security.objects.get(symbol=symbol)
@@ -86,7 +98,7 @@ def GetHoldingsContext(user):
         value_CAD = qty * today_price_CAD
         total_value += value_CAD
 
-        security_data.append([symbol, today_price, price_delta, percent_delta, qty, this_gain, value_CAD])
+        security_data.append([security.symbol, today_price, price_delta, percent_delta, qty, this_gain, value_CAD])
 
     for d in security_data:
         d.append(d[6] / total_value * 100)
@@ -124,7 +136,7 @@ def GeneratePlot(user):
     user.userprofile.save()
 
 @login_required
-def analyze(request):
+def Portfolio(request):
     if not request.user.userprofile.plotly_url:
         GeneratePlot(request.user)
 
@@ -146,22 +158,15 @@ def analyze(request):
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
     overall_context['plotly_embed_html'] = plotly_html
-    overall_context['username'] = request.user.username
     return render(request, 'finance/portfolio.html', overall_context)
 
 @login_required
-def DoWorkHistory(request):
-    data = GetHistoryValuesByAccount(request.user)
-
+def History(request):
     df = GetValueDataFrame(request.user)
-    traces = [go.Scatter(name=name, x=series.index, y=series.values) for name, series in df.iteritems()]    
-    plotly_url = plotly.plotly.plot(traces, filename='portfolio-values', auto_open=False)
-    plotly_embed_html=plotly.tools.get_embed(plotly_url)
 
     context = {
         'names': df.columns,
         'rows': df.itertuples(),
-        'plotly_embed_html': plotly_embed_html
     }
 
     return render(request, 'finance/history.html', context)
@@ -183,6 +188,7 @@ from .models import Activity
 
 @login_required
 def securitydetail(request, symbol):
+    security = Security.objects.get(symbol=symbol)
     activities = Security.objects.get(symbol=symbol).activities.filter(
         account__client__user=request.user, account__taxable=True, security__currency__rates__day=F('tradeDate')
         ).exclude(type='Dividend').order_by('tradeDate').annotate(exch=Sum(F('security__currency__rates__price')))
@@ -208,8 +214,8 @@ def securitydetail(request, symbol):
             act.acbchange = -(prevacbpershare) * abs(act.qty)
 
                                 
-        for security, amt in act.GetHoldingEffect().items():
-            if security.symbol==symbol:
+        for s, amt in act.GetHoldingEffect().items():
+            if s.symbol==symbol:
                 totalqty += amt
         
         act.totalqty = totalqty     
@@ -218,10 +224,11 @@ def securitydetail(request, symbol):
         totalacb = max(0, totalacb)
         act.totalacb = totalacb
         act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
-          
 
+    
+    pendinggain = security.live_price_cad*totalqty - totalacb
 
-    context = {'activities':activities, 'symbol':symbol}
+    context = {'activities':activities, 'symbol':symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/security.html', context)    
 
 

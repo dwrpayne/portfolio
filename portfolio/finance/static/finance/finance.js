@@ -3,7 +3,7 @@ $(document).ready(function () {
         $(this).attr('disabled', 'disabled');
         $(this).text($(this).text().replace("Refresh", "Refreshing"));
         $.ajax({
-            url: 'go',
+            url: window.location.pathname,
             data: 'refresh-' + $(this).attr('data-refresh-type'),
             context: this,
             success: function (data) {

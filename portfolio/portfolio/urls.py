@@ -19,19 +19,13 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 
 
-from django.http import HttpResponse
-def hello(request):
-    return HttpResponse("Hello world! Nothing to see here.")
-
 from django.http import Http404
 def show404(request):
     raise Http404("Page does not exist")
 
 urlpatterns = [
     url('^', include('django.contrib.auth.urls')),
-    url(r'^logout/$', auth_views.logout, name='logout'),
     url(r'^admin/', admin.site.urls),
-    url(r'^hello/', hello),
     url(r'^finance/', include('finance.urls', namespace='finance'))
 ]
 
