@@ -23,7 +23,7 @@ def GetHistoryValues(user, startdate=None):
     query = SecurityPrice.objects.all()
     if startdate:
         query = query.filter(day__gte=startdate)
-
+        
     return query.filter(
         Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
         security__holdings__account__client__user=user, 
@@ -36,12 +36,12 @@ def GetHistoryValuesByAccount(user, startdate=None):
     query = SecurityPrice.objects.all()
     if startdate:
         query = query.filter(day__gte=startdate)
-
+                
     return query.filter(
         Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
         security__holdings__account__client__user=user, 
         security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')).values('day', 'security__holdings__account').order_by('day').annotate(
+        security__currency__rates__day=F('day')).values('day', 'security__holdings__account').order_by().annotate(
             val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
             ).values_list('day', 'security__holdings__account', 'val')
 
@@ -64,7 +64,7 @@ def GetValueDataFrame(user, startdate=None):
 
 def GetHoldingsContext(user):
     all_holdings = Holding.objects.filter(account__client__user=user).current()
-    if not all_holdings:
+    if not all_holdings.exists():
         return {}
     total_gain = 0
     total_value = 0  
@@ -81,9 +81,16 @@ def GetHoldingsContext(user):
                                                                        F('security__rates__price')*F('security__currency__rates__price'),
                                                                        F('qty__sum')
                                                                    )
-        
-    for symbol, qty in all_holdings.exclude(security__type=Security.Type.Cash).values_list('security__symbol').annotate(Sum('qty')):
-        security = Security.objects.get(symbol=symbol)
+    a = list(all_holdings)
+
+    a = Security.objects.exclude(type=Security.Type.Cash).filter(holdings__account__client__user=user, holdings__enddate=None, 
+                                                             rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
+                                                             currency__rates__day=F('rates__day'),
+                                                             ).values_list('symbol','rates__day').annotate(qty=Sum('holdings__qty')
+                                                             )
+    
+    for security in a:#Security.objects.exclude(type=Security.Type.Cash).filter(holdings__in=all_holdings).annotate(qty=Sum('holdings__qty')):
+        qty = security.qty
         yesterday = datetime.date.today() - datetime.timedelta(days=1)
         yesterday_price = security.GetPrice(yesterday)
         yesterday_price_CAD = security.GetPriceCAD(yesterday)

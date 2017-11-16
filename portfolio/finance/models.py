@@ -77,8 +77,8 @@ class RateLookupMixin(models.Model):
         self.rates.update_or_create(day=datetime.date.today(), defaults={'price':value})
 
     def _ProcessRateData(self, data, end_date):
-        if not data: return []
         if isinstance(data, pandas.DataFrame):
+            if data.empty==0: return []
             data = pandas.Series(data[self.lookupColumn], data.index)
         else:
             # Expect iterator of day, price pairs
@@ -254,7 +254,6 @@ class SecurityPrice(RateHistoryTableMixin):
         get_latest_by = 'day'
         indexes = [
             models.Index(fields=['security']),
-            models.Index(fields=['security', 'day']),
             models.Index(fields=['day'])
         ]
 
@@ -269,7 +268,6 @@ class ExchangeRate(RateHistoryTableMixin):
         get_latest_by = 'day'
         indexes = [
             models.Index(fields=['currency']),
-            models.Index(fields=['currency', 'day']),
             models.Index(fields=['day'])
         ]
 
@@ -473,7 +471,7 @@ class BaseAccount(PolymorphicModel):
     def __str__(self):
         return "{} {} {}".format(self.client, self.id, self.type)
     
-    @property
+    @cached_property
     def display_name(self):
         return "{} {}".format(self.client, self.type)
 
@@ -583,6 +581,11 @@ class Holding(models.Model):
     class Meta:
         unique_together = ('account', 'security', 'startdate')
         get_latest_by = 'startdate'
+        indexes = [
+            models.Index(fields=['security_id', 'startdate', 'enddate']),            
+            models.Index(fields=['startdate']),        
+            models.Index(fields=['enddate']),
+        ]
 
     def __repr__(self):
         return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
