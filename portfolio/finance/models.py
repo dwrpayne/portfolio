@@ -78,11 +78,15 @@ class RateLookupMixin(models.Model):
 
     def _ProcessRateData(self, data, end_date):
         if isinstance(data, pandas.DataFrame):
-            if data.empty==0: return []
+            if data.empty: return []
             data = pandas.Series(data[self.lookupColumn], data.index)
         else:
             # Expect iterator of day, price pairs
-            dates, prices = zip(*data)
+            dates_and_prices = list(zip(*data))
+            if len(dates_and_prices) == 0:
+                return []
+
+            dates, prices = dates_and_prices
             data = pandas.Series(prices, index=dates, dtype='float64')
 
         data = data.sort_index()
@@ -365,7 +369,10 @@ class DataProvider:
             option.SyncRates(lambda l,s,e: option.activities.values_list('tradeDate', 'price').distinct('tradeDate'))
 
         for fund in Security.mutualfunds.all():
-            fund.SyncRates(cls.GetMorningstarData)
+            try:
+                fund.SyncRates(cls.GetMorningstarData)
+            except:
+                pass
             if fund.GetShouldSyncRange()[1]:
                 for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
                     with c:
@@ -552,6 +559,9 @@ class HoldingManager(models.Manager):
 class HoldingQuerySet(models.query.QuerySet):
     def current(self):
         return self.filter(enddate=None)
+
+    def owned_by(user):
+        return self.filter(account__client__user=user)
     
     def at_date(self, date):
         return self.filter(startdate__lte=date).exclude(enddate__lt=date)

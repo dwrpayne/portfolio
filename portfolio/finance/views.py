@@ -5,7 +5,7 @@ from django.db.models import F, Q, Sum, When, Case, Max
 from django.contrib.auth.decorators import login_required
 
 from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency
-from .tasks import GetLiveUpdateTaskGroup
+from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
 import arrow
 import datetime
 from collections import defaultdict
@@ -81,22 +81,25 @@ def GetHoldingsContext(user):
                                                                        F('security__rates__price')*F('security__currency__rates__price'),
                                                                        F('qty__sum')
                                                                    )
-    a = list(all_holdings)
 
-    a = Security.objects.exclude(type=Security.Type.Cash).filter(holdings__account__client__user=user, holdings__enddate=None, 
+    data = Security.objects.exclude(type=Security.Type.Cash).filter(holdings__account__client__user=user, holdings__enddate=None, 
                                                              rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
                                                              currency__rates__day=F('rates__day'),
-                                                             ).values_list('symbol','rates__day').annotate(qty=Sum('holdings__qty')
-                                                             )
-    
-    for security in a:#Security.objects.exclude(type=Security.Type.Cash).filter(holdings__in=all_holdings).annotate(qty=Sum('holdings__qty')):
-        qty = security.qty
-        yesterday = datetime.date.today() - datetime.timedelta(days=1)
-        yesterday_price = security.GetPrice(yesterday)
-        yesterday_price_CAD = security.GetPriceCAD(yesterday)
+                                                             ).values(
+                                                                 'symbol', 
+                                                                 day = F('rates__day'), 
+                                                                 price = F('rates__price'), 
+                                                                 exch = F('currency__rates__price')
+                                                             ).annotate(qty=Sum('holdings__qty'))
 
-        today_price = security.live_price
-        today_price_CAD = today_price * security.currency.live_price
+    for yesterday, today in zip(data[::2], data[1::2]):
+        assert yesterday['symbol'] == today['symbol']
+        qty = today['qty']
+        yesterday_price = yesterday['price']
+        yesterday_price_CAD = yesterday['price'] * yesterday['exch']
+        
+        today_price = today['price']
+        today_price_CAD = today['price'] * today['exch']
 
         price_delta = today_price - yesterday_price
         percent_delta = price_delta / yesterday_price
@@ -105,7 +108,7 @@ def GetHoldingsContext(user):
         value_CAD = qty * today_price_CAD
         total_value += value_CAD
 
-        security_data.append([security.symbol, today_price, price_delta, percent_delta, qty, this_gain, value_CAD])
+        security_data.append([today['symbol'], today_price, price_delta, percent_delta, qty, this_gain, value_CAD])
 
     for d in security_data:
         d.append(d[6] / total_value * 100)
@@ -240,7 +243,17 @@ def securitydetail(request, symbol):
 
 
 def index(request):
+    context = {}
+    last_update_days = SecurityPrice.objects.filter(
+            day__gt=datetime.date.today()-datetime.timedelta(days=30)
+        ).order_by('security', '-day').distinct('security').filter(
+            security__holdings__enddate=None, security__holdings__account__client__user=request.user
+        ).values_list('day', flat=True)
+    if any(day < datetime.date.today() for day in last_update_days):
+        context['updating'] = True
+        result = DailyUpdateTask.delay()
+
     if request.user.is_authenticated:
-        return render(request, 'finance/index.html')
+        return render(request, 'finance/index.html', context)
     else:
         return redirect('/login/')

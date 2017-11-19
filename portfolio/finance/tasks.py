@@ -24,6 +24,7 @@ def LiveUpdateTask():
 @shared_task
 def DailyUpdateTask():
     from .models import DataProvider
+    DataProvider.SyncAllExchangeRates()
     DataProvider.SyncAllSecurities()
 
 def GetLiveUpdateTaskGroup(user):

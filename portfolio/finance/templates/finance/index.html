@@ -4,4 +4,7 @@
 {% block title %}Finance home{% endblock title %}
 {% block content %}  
 <br /><br />Welcome to the home page for my financial analysis tool.
+{% if updating %}
+<br />Currently updating out-of-date data. The system might not work until we finish the data sync. Please try again in a few seconds.
+{% endif %}
 {% endblock content %}

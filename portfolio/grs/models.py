@@ -87,7 +87,7 @@ class GrsClient(BaseClient):
                 for date, value in zip(dates, values):
                     if not 'Unknown' in value:
                         yield parser.parse(date).date(), Decimal(value[1:])
-        return
+        return 
     
     def SyncPrices(self):
         self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx', params={'Selected_Info': self.accounts.first().plan_data})
