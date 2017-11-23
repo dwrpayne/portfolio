@@ -13,10 +13,10 @@ from decimal import Decimal
 from contextlib import ExitStack
 import plotly
 import plotly.graph_objs as go
-
 import pandas
 import requests
 from celery import group
+import itertools
 
 
 def GetHistoryValues(user, startdate=None):
@@ -61,66 +61,77 @@ def GetValueDataFrame(user, startdate=None):
     df.index = df.index.date
     return df
 
+def GetSecurityPriceInfo(user, by_account = False):
+    kwcolumns = {'day' : F('rates__day'), 'price' : F('rates__price'), 'exch' : F('currency__rates__price')}
+    orderby = ['symbol', 'day']
+    if by_account:
+        kwcolumns['acc'] = F('holdings__account')
+        orderby = ['symbol', 'acc', 'day']
+    data = Security.objects.filter(holdings__account__client__user=user, holdings__enddate=None, 
+                                    rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
+                                    currency__rates__day=F('rates__day'),
+                                    ).values('symbol', **kwcolumns).annotate(qty=Sum('holdings__qty')
+                                    ).order_by(*orderby)
+
+    return data
+
+class HoldingView:
+    pass
+
+def GenerateHoldingView(yesterday, today):
+    assert yesterday['symbol'] == today['symbol']
+    h = HoldingView()
+    h.symbol = today['symbol']
+    h.qty = today['qty']
+    yesterday_price = yesterday['price']
+    yesterday_price_CAD = yesterday['price'] * yesterday['exch']
+    h.today_price = today['price']
+    today_price_CAD = today['price'] * today['exch']
+    h.price_delta = h.today_price - yesterday_price
+    h.percent_delta = h.price_delta / yesterday_price
+    h.this_gain = h.qty * (today_price_CAD - yesterday_price_CAD)
+    h.value_CAD = h.qty * today_price_CAD
+
+    if 'acc' in today:
+        h.acc = today['acc']
+    else:
+        h.account_data = []
+    return h
 
 def GetHoldingsContext(user):
-    all_holdings = Holding.objects.filter(account__client__user=user).current()
-    if not all_holdings.exists():
-        return {}
     total_gain = 0
     total_value = 0  
-
     security_data = []
-    cash_data = []
-    all_holdings.exclude(security__type=Security.Type.Cash).filter(security__rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
-                                                                   security__currency__rates__day=F('security__rates__day')
-                                                                   ).values_list('security__symbol','security__rates__day').annotate(Sum('qty')
-                                                                   ).values_list(
-                                                                       'security__symbol', 
-                                                                       'security__rates__day',
-                                                                       F('security__rates__price'),
-                                                                       F('security__rates__price')*F('security__currency__rates__price'),
-                                                                       F('qty__sum')
-                                                                   )
 
-    data = Security.objects.exclude(type=Security.Type.Cash).filter(holdings__account__client__user=user, holdings__enddate=None, 
-                                                             rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
-                                                             currency__rates__day=F('rates__day'),
-                                                             ).values(
-                                                                 'symbol', 
-                                                                 day = F('rates__day'), 
-                                                                 price = F('rates__price'), 
-                                                                 exch = F('currency__rates__price')
-                                                             ).annotate(qty=Sum('holdings__qty'))
+    data = GetSecurityPriceInfo(user)
+    data_by_account = GetSecurityPriceInfo(user, True)
 
-    for yesterday, today in zip(data[::2], data[1::2]):
-        assert yesterday['symbol'] == today['symbol']
-        qty = today['qty']
-        yesterday_price = yesterday['price']
-        yesterday_price_CAD = yesterday['price'] * yesterday['exch']
-        
-        today_price = today['price']
-        today_price_CAD = today['price'] * today['exch']
+    cash_holdings = data.filter(type=Security.Type.Cash)
+    cash = [{'symbol':'Cash'},{'symbol':'Cash'}]
+    for i, day in enumerate(cash_holdings.dates('day','day')):
+        cash[i]['day'] = day
+        cash[i]['exch'] = cash[i]['qty'] = 1
+        cash[i]['price'] = sum([holding['qty'] * holding['exch'] for holding in cash_holdings if holding['day'] == day])
 
-        price_delta = today_price - yesterday_price
-        percent_delta = price_delta / yesterday_price
-        this_gain = qty * (today_price_CAD - yesterday_price_CAD)
-        total_gain += this_gain
-        value_CAD = qty * today_price_CAD
-        total_value += value_CAD
 
-        security_data.append([today['symbol'], today_price, price_delta, percent_delta, qty, this_gain, value_CAD])
+    securities = data#list(data.exclude(type=Security.Type.Cash)) + cash
+    for yesterday, today in zip(securities[::2], securities[1::2]):
+        security_data.append( GenerateHoldingView(yesterday, today))
 
+    total_gain = sum([d.this_gain for d in security_data])
+    total_value = sum([d.value_CAD for d in security_data])    
     for d in security_data:
-        d.append(d[6] / total_value * 100)
+        d.percent = d.value_CAD / total_value * 100
 
-    for symbol, qty in all_holdings.filter(security__type=Security.Type.Cash).values_list('security__symbol').annotate(Sum('qty')):
-        cash_data.append((symbol.split()[0], qty))
-
+    for view in security_data:
+        security_by_acc_data = data_by_account.filter(symbol=view.symbol)
+        for yesterday, today in zip(security_by_acc_data[::2], security_by_acc_data[1::2]):            
+            view.account_data.append(GenerateHoldingView(yesterday, today))
+        for account_view in view.account_data:
+            account_view.percent = account_view.value_CAD / total_value * 100
+            
     total = [(total_gain, total_gain / total_value, total_value)]
-    exchange_live = 1/Currency.objects.get(code='USD').live_price
-    exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
-    exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
-    context = {'security_data':security_data, 'total':total, 'cash_data':cash_data, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta}
+    context = {'security_data':security_data, 'total':total}
     return context
 
 def GetBalanceContext(user):
@@ -134,7 +145,11 @@ def GetBalanceContext(user):
 
     total_data = [('Total', sum(sod), sum(cur), sum(cur_cash), sum(change))]
 
-    context = {'account_data':account_data, 'total_data':total_data }
+    exchange_live = 1/Currency.objects.get(code='USD').live_price
+    exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
+    exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
+
+    context = {'account_data':account_data, 'total_data':total_data, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta }
     return context
 
 def GeneratePlot(user):
@@ -199,7 +214,7 @@ from .models import Activity
 @login_required
 def securitydetail(request, symbol):
     security = Security.objects.get(symbol=symbol)
-    activities = Security.objects.get(symbol=symbol).activities.filter(
+    activities = security.activities.filter(
         account__client__user=request.user, account__taxable=True, security__currency__rates__day=F('tradeDate')
         ).exclude(type='Dividend').order_by('tradeDate').annotate(exch=Sum(F('security__currency__rates__price')))
 

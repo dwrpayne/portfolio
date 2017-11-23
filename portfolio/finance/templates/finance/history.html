@@ -1,13 +1,8 @@
-﻿<!DOCTYPE html>
+﻿{% extends "finance/base.html" %}
 {% load mytags %}
 {% load static %}
-
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <meta charset="utf-8" />
-    <title></title>
-</head>
-<body>
+{% block title %}Account History - {{request.user.username}}{% endblock title %}
+{% block content %}  
     <br /><br />
     <table id="history">
         <thead>
@@ -26,6 +21,4 @@
         {% endfor %}
         </tbody>
     </table>
-<script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
-</body>
-</html>
+{% endblock content %}

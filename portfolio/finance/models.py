@@ -560,7 +560,7 @@ class HoldingQuerySet(models.query.QuerySet):
     def current(self):
         return self.filter(enddate=None)
 
-    def owned_by(user):
+    def owned_by(self, user):
         return self.filter(account__client__user=user)
     
     def at_date(self, date):
@@ -684,7 +684,7 @@ class Activity(models.Model):
 
         elif self.type in [Activity.Type.Transfer, Activity.Type.Dividend, Activity.Type.Fee, Activity.Type.Interest, Activity.Type.FX]:
             effect[self.cash] = self.netAmount
-            
+         
         elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
             effect[self.security] = self.qty
 
@@ -694,4 +694,7 @@ class Activity(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
+
+    def GetHeldSecurities(self):
+        return Security.objects.filter(holdings__in=Holding.objects.owned_by(self.user).current()).distinct()
 

@@ -6,3 +6,7 @@
 #djDebug [hidden][style='display: none;'] {
     display: none !important;
 }
+
+.table>tfoot>tr>td {
+    font-weight: bold;
+}

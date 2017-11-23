@@ -1,38 +1,40 @@
 {% load mytags %}
 <div id="balances">
-    <pre>
-        <table style="border-spacing: 20px 5px;" id="balances-table" class="tablesorter compact">
-            <thead>           
-                <tr>
-                    <th>Account</th>
-                    <th>SOD</th>
-                    <th>Current</th>
-                    <th>Cash</th>
-                    <th>Change</th>
-                </tr>
-            </thead>
-            <tfoot>
-            {% for name, sod, cur, cadcash, change in total_data %}
-                <tr>
-                    <td>{{name}}</td>
-                    <td>{{sod | currencyround}}</td>
-                    <td>{{cur | currencyround}}</td>
-                    <td>{{cadcash | currencyround}}</td>
-                    <td>{{change | currency | colorize}}</td>
-                </tr>
-            {% endfor %}
-            </tfoot>
-            <tbody>
-            {% for name, id, sod, cur, cadcash, change in account_data %}
-                <tr>
-                    <td><a href="{% url 'finance:accountdetail' id %}">{{name}}</a></td>
-                    <td>{{sod | currencyround}}</td>
-                    <td>{{cur | currencyround}}</td>
-                    <td>{{cadcash | currencyround}}</td>
-                    <td>{{change | currency | colorize}}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </pre>
+    <table class="table table-striped table-hover table-sm" id="balances-table" >
+        <thead>           
+            <tr>
+                <th>Account</th>
+                <th>ID</th>
+                <th>SOD</th>
+                <th>Current</th>
+                <th>Cash</th>
+                <th>Change</th>
+            </tr>
+        </thead>
+        <tfoot>
+        {% for name, sod, cur, cadcash, change in total_data %}
+            <tr>
+                <td>{{name}}</td>
+                <td></td>
+                <td>{{sod | currencyround}}</td>
+                <td>{{cur | currencyround}}</td>
+                <td>{{cadcash | currencyround}}</td>
+                <td>{{change | currency | colorize}}</td>
+            </tr>
+        {% endfor %}
+        </tfoot>
+        <tbody>
+        {% for name, id, sod, cur, cadcash, change in account_data %}
+            <tr>
+                <td><a href="{% url 'finance:accountdetail' id %}">{{name}}</a></td>                
+                <td>{{id}}</td>
+                <td>{{sod | currencyround}}</td>
+                <td>{{cur | currencyround}}</td>
+                <td>{{cadcash | currencyround}}</td>
+                <td>{{change | currency | colorize}}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    Current USD exchange: {{exchange_live|floatformat:4}} {{exchange_delta | percentage | colorize}}
 </div>

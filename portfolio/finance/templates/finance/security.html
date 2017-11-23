@@ -1,15 +1,9 @@
+{% extends "finance/base.html" %}
 {% load mytags %}
 {% load static %}
-<html>
-<head>
-    <title>{{symbol}}</title>
-</head>
-<body>
-    <script src="https://code.jquery.com/jquery-3.1.0.js"></script>
-    <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
-    <script src="{% static "finance/finance.js" %}"></script>       
-    <br />
-    
+{% block title %} {{symbol}} {% endblock title %}
+{% block content %}  
+    <br />    
     <center><h2>{{symbol}}</h2><br /><h3>All values converted to Canadian dollars.</h3></center>
     <div id="security_info">
         <pre>
@@ -48,5 +42,4 @@
             <br />Pending Gain: {{pendinggain | currency}}
         </pre>
     </div>
-</body>
-</html>
+{% endblock content %}

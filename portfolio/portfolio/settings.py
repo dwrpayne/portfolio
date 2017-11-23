@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 """
 
 import os
+import raven
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -50,7 +51,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django_celery_results',
     'django_celery_beat',
+    
 ]
+
+SENTRY_DSN = 'https://c0e0ce1a5e2d44c782de20861b36a0cb:c430a68a5fbe48559bf744a92b52a212@sentry.io/249441'
+if SENTRY_DSN:
+    INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
+    RAVEN_CONFIG = {
+        'dsn': SENTRY_DSN,
+    }
+
 
 MIDDLEWARE = [
     'debug_toolbar.middleware.DebugToolbarMiddleware',

@@ -3,20 +3,18 @@
 {% load static %}
 {% block title %} {{request.user.username}} {% endblock title %}
 {% block content %}  
-    <br />
-    <h3><center>Portfolio info for {{request.user.username}}.</center></h3>
-<div class="row">
-    <div class="col-sm-5">{% include "finance/holdings.html" %}</div>
-    <div class="col-sm-5">{% include "finance/balances.html" %}</div>   
-    <div class="col-sm-2">
-        <br /><br /> <button type="submit" class="refresh" data-refresh-type="live" data-refresh-div="holdings;balances">Refresh Live Data</button> 
-        <br /><br /> <button type="submit" class="refresh" data-refresh-type="plot" data-refresh-div="history-plot">Refresh Plot Data</button>
-        <br /><br /> <button type="submit" class="refresh" data-refresh-type="account" data-refresh-div="holdings;balances">Refresh Account Data</button>
-    </div>        
-</div>
-<div class="row">
-    <div style="clear:both;width:800px" id="history-plot">
-        {{plotly_embed_html | safe}}
+    <div class="row">
+        <div class="col-sm-5">{% include "finance/holdings.html" %}</div>
+        <div class="col-sm-5">{% include "finance/balances.html" %}</div>   
+        <div class="col-sm-2">
+            <br /><br /> <button type="submit" class="refresh" data-refresh-type="live" data-refresh-div="holdings;balances">Refresh Live Data</button> 
+            <br /><br /> <button type="submit" class="refresh" data-refresh-type="plot" data-refresh-div="history-plot">Refresh Plot Data</button>
+            <br /><br /> <button type="submit" class="refresh" data-refresh-type="account" data-refresh-div="holdings;balances">Refresh Account Data</button>
+        </div>        
     </div>
+    <div class="row">
+        <div style="clear:both;width:800px" id="history-plot">
+            {{plotly_embed_html | safe}}
+        </div>
     </div>
 {% endblock content %}
