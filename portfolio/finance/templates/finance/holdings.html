@@ -22,7 +22,7 @@
                 <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter}}" >&gt;</div></td>
                 <td><a href="{% url 'finance:securitydetail' symbol %}">{{holding_view.symbol}}</a></td>
                 <td>{{holding_view.today_price | floatformat:2}}</td>
-                <td>{{holding_view.price_delta | floatformat:2 | colorize}} {{holding_view.percent_delta | percentage | colorize}}</td>
+                <td>{{holding_view.price_delta | floatformat:2 | colorize}} {{holding_view.percent_delta | percentage | parens | colorize}}</td>
                 <td>{{holding_view.qty | floatformat:0}}</td>
                 <td>{{holding_view.this_gain | currency | colorize}}</td>
                 <td>{{holding_view.value_CAD | currency}}</td>
@@ -33,7 +33,7 @@
                     <td></td>
                     <td>{{account.acc}}</td>
                     <td>{{account.today_price | floatformat:2}}</td>
-                    <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_delta | percentage | colorize}}</td>
+                    <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_delta | percentage | parens | colorize}}</td>
                     <td>{{account.qty | floatformat:0}}</td>
                     <td>{{account.this_gain | currency | colorize}}</td>
                     <td>{{account.value_CAD | currency}}</td>

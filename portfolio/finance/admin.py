@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import ManualRawActivity, BaseRawActivity, BaseAccount, BaseClient, Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency
+from .models import ManualRawActivity, BaseRawActivity, BaseAccount, BaseClient
+from .models import Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, Allocation
 from .models import UserProfile
 
 def MakeNormalizedFloat(field, desc):
@@ -60,6 +61,13 @@ admin.site.register(ExchangeRate, ExchangeRateAdmin)
 
 admin.site.register(BaseAccount)
 admin.site.register(BaseClient)
+
+    
+class AllocationAdmin(admin.ModelAdmin):
+    list_display = ['user', 'desired_pct', 'list_securities']
+
+admin.site.register(Allocation, AllocationAdmin)
+
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile

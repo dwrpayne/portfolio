@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse, Http404
 from django.db.models.aggregates import Sum
-from django.db.models import F, Q, Sum, When, Case, Max
+from django.db.models import F, Q, Sum, When, Case, Max, Value
 from django.contrib.auth.decorators import login_required
 
 from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency
@@ -61,41 +61,25 @@ def GetValueDataFrame(user, startdate=None):
     df.index = df.index.date
     return df
 
-def GetSecurityPriceInfo(user, by_account = False):
-    kwcolumns = {'day' : F('rates__day'), 'price' : F('rates__price'), 'exch' : F('currency__rates__price')}
-    orderby = ['symbol', 'day']
-    if by_account:
-        kwcolumns['acc'] = F('holdings__account')
-        orderby = ['symbol', 'acc', 'day']
-    data = Security.objects.filter(holdings__account__client__user=user, holdings__enddate=None, 
-                                    rates__day__gte=datetime.date.today()-datetime.timedelta(days=1), 
-                                    currency__rates__day=F('rates__day'),
-                                    ).values('symbol', **kwcolumns).annotate(qty=Sum('holdings__qty')
-                                    ).order_by(*orderby)
-
-    return data
-
 class HoldingView:
     def __init__(self, yesterday, today):
-        assert yesterday['symbol'] == today['symbol']
-        self.symbol = today['symbol']
-        self.qty = today['qty']
-        yesterday_price = yesterday['price']
-        yesterday_price_CAD = yesterday['price'] * yesterday['exch']
-        self.today_price = today['price']
-        today_price_CAD = today['price'] * today['exch']
+        assert yesterday.symbol == today.symbol
+        self.symbol = today.symbol
+        self.qty = today.qty
+        yesterday_price = yesterday.price
+        yesterday_price_CAD = yesterday.price * yesterday.exch
+        self.today_price = today.price
+        today_price_CAD = today.price * today.exch
         self.price_delta = self.today_price - yesterday_price
         self.percent_delta = self.price_delta / yesterday_price
         self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
         self.value_CAD = self.qty * today_price_CAD
 
-        if 'acc' in today:
-            self.acc = today['acc']
+        if hasattr(today, 'acc'):
+            self.acc = today.acc
 
-def GetHoldingViewList(user, symbol=None):
-    data = GetSecurityPriceInfo(user, True if symbol else False)
-    if symbol: data = data.filter(symbol=symbol)
-
+def GetHoldingViewList(user, by_account=False):
+    data = Security.objects.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
     return list(map(HoldingView, data[::2], data[1::2]))
 
 def GetHoldingsContext(user):    
@@ -103,10 +87,11 @@ def GetHoldingsContext(user):
     total_yesterday = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today() - datetime.timedelta(days=1))
     total_gain = total_value - total_yesterday
     
-    holding_data = GetHoldingViewList(user)
+    holding_data = GetHoldingViewList(user)    
+    account_data = GetHoldingViewList(user, True)    
     for view in holding_data:
         view.percent = view.value_CAD / total_value * 100
-        view.account_data = GetHoldingViewList(user, view.symbol)    
+        view.account_data = [d for d in account_data if d.symbol == view.symbol]
         for account_view in view.account_data:
             account_view.percent = account_view.value_CAD / total_value * 100
 
@@ -177,6 +162,27 @@ def History(request):
     }
 
     return render(request, 'finance/history.html', context)
+
+from finance.models import Allocation
+
+@login_required
+def Rebalance(request):
+    securities = Security.objects.with_prices(request.user)
+    total_value = sum([s.value for s in securities])
+
+    allocs = list(request.user.allocations.all().prefetch_related('securities'))
+    for alloc in allocs:
+        alloc.current_amt = sum([s.value for s in securities if s in alloc.securities.all()])
+        alloc.current_pct = alloc.current_amt / total_value
+        alloc.desired_amt = alloc.desired_pct * total_value
+        alloc.buysell = alloc.desired_amt - alloc.current_amt
+           
+
+    context = {
+        'allocs': allocs,
+    }
+
+    return render(request, 'finance/rebalance.html', context)
 
 @login_required
 def accountdetail(request, account_id):

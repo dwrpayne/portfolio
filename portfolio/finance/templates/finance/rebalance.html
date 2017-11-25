@@ -1,0 +1,36 @@
+﻿{% extends "finance/base.html" %}
+{% load mytags %}
+{% load static %}
+{% block title %}Rebalancing Table{% endblock title %}
+{% block content %}  
+<br /><br />
+<div class="row">
+    <div class="col-sm-6">
+        <table class="table table-striped table-hover" id="rebalance-table">
+            <thead>
+                <tr>
+                    <th>Symbols</th>
+                    <th>Desired %</th>
+                    <th>Current %</th>
+                    <th>Desired $</th>
+                    <th>Current $</th>
+                    <th>Buy/Sell</th>
+                </tr>
+            </thead>
+      
+            <tbody>
+                {% for alloc in allocs %}
+                <tr>
+                    <td>{{alloc.list_securities}}</td>
+                    <td>{{alloc.desired_pct | percentage:0}}</td>
+                    <td>{{alloc.current_pct | percentage}}</td>
+                    <td>{{alloc.desired_amt | currencyround}}</td>
+                    <td>{{alloc.current_amt | currencyround}}</td>
+                    <td>{{alloc.buysell | currencyround | colorize}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock content %}

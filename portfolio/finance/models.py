@@ -127,6 +127,22 @@ class Currency(RateLookupMixin):
         
     def GetExchangeRate(self, day):
         return self.GetRate(day)
+
+class SecurityQuerySet(models.query.QuerySet):
+    def with_prices(self, user, start_date=datetime.date.today(), by_account = False):
+        kwcolumns = {'day' : F('rates__day'), 'price' : F('rates__price'), 'exch' : F('currency__rates__price')}
+        orderby = ['symbol', 'day']
+        if by_account:
+            kwcolumns['acc'] = F('holdings__account')
+            orderby = ['symbol', 'acc', 'day']
+
+        query = self.filter(holdings__account__client__user=user, holdings__enddate=None, 
+                            rates__day__gte=start_date, currency__rates__day=F('rates__day')
+                            ).annotate(qty=Sum('holdings__qty'), **kwcolumns
+                            ).order_by(*orderby)
+        for s in query:
+            s.value = s.price * s.exch * s.qty
+        return query
         
 class StockSecurityManager(models.Manager):
     def get_queryset(self):
@@ -144,6 +160,7 @@ class MutualFundSecurityManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
 
+
 class Security(RateLookupMixin):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
 
@@ -154,11 +171,11 @@ class Security(RateLookupMixin):
     listingExchange = models.CharField(max_length=20, null=True, blank=True, default='')
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE) 
 
-    objects = models.Manager()
-    stocks = StockSecurityManager()
-    cash = CashSecurityManager()
-    options = OptionSecurityManager()
-    mutualfunds = MutualFundSecurityManager()
+    objects = SecurityQuerySet.as_manager()
+    stocks = StockSecurityManager.from_queryset(SecurityQuerySet)()
+    cash = CashSecurityManager.from_queryset(SecurityQuerySet)()
+    options = OptionSecurityManager.from_queryset(SecurityQuerySet)()
+    mutualfunds = MutualFundSecurityManager.from_queryset(SecurityQuerySet)()
 
     @classmethod
     def CreateStock(cls, symbol, currency_str):
@@ -692,7 +709,23 @@ class Activity(models.Model):
         elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
             effect[self.security] = self.qty
 
-        return effect                 
+        return effect         
+    
+
+class Allocation(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='allocations')
+    securities = models.ManyToManyField(Security)
+    desired_pct = models.DecimalField(max_digits=6, decimal_places=4)
+    
+    def __str__(self):
+        return "{} - {} - {}".format(self.user, self.desired_pct, self.list_securities())
+
+    def __repr__(self):
+        return "Allocation<{},{},{}>".format(self.user, self.desired_pct, self.list_securities())
+            
+    def list_securities(self):
+        return ', '.join([s.symbol for s in self.securities.all()])
+
     
   
 class UserProfile(models.Model):

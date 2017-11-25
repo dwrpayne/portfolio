@@ -29,5 +29,9 @@ def currencyround(dollars):
     return "{}${:,d}".format(prefix, abs(round(dollars)))
 
 @register.filter()
-def percentage(amount):
-    return "({:,.2f}%)".format(amount*100)
+def percentage(amount, decimals=2):
+    return ("{:,."+str(decimals)+"f}%").format(amount*100)
+
+@register.filter()
+def parens(s):
+    return "({})".format(s)

@@ -28,7 +28,7 @@ def debug_task(self):
 app.conf.beat_schedule = {
     'sync-daily-client-prices': {
         'task': 'finance.tasks.DailyUpdateTask',
-        'schedule': crontab(minute=0, hour=4),
+        'schedule': crontab(minute='0', hour='0'),
     },
     'refresh-questrade-tokens': {
         'task': 'questrade.tasks.RefreshAccessTokens',
