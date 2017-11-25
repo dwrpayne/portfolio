@@ -467,7 +467,7 @@ class BaseClient(PolymorphicModel):
         date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
         
         print ('Syncing all activities for {} in {} chunks.'.format(account, len(date_range)))
-        return sum([self._CreateRawActivities(account, start, end) for start, end in date_range])
+        return sum(self._CreateRawActivities(account, start, end) for start, end in date_range)
 
     def Refresh(self):
         #self.SyncAccounts()

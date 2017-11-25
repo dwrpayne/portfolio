@@ -168,18 +168,31 @@ from finance.models import Allocation
 @login_required
 def Rebalance(request):
     securities = Security.objects.with_prices(request.user)
-    total_value = sum([s.value for s in securities])
+    total_value = sum(s.value for s in securities)
 
     allocs = list(request.user.allocations.all().prefetch_related('securities'))
     for alloc in allocs:
-        alloc.current_amt = sum([s.value for s in securities if s in alloc.securities.all()])
+        alloc.current_amt = sum(s.value for s in securities if s in alloc.securities.all())
         alloc.current_pct = alloc.current_amt / total_value
         alloc.desired_amt = alloc.desired_pct * total_value
         alloc.buysell = alloc.desired_amt - alloc.current_amt
+    allocs.sort(key=lambda a:a.desired_pct, reverse=True)
+
+    missing = [s for s in securities if not s.allocation_set.exists()]
+    for s in missing:
+        s.current_pct = s.value / total_value
            
+    total = [sum(a.desired_pct for a in allocs),
+             sum(a.current_pct for a in allocs),
+             sum(a.desired_amt for a in allocs),
+             sum(a.current_amt for a in allocs),
+             sum(a.buysell for a in allocs),
+             ]
 
     context = {
         'allocs': allocs,
+        'missing': missing,
+        'total' : total
     }
 
     return render(request, 'finance/rebalance.html', context)
