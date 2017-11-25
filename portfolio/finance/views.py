@@ -76,62 +76,44 @@ def GetSecurityPriceInfo(user, by_account = False):
     return data
 
 class HoldingView:
-    pass
+    def __init__(self, yesterday, today):
+        assert yesterday['symbol'] == today['symbol']
+        self.symbol = today['symbol']
+        self.qty = today['qty']
+        yesterday_price = yesterday['price']
+        yesterday_price_CAD = yesterday['price'] * yesterday['exch']
+        self.today_price = today['price']
+        today_price_CAD = today['price'] * today['exch']
+        self.price_delta = self.today_price - yesterday_price
+        self.percent_delta = self.price_delta / yesterday_price
+        self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
+        self.value_CAD = self.qty * today_price_CAD
 
-def GenerateHoldingView(yesterday, today):
-    assert yesterday['symbol'] == today['symbol']
-    h = HoldingView()
-    h.symbol = today['symbol']
-    h.qty = today['qty']
-    yesterday_price = yesterday['price']
-    yesterday_price_CAD = yesterday['price'] * yesterday['exch']
-    h.today_price = today['price']
-    today_price_CAD = today['price'] * today['exch']
-    h.price_delta = h.today_price - yesterday_price
-    h.percent_delta = h.price_delta / yesterday_price
-    h.this_gain = h.qty * (today_price_CAD - yesterday_price_CAD)
-    h.value_CAD = h.qty * today_price_CAD
+        if 'acc' in today:
+            self.acc = today['acc']
 
-    if 'acc' in today:
-        h.acc = today['acc']
-    else:
-        h.account_data = []
-    return h
+def GetHoldingViewList(user, symbol=None):
+    data = GetSecurityPriceInfo(user, True if symbol else False)
+    if symbol: data = data.filter(symbol=symbol)
 
-def GetHoldingsContext(user):
-    total_gain = 0
-    total_value = 0  
-    security_data = []
+    return list(map(HoldingView, data[::2], data[1::2]))
 
-    data = GetSecurityPriceInfo(user)
-    data_by_account = GetSecurityPriceInfo(user, True)
-
-    cash_holdings = data.filter(type=Security.Type.Cash)
-    cash = [{'symbol':'Cash'},{'symbol':'Cash'}]
-    for i, day in enumerate(cash_holdings.dates('day','day')):
-        cash[i]['day'] = day
-        cash[i]['exch'] = cash[i]['qty'] = 1
-        cash[i]['price'] = sum([holding['qty'] * holding['exch'] for holding in cash_holdings if holding['day'] == day])
-
-
-    securities = data#list(data.exclude(type=Security.Type.Cash)) + cash
-    for yesterday, today in zip(securities[::2], securities[1::2]):
-        security_data.append( GenerateHoldingView(yesterday, today))
-
-    total_gain = sum([d.this_gain for d in security_data])
-    total_value = sum([d.value_CAD for d in security_data])    
-    for d in security_data:
-        d.percent = d.value_CAD / total_value * 100
-
-    for view in security_data:
-        security_by_acc_data = data_by_account.filter(symbol=view.symbol)
-        for yesterday, today in zip(security_by_acc_data[::2], security_by_acc_data[1::2]):            
-            view.account_data.append(GenerateHoldingView(yesterday, today))
+def GetHoldingsContext(user):    
+    total_value = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today())
+    total_yesterday = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today() - datetime.timedelta(days=1))
+    total_gain = total_value - total_yesterday
+    
+    holding_data = GetHoldingViewList(user)
+    for view in holding_data:
+        view.percent = view.value_CAD / total_value * 100
+        view.account_data = GetHoldingViewList(user, view.symbol)    
         for account_view in view.account_data:
             account_view.percent = account_view.value_CAD / total_value * 100
+
+    holding_data.sort(key=lambda h:h.value_CAD, reverse=True)
             
     total = [(total_gain, total_gain / total_value, total_value)]
-    context = {'security_data':security_data, 'total':total}
+    context = {'security_data':holding_data, 'total':total}
     return context
 
 def GetBalanceContext(user):

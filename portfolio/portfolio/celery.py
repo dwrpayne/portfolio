@@ -34,8 +34,12 @@ app.conf.beat_schedule = {
         'task': 'questrade.tasks.RefreshAccessTokens',
         'schedule': crontab(minute='*/15')
     },
+    'sync-live-exchanges': {
+        'task': 'finance.tasks.LiveExchangeUpdateTask',
+        'schedule': crontab(minute='0', hour='*')
+    },
     'sync-live-prices': {
-        'task': 'finance.tasks.LiveUpdateTask',
+        'task': 'finance.tasks.LiveSecurityUpdateTask',
         'schedule': crontab(minute='*', hour='6-15', day_of_week='mon-fri')
     },
 }

@@ -360,6 +360,10 @@ class DataProvider:
                     with c:
                         c.SyncPrices()
                     
+        # Just generate fake 1 entries so we can join these tables later.
+        for cash in Security.cash.all():
+            cash.SyncRates(cls._FakeData)
+
     @classmethod
     def SyncAllSecurities(cls):
         for stock in Security.stocks.all():
@@ -388,8 +392,8 @@ class DataProvider:
             Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
 
-        #r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'eb324bcd04b743c2830360072d84e024', 'symbols':'CAD'})
-        #Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
+        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'2f666e800586440088f5fc22d688f520', 'symbols':'CAD'})
+        Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
         
 
 class BaseClient(PolymorphicModel):    
@@ -572,7 +576,7 @@ class HoldingQuerySet(models.query.QuerySet):
     def value_as_of(self, date):
         if not self:
             return 0
-        filtered = self.filter(security__rates__day=date, security__currency__rates__day=date)
+        filtered = self.at_date(date).filter(security__rates__day=date, security__currency__rates__day=date)
         if not filtered:
             print("HoldingQuerySet filtered out because of missing price data")
             return 0
