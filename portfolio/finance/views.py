@@ -4,7 +4,7 @@ from django.db.models.aggregates import Sum
 from django.db.models import F, Q, Sum, When, Case, Max, Value
 from django.contrib.auth.decorators import login_required
 
-from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, Allocation
+from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, Allocation, Activity
 from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
 import arrow
 import datetime
@@ -17,62 +17,15 @@ import pandas
 import requests
 from celery import group
 import itertools
-
-def GetHistoryValues(user, startdate=None):
-    query = SecurityPrice.objects.all()
-    if startdate:
-        query = query.filter(day__gte=startdate)
-        
-    return query.filter(
-        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
-        security__holdings__account__client__user=user, 
-        security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')).values('day').order_by('day').annotate(
-            val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
-            ).values_list('day', 'val')
-
-def GetHistoryValuesByAccount(user, startdate=None):
-    query = SecurityPrice.objects.all()
-    if startdate:
-        query = query.filter(day__gte=startdate)
-                
-    return query.filter(
-        Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
-        security__holdings__account__client__user=user, 
-        security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')).values('day', 'security__holdings__account'
-        ).order_by('day', 'security__holdings__account').annotate(
-            val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
-        ).values_list('day', 'security__holdings__account', 'val')
-
-class HoldingView:
-    def __init__(self, yesterday, today):
-        assert yesterday.symbol == today.symbol
-        self.symbol = today.symbol
-        self.qty = today.qty
-        yesterday_price = yesterday.price
-        yesterday_price_CAD = yesterday.price * yesterday.exch
-        self.today_price = today.price
-        today_price_CAD = today.price * today.exch
-        self.price_delta = self.today_price - yesterday_price
-        self.percent_delta = self.price_delta / yesterday_price
-        self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
-        self.value_CAD = self.qty * today_price_CAD
-
-        if hasattr(today, 'acc'):
-            self.acc = today.acc
-
-def GetHoldingViewList(user, by_account=False):
-    data = Security.objects.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
-    return list(map(HoldingView, data[::2], data[1::2]))
+import simplejson
 
 def GetHoldingsContext(user):    
     total_value = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today())
     total_yesterday = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today() - datetime.timedelta(days=1))
     total_gain = total_value - total_yesterday
     
-    holding_data = GetHoldingViewList(user)    
-    account_data = GetHoldingViewList(user, True)    
+    holding_data = Security.objects.get_todays_changes(user)    
+    account_data = Security.objects.get_todays_changes(user, True)    
     for view in holding_data:
         view.percent = view.value_CAD / total_value * 100
         view.account_data = [d for d in account_data if d.symbol == view.symbol]
@@ -104,7 +57,7 @@ def GetBalanceContext(user):
     return context
 
 def GeneratePlot(user):
-    pairs = GetHistoryValues(user, datetime.date.today() - datetime.timedelta(days=30))
+    pairs = SecurityPrice.objects.get_history(user, startdate=datetime.date.today() - datetime.timedelta(days=30))
     dates, vals = list(zip(*pairs))
     trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
     plotly_url = plotly.plotly.plot([trace], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
@@ -138,11 +91,11 @@ def Portfolio(request):
 
 @login_required
 def History(request):
-    vals_list = GetHistoryValuesByAccount(request.user)
+    vals_list = SecurityPrice.objects.get_history(request.user, by_account=True)
     accounts = BaseAccount.objects.filter(client__user=request.user)
     ids = accounts.values_list('id', flat=True)
     rows = defaultdict(lambda:{id:0 for id in ids})
-    for d,a,v in vals_list:
+    for d,a,v in reversed(vals_list):
         rows[d][a]=v
 
     context = {
@@ -182,16 +135,12 @@ def accountdetail(request, account_id):
     context = {'account':account, 'activities':activities}
     return render(request, 'finance/account.html', context)    
 
-
-import simplejson
-from .models import Activity
-
 @login_required
 def securitydetail(request, symbol):
     security = Security.objects.get(symbol=symbol)
     activities = security.activities.filter(
         account__client__user=request.user, account__taxable=True, security__currency__rates__day=F('tradeDate')
-        ).exclude(type='Dividend').order_by('tradeDate').annotate(exch=Sum(F('security__currency__rates__price')))
+        ).exclude(type=Activity.Type.Dividend).order_by('tradeDate').annotate(exch=Sum(F('security__currency__rates__price')))
 
     totalqty = Decimal('0')
     totalacb = Decimal('0')

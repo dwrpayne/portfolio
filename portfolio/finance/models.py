@@ -128,6 +128,24 @@ class Currency(RateLookupMixin):
     def GetExchangeRate(self, day):
         return self.GetRate(day)
 
+    
+class HoldingView:
+    def __init__(self, yesterday, today):
+        assert yesterday.symbol == today.symbol
+        self.symbol = today.symbol
+        self.qty = today.qty
+        yesterday_price = yesterday.price
+        yesterday_price_CAD = yesterday.price * yesterday.exch
+        self.today_price = today.price
+        today_price_CAD = today.price * today.exch
+        self.price_delta = self.today_price - yesterday_price
+        self.percent_delta = self.price_delta / yesterday_price
+        self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
+        self.value_CAD = self.qty * today_price_CAD
+
+        if hasattr(today, 'acc'):
+            self.acc = today.acc
+
 class SecurityQuerySet(models.query.QuerySet):
     def with_prices(self, user, start_date=datetime.date.today(), by_account = False):
         kwcolumns = {'day' : F('rates__day'), 'price' : F('rates__price'), 'exch' : F('currency__rates__price')}
@@ -143,20 +161,25 @@ class SecurityQuerySet(models.query.QuerySet):
         for s in query:
             s.value = s.price * s.exch * s.qty
         return query
+
+class SecurityManager(models.Manager):
+    def get_todays_changes(self, user, by_account=False):
+        data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
+        return list(map(HoldingView, data[::2], data[1::2]))
         
-class StockSecurityManager(models.Manager):
+class StockSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
     
-class CashSecurityManager(models.Manager):
+class CashSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Cash)
     
-class OptionSecurityManager(models.Manager):
+class OptionSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Option)
 
-class MutualFundSecurityManager(models.Manager):
+class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
 
@@ -171,12 +194,18 @@ class Security(RateLookupMixin):
     listingExchange = models.CharField(max_length=20, null=True, blank=True, default='')
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE) 
 
-    objects = SecurityQuerySet.as_manager()
+    objects = SecurityManager.from_queryset(SecurityQuerySet)()
     stocks = StockSecurityManager.from_queryset(SecurityQuerySet)()
     cash = CashSecurityManager.from_queryset(SecurityQuerySet)()
     options = OptionSecurityManager.from_queryset(SecurityQuerySet)()
     mutualfunds = MutualFundSecurityManager.from_queryset(SecurityQuerySet)()
 
+    def __str__(self):
+        return "{} {}".format(self.symbol, self.currency)
+
+    def __repr(self):
+        return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
+    
     @classmethod
     def CreateStock(cls, symbol, currency_str):
         return Security.objects.create(
@@ -260,15 +289,29 @@ class Security(RateLookupMixin):
     def GetPriceCAD(self, day):
         return self.GetPrice(day) * self.currency.GetRateOnDay(day)
 
-    def __str__(self):
-        return "{} {}".format(self.symbol, self.currency)
 
-    def __repr(self):
-        return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
-    
+class SecurityPriceManager(models.Manager):
+    def get_history(self, user, by_account=False, startdate=None):
+        query = SecurityPrice.objects.all()
+        if startdate:
+            query = query.filter(day__gte=startdate)
+        
+        history = query.filter(
+            Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
+            security__holdings__account__client__user=user, 
+            security__holdings__startdate__lte=F('day'),
+            security__currency__rates__day=F('day'))
+
+        group_by = ['day']
+        if by_account: group_by.append('security__holdings__account')
+
+        return history.values(*group_by).order_by(*group_by).annotate(
+                val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
+        ).values_list(*group_by, 'val')
 
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
+    objects = SecurityPriceManager()
 
     class Meta:
         unique_together = ('security', 'day')
