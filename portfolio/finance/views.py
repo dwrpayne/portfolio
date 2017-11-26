@@ -4,7 +4,7 @@ from django.db.models.aggregates import Sum
 from django.db.models import F, Q, Sum, When, Case, Max, Value
 from django.contrib.auth.decorators import login_required
 
-from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency
+from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, Allocation
 from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
 import arrow
 import datetime
@@ -17,7 +17,6 @@ import pandas
 import requests
 from celery import group
 import itertools
-
 
 def GetHistoryValues(user, startdate=None):
     query = SecurityPrice.objects.all()
@@ -41,25 +40,10 @@ def GetHistoryValuesByAccount(user, startdate=None):
         Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None), 
         security__holdings__account__client__user=user, 
         security__holdings__startdate__lte=F('day'),
-        security__currency__rates__day=F('day')).values('day', 'security__holdings__account').order_by().annotate(
+        security__currency__rates__day=F('day')).values('day', 'security__holdings__account'
+        ).order_by('day', 'security__holdings__account').annotate(
             val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
-            ).values_list('day', 'security__holdings__account', 'val')
-
-def GetValueDataFrame(user, startdate=None):
-    """ Returns an (account, date, value) tuple for each date where the value of that account is > 0 """
-    val_list = GetHistoryValuesByAccount(user, startdate)
-
-    dates = val_list.dates('day', 'day')
-
-    vals = defaultdict(dict)
-    for d,a,v in val_list:
-        vals[a][pandas.Timestamp(d)] = v
-    
-    s = [pandas.Series(vals[a.id], name=a.display_name) for a in BaseAccount.objects.filter(client__user=user)]
-    df = pandas.DataFrame(s).T.fillna(0).astype(int).iloc[::-1]
-    df = df.assign(Total=pandas.Series(df.sum(1)))
-    df.index = df.index.date
-    return df
+        ).values_list('day', 'security__holdings__account', 'val')
 
 class HoldingView:
     def __init__(self, yesterday, today):
@@ -154,34 +138,24 @@ def Portfolio(request):
 
 @login_required
 def History(request):
-    df = GetValueDataFrame(request.user)
+    vals_list = GetHistoryValuesByAccount(request.user)
+    accounts = BaseAccount.objects.filter(client__user=request.user)
+    ids = accounts.values_list('id', flat=True)
+    rows = defaultdict(lambda:{id:0 for id in ids})
+    for d,a,v in vals_list:
+        rows[d][a]=v
 
     context = {
-        'names': df.columns,
-        'rows': df.itertuples(),
+        'names': [a.display_name for a in accounts],
+        'rows': rows.items(),
     }
 
     return render(request, 'finance/history.html', context)
 
-from finance.models import Allocation
-
 @login_required
 def Rebalance(request):
-    securities = Security.objects.with_prices(request.user)
-    total_value = sum(s.value for s in securities)
+    allocs, missing = Allocation.objects.get_rebalance_info(request.user)
 
-    allocs = list(request.user.allocations.all().prefetch_related('securities'))
-    for alloc in allocs:
-        alloc.current_amt = sum(s.value for s in securities if s in alloc.securities.all())
-        alloc.current_pct = alloc.current_amt / total_value
-        alloc.desired_amt = alloc.desired_pct * total_value
-        alloc.buysell = alloc.desired_amt - alloc.current_amt
-    allocs.sort(key=lambda a:a.desired_pct, reverse=True)
-
-    missing = [s for s in securities if not s.allocation_set.exists()]
-    for s in missing:
-        s.current_pct = s.value / total_value
-           
     total = [sum(a.desired_pct for a in allocs),
              sum(a.current_pct for a in allocs),
              sum(a.desired_amt for a in allocs),

@@ -266,7 +266,7 @@ class Security(RateLookupMixin):
     def __repr(self):
         return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)   
     
-    
+
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
 
@@ -546,7 +546,7 @@ class BaseAccount(PolymorphicModel):
     def GetDividendsInYear(self, year):
         sum(account.activities.dividends().in_year(year).values_list('netAmount',flat=True))
 
-                 
+
 class HoldingManager(models.Manager):
     def add_effect(self, account, security, qty_delta, date):                       
         previous_qty = 0
@@ -709,13 +709,33 @@ class Activity(models.Model):
         elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
             effect[self.security] = self.qty
 
-        return effect         
+        return effect     
+    
+class AllocationManager(models.Manager):
+    def get_rebalance_info(self, user): 
+        securities = Security.objects.with_prices(user)
+        total_value = sum(s.value for s in securities)
+
+        allocs = list(user.allocations.all().prefetch_related('securities'))
+        for alloc in allocs:
+            alloc.current_amt = sum(s.value for s in securities if s in alloc.securities.all())
+            alloc.current_pct = alloc.current_amt / total_value
+            alloc.desired_amt = alloc.desired_pct * total_value
+            alloc.buysell = alloc.desired_amt - alloc.current_amt
+        allocs.sort(key=lambda a:a.desired_pct, reverse=True)
+
+        missing = [s for s in securities if not s.allocation_set.exists()]
+        for s in missing:
+            s.current_pct = s.value / total_value
+
+        return allocs, missing        
     
 
 class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='allocations')
     securities = models.ManyToManyField(Security)
     desired_pct = models.DecimalField(max_digits=6, decimal_places=4)
+    objects = AllocationManager()
     
     def __str__(self):
         return "{} - {} - {}".format(self.user, self.desired_pct, self.list_securities())
