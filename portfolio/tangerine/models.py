@@ -42,7 +42,7 @@ class TangerineRawActivity(BaseRawActivity):
             type = Activity.Type.Dividend
             
         return Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty, 
-                        price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
+                        price=self.price, netAmount=self.qty*self.price, type=Activity.Type.Buy, raw=self)
     
 class TangerineAccount(BaseAccount):
     internal_display_name = models.CharField(max_length = 100)

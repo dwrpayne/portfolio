@@ -57,10 +57,28 @@ def GetBalanceContext(user):
     return context
 
 def GeneratePlot(user):
-    pairs = SecurityPrice.objects.get_history(user, startdate=datetime.date.today() - datetime.timedelta(days=30))
+    pairs = SecurityPrice.objects.get_history(user)
     dates, vals = list(zip(*pairs))
     trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
-    plotly_url = plotly.plotly.plot([trace], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
+
+    deposits = Activity.objects.filter(account__client__user=user)
+    f = Q(type=Activity.Type.Deposit)
+    if user.username=='amie':
+        f = f | Q(type=Activity.Type.Transfer) | Q(type=Activity.Type.Buy)
+
+    deposits = deposits.filter(f).values_list('tradeDate', 'netAmount')
+    dates, amounts = list(zip(*list(deposits)))
+
+    running_totals = []
+    total = 0
+    for a in amounts:
+        total += a
+        running_totals.append(total)
+
+
+    trace2 = go.Scatter(name='Deposits', x=dates, y=running_totals, mode='lines+markers')
+
+    plotly_url = plotly.plotly.plot([trace, trace2], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
     user.userprofile.plotly_url = plotly_url    
     user.userprofile.save()
 
@@ -180,7 +198,7 @@ def securitydetail(request, symbol):
     context = {'activities':activities, 'symbol':symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/security.html', context)    
 
-
+@login_required
 def index(request):
     context = {}
     last_update_days = SecurityPrice.objects.filter(

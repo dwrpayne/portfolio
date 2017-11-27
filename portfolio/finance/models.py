@@ -709,6 +709,9 @@ class ActivityQuerySet(models.query.QuerySet):
     def in_year(self, year):
         return self.filter(tradeDate__year=year)
 
+    def owned_by(self, user):
+        return self.filter(account__client__user=user)
+
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
     tradeDate = models.DateField()
@@ -744,7 +747,8 @@ class Activity(models.Model):
 
         if self.type in [Activity.Type.Buy, Activity.Type.Sell, Activity.Type.Deposit, Activity.Type.Withdrawal]:
             effect[self.security] = self.qty
-            effect[self.cash] = self.netAmount
+            if self.cash:
+                effect[self.cash] = self.netAmount
 
         elif self.type in [Activity.Type.Transfer, Activity.Type.Dividend, Activity.Type.Fee, Activity.Type.Interest, Activity.Type.FX]:
             effect[self.cash] = self.netAmount
