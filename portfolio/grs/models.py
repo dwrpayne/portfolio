@@ -4,12 +4,9 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import parser
 from decimal import Decimal
-import datetime
 import arrow
-import pandas
-from utils.api import api_response
 
-from finance.models import BaseAccount, BaseClient, BaseRawActivity, Security, SecurityPrice, Activity
+from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, Security
 
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()

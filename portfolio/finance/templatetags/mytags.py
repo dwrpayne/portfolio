@@ -1,15 +1,12 @@
 from django import template
 from django.template.defaultfilters import stringfilter
-from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 register = template.Library()
 
-@register.filter(needs_autoescape=True)
+@register.filter()
 @stringfilter
-def colorize(amount, autoescape=True):
-    if autoescape:
-        value = escape(amount)
+def colorize(amount):
     if '0.00' in amount:
         color = 'black'
     elif '-' in amount:

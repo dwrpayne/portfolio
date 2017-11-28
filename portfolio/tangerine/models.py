@@ -1,14 +1,10 @@
-from django.db import models, transaction
+from django.db import models
 
 import requests
 import tangerine.tangerinelib
 from dateutil import parser
-from decimal import Decimal
-import datetime
-import arrow
-import pandas
 
-from finance.models import BaseAccount, BaseClient, BaseRawActivity, Security, SecurityPrice, Activity
+from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, Security
 
 class TangerineRawActivity(BaseRawActivity):
     day = models.DateField()
@@ -37,12 +33,12 @@ class TangerineRawActivity(BaseRawActivity):
             security = Security.CreateMutualFund(symbol, currency)
 
         if self.type == 'PURCHASES':
-            type = Activity.Type.Buy
+            activity_type = Activity.Type.Buy
         else:
-            type = Activity.Type.Dividend
+            activity_type = Activity.Type.Dividend
             
         return Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty, 
-                        price=self.price, netAmount=self.qty*self.price, type=Activity.Type.Buy, raw=self)
+                        price=self.price, netAmount=self.qty*self.price, type=activity_type, raw=self)
     
 class TangerineAccount(BaseAccount):
     internal_display_name = models.CharField(max_length = 100)

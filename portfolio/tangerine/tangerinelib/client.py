@@ -1,7 +1,6 @@
 from urllib.parse import urlencode, quote
 from . import exceptions
 from .login import TangerineLoginFlow
-import functools
 import datetime
 import contextlib
 import requests

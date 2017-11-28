@@ -1,22 +1,16 @@
-from django.shortcuts import get_object_or_404, render, redirect
-from django.http import HttpResponse, Http404
+from django.shortcuts import redirect, render
+from django.http import HttpResponse
 from django.db.models.aggregates import Sum
-from django.db.models import F, Q, Sum, When, Case, Max, Value
+from django.db.models import F, Q, Sum
 from django.contrib.auth.decorators import login_required
 
 from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, Allocation, Activity
 from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
-import arrow
 import datetime
 from collections import defaultdict
 from decimal import Decimal
-from contextlib import ExitStack
 import plotly
 import plotly.graph_objs as go
-import pandas
-import requests
-from celery import group
-import itertools
 import simplejson
 
 def GetHoldingsContext(user):    
@@ -208,7 +202,7 @@ def index(request):
         ).values_list('day', flat=True)
     if any(day < datetime.date.today() for day in last_update_days):
         context['updating'] = True
-        result = DailyUpdateTask.delay()
+        DailyUpdateTask.delay()
 
     if request.user.is_authenticated:
         return render(request, 'finance/index.html', context)

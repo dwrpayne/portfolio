@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import ManualRawActivity, BaseRawActivity, BaseAccount, BaseClient
+from .models import BaseAccount, BaseClient, ManualRawActivity
 from .models import Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, Allocation
 from .models import UserProfile
 

@@ -1,22 +1,12 @@
-from django.db import models, transaction
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.utils import IntegrityError
+from django.db import models
 from django.utils import timezone
-from django.db.models import F, Max, Q, Sum
-from model_utils import Choices
 
 import requests
-import os
-import sys
-import operator
 from dateutil import parser
 import arrow
-from collections import defaultdict
 import logging 
-import copy
 import datetime
 from decimal import Decimal
-import traceback
 import simplejson
 import threading
 from utils.api import api_response
@@ -24,7 +14,7 @@ from utils.api import api_response
 #logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from finance.models import Holding, Security, SecurityPrice, Currency, ExchangeRate, Activity
+from finance.models import Activity, Security
 from finance.models import BaseRawActivity, BaseAccount, BaseClient
 
 class QuestradeRawActivity(BaseRawActivity):

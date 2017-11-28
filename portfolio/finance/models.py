@@ -1,7 +1,7 @@
 from django.db import models, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from polymorphic.models import PolymorphicModel
-from django.db.models import F, Max, Q, Sum
+from django.db.models import F, Q, Sum
 from django.utils.functional import cached_property
 from django.conf import settings
 
@@ -11,7 +11,6 @@ import datetime
 from model_utils import Choices
 import arrow
 import pandas
-import numpy
 from dateutil import parser
 import requests
 from pandas_datareader import data as pdr

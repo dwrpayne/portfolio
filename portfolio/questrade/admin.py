@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.template.defaultfilters import floatformat
 
 from .models import QuestradeClient, QuestradeAccount, QuestradeRawActivity
 
