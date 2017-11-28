@@ -15,8 +15,10 @@ from dateutil import parser
 import requests
 from pandas_datareader import data as pdr
 
+
 class ActivitySyncException(Exception):
     pass
+
 
 class RateHistoryTableMixin(models.Model):
     """
@@ -28,6 +30,7 @@ class RateHistoryTableMixin(models.Model):
 
     class Meta:
         abstract = True
+
 
 class RateLookupMixin(models.Model):
     """
@@ -115,6 +118,7 @@ class RateLookupMixin(models.Model):
     class Meta:
         abstract = True
 
+
 class Currency(RateLookupMixin):
     code = models.CharField(max_length=3, primary_key=True)
 
@@ -145,6 +149,7 @@ class HoldingView:
         if hasattr(today, 'acc'):
             self.acc = today.acc
 
+
 class SecurityQuerySet(models.query.QuerySet):
     def with_prices(self, user, start_date=None, by_account=False):
         if not start_date:
@@ -159,27 +164,32 @@ class SecurityQuerySet(models.query.QuerySet):
         query = self.filter(holdings__account__client__user=user, holdings__enddate=None,
                             rates__day__gte=start_date, currency__rates__day=F('rates__day')
                             ).annotate(qty=Sum('holdings__qty'), **kwcolumns
-                            ).order_by(*orderby)
+                                       ).order_by(*orderby)
         for s in query:
             s.value = s.price * s.exch * s.qty
         return query
+
 
 class SecurityManager(models.Manager):
     def get_todays_changes(self, user, by_account=False):
         data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
         return list(map(HoldingView, data[::2], data[1::2]))
 
+
 class StockSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
+
 
 class CashSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Cash)
 
+
 class OptionSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Option)
+
 
 class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
@@ -311,6 +321,7 @@ class SecurityPriceManager(models.Manager):
                 val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
         ).values_list(*group_by, 'val')
 
+
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
     objects = SecurityPriceManager()
@@ -325,6 +336,7 @@ class SecurityPrice(RateHistoryTableMixin):
 
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
+
 
 class ExchangeRate(RateHistoryTableMixin):
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name='rates')
@@ -380,7 +392,6 @@ class DataProvider:
         if 'Time Series (Daily)' in json:
             return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
         return []
-
 
     @classmethod
     def GetMorningstarData(cls, lookup, start, end):
@@ -515,7 +526,6 @@ class BaseClient(PolymorphicModel):
         return sum(self._CreateRawActivities(account, start, end) for start, end in date_range)
 
     def Refresh(self):
-        #self.SyncAccounts()
         for account in self.accounts.all():
             new_activities = self.SyncActivities(account)
             # TODO: Better error handling when we can't actually sync new activities from server. Should we still regen here?
@@ -528,6 +538,7 @@ class BaseClient(PolymorphicModel):
 
     def SyncCurrentAccountBalances(self):
         pass
+
 
 class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
@@ -622,6 +633,7 @@ class HoldingManager(models.Manager):
             print("Creating {} {} {} {}".format(security, new_qty, date, None))
             self.create(account=account, security=security, qty=new_qty, startdate=date, enddate=None)
 
+
 class HoldingQuerySet(models.query.QuerySet):
     def current(self):
         return self.filter(enddate=None)
@@ -643,6 +655,7 @@ class HoldingQuerySet(models.query.QuerySet):
             print("HoldingQuerySet filtered out because of missing price data")
             return 0
         return filtered.aggregate(val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price')))['val']
+
 
 class Holding(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE)
@@ -673,6 +686,7 @@ class BaseRawActivity(PolymorphicModel):
     def CreateActivity(self):
         pass
 
+
 class ManualRawActivity(BaseRawActivity):
     day = models.DateField()
     security = models.CharField(max_length=100)
@@ -698,11 +712,12 @@ class ManualRawActivity(BaseRawActivity):
                     security = Security.CreateStock(self.security, self.cash)
 
         a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash+' Cash', qty=self.qty,
-                        price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
+                     price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
 
         if not a.cash_id:
             a.cash = None
         return a
+
 
 class ActivityQuerySet(models.query.QuerySet):
     def dividends(self):
@@ -713,6 +728,7 @@ class ActivityQuerySet(models.query.QuerySet):
 
     def owned_by(self, user):
         return self.filter(account__client__user=user)
+
 
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
@@ -736,7 +752,6 @@ class Activity(models.Model):
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']
 
-
     def __str__(self):
         return "{} - {} - {}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.security, self.qty, self.price, self.type, self.description)
 
@@ -759,6 +774,7 @@ class Activity(models.Model):
             effect[self.security] = self.qty
 
         return effect
+
 
 class AllocationManager(models.Manager):
     def get_rebalance_info(self, user):
@@ -794,7 +810,6 @@ class Allocation(models.Model):
 
     def list_securities(self):
         return ', '.join([s.symbol for s in self.securities.all()])
-
 
 
 class UserProfile(models.Model):

@@ -6,6 +6,7 @@ from .models import BaseAccount, BaseClient, ManualRawActivity
 from .models import Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, Allocation
 from .models import UserProfile
 
+
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
         return getattr(obj, field).normalize()
@@ -13,10 +14,12 @@ def MakeNormalizedFloat(field, desc):
     display.admin_order_field = field
     return display
 
+
 class ManualRawActivityAdmin(admin.ModelAdmin):
     list_display = ['account', 'day', 'type', 'security', 'qty', 'price', 'cash', 'netAmount']
     list_filter = ['account', 'day', 'security', 'type']
 admin.site.register(ManualRawActivity, ManualRawActivityAdmin)
+
 
 class ActivityAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
@@ -34,13 +37,16 @@ class HoldingAdmin(admin.ModelAdmin):
     list_filter = ['account', 'security', 'enddate']
 admin.site.register(Holding, HoldingAdmin)
 
+
 class CurrencyAdmin(admin.ModelAdmin):
     list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn', 'live_price']
 admin.site.register(Currency, CurrencyAdmin)
 
+
 class SecurityAdmin(admin.ModelAdmin):
     def latest_update_day(self, obj):
         return obj.rates.latest().day
+
     def first_update_day(self, obj):
         return obj.rates.earliest().day
     latest_update_day.short_description = "Latest Price"
@@ -48,10 +54,12 @@ class SecurityAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'symbolid', 'type', 'currency', 'live_price', 'first_update_day', 'latest_update_day', 'lookupSymbol', 'description']
 admin.site.register(Security, SecurityAdmin)
 
+
 class SecurityPriceAdmin(admin.ModelAdmin):
     list_display = ['security', 'day', 'price']
     list_filter = ['day', 'security']
 admin.site.register(SecurityPrice, SecurityPriceAdmin)
+
 
 class ExchangeRateAdmin(admin.ModelAdmin):
     list_display = ['currency', 'day', 'price']
@@ -73,6 +81,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     verbose_name_plural = 'User Profile'
+
 
 class UserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline, )

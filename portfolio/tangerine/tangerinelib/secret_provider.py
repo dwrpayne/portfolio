@@ -20,6 +20,7 @@ class InteractiveSecretProvider(SecretProvider):
     """Interactive SecretProvider allows the user to provide secrets
     and answer challenges interactively through a terminal.
     """
+
     def __init__(self, input=input, getpass=getpass.getpass):
         self.input = input
         self.getpass = getpass
@@ -40,6 +41,7 @@ class DictionaryBasedSecretProvider(SecretProvider):
     """Dictionary-based SecretProvider allows the user to provide required
     secrets through a Python dictionary which is more conducive to automation.
     """
+
     def __init__(self, secret_dict: dict):
         self.secret_dict = secret_dict
 

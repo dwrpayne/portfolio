@@ -4,6 +4,7 @@ from .models import *
 from decimal import Decimal
 import unittest
 
+
 def setUpModule():
     Security.objects.all().delete()
     QuestradeClient.objects.all().delete()
@@ -11,6 +12,7 @@ def setUpModule():
     Currency.objects.create(code='CAD', rateLookup='CADBASE')
     Currency.objects.create(code='USD', rateLookup='DEXCAUS')
     #QuestradeClient.CreateClient('test', '123457890')
+
 
 def tearDownModule():
     pass
@@ -36,6 +38,7 @@ class ClientModelTests(TestCase):
         self.client.EnsureSecuritiesExist([38526])
         self.client.EnsureSecuritiesExist([38526, 8049])
         self.assertEqual(len(Security.objects.all()), 2)
+
 
 class ActivityModelTests(TestCase):
     @classmethod
@@ -134,7 +137,6 @@ class AccountModelTests(TestCase):
 
     def test_value_after_4(self):
         self.assertEqual(self.account.GetValueAtDate('2014-07-15'), Decimal('2252.46261'))
-
 
 
 class SecurityModelTests(TestCase):

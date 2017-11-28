@@ -16,8 +16,10 @@ def setUpModule():
     Currency.objects.create(code='USD')
     #QuestradeClient.CreateClient('test', '123457890')
 
+
 def tearDownModule():
     Security.objects.all().delete()
+
 
 class RateLookupMixinTests(TestCase):
     @classmethod
@@ -83,6 +85,7 @@ class RateLookupMixinTests(TestCase):
         count = self.tsla.rates.all().count()
         self.tsla.SyncRates(DataProvider._RetrieveData)
         self.assertEqual(count, self.tsla.rates.all().count())
+
 
 class SecurityModelTests(TestCase):
     @classmethod

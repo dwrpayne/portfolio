@@ -1,11 +1,13 @@
 import functools
 
+
 class APIResponseError(RuntimeError):
     def __init__(self, api_response):
         self.api_response = api_response
 
     def __str__(self):
         return 'The API request did not receive a successful response: {!r}'.format(self.api_response)
+
 
 def api_response(root_key='', check_response_status=True):
     def decorator(fn):

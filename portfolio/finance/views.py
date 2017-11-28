@@ -13,6 +13,7 @@ import plotly
 import plotly.graph_objs as go
 import simplejson
 
+
 def GetHoldingsContext(user):
     total_value = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today())
     total_yesterday = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today() - datetime.timedelta(days=1))
@@ -32,6 +33,7 @@ def GetHoldingsContext(user):
     context = {'security_data': holding_data, 'total': total}
     return context
 
+
 def GetBalanceContext(user):
     accounts = BaseAccount.objects.filter(client__user=user)
     if not accounts.exists():
@@ -49,6 +51,7 @@ def GetBalanceContext(user):
 
     context = {'account_data': account_data, 'total_data': total_data, 'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
+
 
 def GeneratePlot(user):
     pairs = SecurityPrice.objects.get_history(user)
@@ -69,12 +72,12 @@ def GeneratePlot(user):
         total += a
         running_totals.append(total)
 
-
     trace2 = go.Scatter(name='Deposits', x=dates, y=running_totals, mode='lines+markers')
 
     plotly_url = plotly.plotly.plot([trace, trace2], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
     user.userprofile.plotly_url = plotly_url
     user.userprofile.save()
+
 
 @login_required
 def Portfolio(request):
@@ -101,6 +104,7 @@ def Portfolio(request):
     overall_context['plotly_embed_html'] = plotly_html
     return render(request, 'finance/portfolio.html', overall_context)
 
+
 @login_required
 def History(request):
     vals_list = SecurityPrice.objects.get_history(request.user, by_account=True)
@@ -116,6 +120,7 @@ def History(request):
     }
 
     return render(request, 'finance/history.html', context)
+
 
 @login_required
 def Rebalance(request):
@@ -136,6 +141,7 @@ def Rebalance(request):
 
     return render(request, 'finance/rebalance.html', context)
 
+
 @login_required
 def accountdetail(request, account_id):
     account = BaseAccount.objects.get(id=account_id)
@@ -146,6 +152,7 @@ def accountdetail(request, account_id):
 
     context = {'account': account, 'activities': activities}
     return render(request, 'finance/account.html', context)
+
 
 @login_required
 def securitydetail(request, symbol):
@@ -174,7 +181,6 @@ def securitydetail(request, symbol):
         else:
             act.acbchange = -(prevacbpershare) * abs(act.qty)
 
-
         for s, amt in act.GetHoldingEffect().items():
             if s.symbol == symbol:
                 totalqty += amt
@@ -186,11 +192,11 @@ def securitydetail(request, symbol):
         act.totalacb = totalacb
         act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
 
-
     pendinggain = security.live_price_cad*totalqty - totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/security.html', context)
+
 
 @login_required
 def index(request):

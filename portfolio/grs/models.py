@@ -8,6 +8,7 @@ import arrow
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, Security
 
+
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
@@ -27,6 +28,7 @@ class GrsRawActivity(BaseRawActivity):
         return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty,
                         price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
 
+
 class GrsAccount(BaseAccount):
     plan_data = models.CharField(max_length=100)
 
@@ -35,6 +37,7 @@ class GrsAccount(BaseAccount):
 
     def __repr__(self):
         return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
+
 
 class GrsClient(BaseClient):
     username = models.CharField(max_length=32)
@@ -67,14 +70,13 @@ class GrsClient(BaseClient):
                 if created: count += 1
         return count
 
-
     def _GetRawPrices(self, lookup, start_date, end_date):
         print("_GetRawPrices... {} {} {}".format(lookup.lookupSymbol, start_date, end_date))
         for start, end in arrow.Arrow.interval('day', arrow.get(start_date), arrow.get(end_date), 15):
             response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
-                data={'PlanFund': lookup.lookupSymbol, 'PlanDetail': '', 'BodyTitle': '',
-                    'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
+                                         data={'PlanFund': lookup.lookupSymbol, 'PlanDetail': '', 'BodyTitle': '',
+                                               'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
+                                         headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
                 )
             soup = BeautifulSoup(response.text, 'html.parser')
             table_header = soup.find('tr', class_='table-header')

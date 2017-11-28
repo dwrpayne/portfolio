@@ -19,6 +19,8 @@ from django.contrib import admin
 
 
 from django.http import Http404
+
+
 def show404(request):
     raise Http404("Page does not exist")
 

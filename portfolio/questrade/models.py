@@ -4,18 +4,15 @@ from django.utils import timezone
 import requests
 from dateutil import parser
 import arrow
-import logging
 import datetime
 from decimal import Decimal
 import simplejson
 import threading
 from utils.api import api_response
 
-#logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 from finance.models import Activity, Security
 from finance.models import BaseRawActivity, BaseAccount, BaseClient
+
 
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
@@ -116,7 +113,6 @@ class QuestradeRawActivity(BaseRawActivity):
         if json['currency'] == json['symbol']:
             json['symbol'] = None
 
-
         if json['symbol']:
             try:
                 json['security'] = Security.objects.get(symbol=json['symbol'])
@@ -141,6 +137,7 @@ class QuestradeRawActivity(BaseRawActivity):
         activity = Activity(**create_args)
         return activity
 
+
 class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
@@ -158,6 +155,7 @@ class QuestradeAccount(BaseAccount):
     @property
     def yesterday_balance(self):
         return self.sodBalanceSynced
+
 
 class QuestradeClient(BaseClient):
     username = models.CharField(max_length=32)
@@ -341,6 +339,7 @@ sarah_tfsa_data = [
 
 from finance.models import ManualRawActivity
 
+
 def AddManualRawActivity():
     ManualRawActivity.objects.all().delete()
     for account_id, data in [
@@ -350,14 +349,14 @@ def AddManualRawActivity():
         account = BaseAccount.objects.get(id=account_id)
         for date, type, security, cash, price, qty, netAmount, description in data:
             act = ManualRawActivity(day=parser.parse(date),
-                security=security,
-                type=type,
-                cash=cash,
-                qty=qty if qty else '0',
-                price=price if price else '0',
-                netAmount=netAmount if netAmount else '0',
-                description=description,
-                account=account)
+                                    security=security,
+                                    type=type,
+                                    cash=cash,
+                                    qty=qty if qty else '0',
+                                    price=price if price else '0',
+                                    netAmount=netAmount if netAmount else '0',
+                                    description=description,
+                                    account=account)
 
             act.save()
             b = act.CreateActivity()

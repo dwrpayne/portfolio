@@ -6,6 +6,7 @@ from dateutil import parser
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, Security
 
+
 class TangerineRawActivity(BaseRawActivity):
     day = models.DateField()
     description = models.CharField(max_length=1000)
@@ -40,6 +41,7 @@ class TangerineRawActivity(BaseRawActivity):
         return Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
                         price=self.price, netAmount=self.qty*self.price, type=activity_type, raw=self)
 
+
 class TangerineAccount(BaseAccount):
     internal_display_name = models.CharField(max_length=100)
     account_balance = models.DecimalField(max_digits=16, decimal_places=6)
@@ -53,6 +55,7 @@ class TangerineAccount(BaseAccount):
     @property
     def cur_balance(self):
         return self.account_balance
+
 
 class TangerineClient(BaseClient):
     username = models.CharField(max_length=32)
@@ -78,7 +81,7 @@ class TangerineClient(BaseClient):
 
     def Authorize(self):
         secrets_dict = {'username': self.username, 'password': self.password,
-        'security_questions': {
+                        'security_questions': {
             self.securityq1: self.securitya1,
             self.securityq2: self.securitya2,
             self.securityq3: self.securitya3}}
