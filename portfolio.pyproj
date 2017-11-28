@@ -170,6 +170,8 @@
     <Folder Include="utils\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include=".env" />
+    <Content Include=".gitignore" />
     <Content Include="finance\templates\finance\base.html" />
     <Content Include="finance\templates\finance\security.html" />
     <Content Include="finance\templates\finance\account.html" />
@@ -177,6 +179,10 @@
     <Content Include="finance\templates\finance\navigation.html" />
     <Content Include="grs\templates\index.html" />
     <Content Include="finance\templates\registration\login.html" />
+    <Content Include="Pipfile" />
+    <Content Include="Pipfile.lock" />
+    <Content Include="Procfile" />
+    <Content Include="Procfile.local" />
     <Content Include="questrade\fixtures\initialholdings.json" />
     <Content Include="questrade\migrations\__pycache__\0001_initial.cpython-36.pyc" />
     <Content Include="questrade\migrations\__pycache__\0002_auto_20171014_2357.cpython-36.pyc" />
@@ -217,7 +223,6 @@
     <Content Include="questrade\__pycache__\utils.cpython-36.pyc" />
     <Content Include="questrade\__pycache__\views.cpython-36.pyc" />
     <Content Include="questrade\__pycache__\__init__.cpython-36.pyc" />
-    <Content Include="requirements.txt" />
     <Content Include="tangerine\tangerinelib\VERSION" />
     <Content Include="tangerine\tangerinelib\__pycache__\client.cpython-36.pyc" />
     <Content Include="tangerine\tangerinelib\__pycache__\exceptions.cpython-36.pyc" />
