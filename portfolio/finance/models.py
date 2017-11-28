@@ -40,7 +40,7 @@ class RateLookupMixin(models.Model):
 
     @property
     def earliest_price_needed(self):
-        return datetime.date(2009,1,1)
+        return datetime.date(2009, 1, 1)
 
     @property
     def latest_price_needed(self):
@@ -73,7 +73,7 @@ class RateLookupMixin(models.Model):
 
     @live_price.setter
     def live_price(self, value):
-        self.rates.update_or_create(day=datetime.date.today(), defaults={'price':value})
+        self.rates.update_or_create(day=datetime.date.today(), defaults={'price': value})
 
     def _ProcessRateData(self, data, end_date):
         if isinstance(data, pandas.DataFrame):
@@ -89,7 +89,7 @@ class RateLookupMixin(models.Model):
             data = pandas.Series(prices, index=dates, dtype='float64')
 
         data = data.sort_index()
-        index = pandas.DatetimeIndex(start = min(data.index), end=end_date, freq='D').date
+        index = pandas.DatetimeIndex(start=min(data.index), end=end_date, freq='D').date
         data = data.reindex(index).ffill()
         return data.iteritems()
 
@@ -100,14 +100,14 @@ class RateLookupMixin(models.Model):
         """
         start, end = self.GetShouldSyncRange()
         if start is None:
-            print ('Already synced data for {}, skipping.'.format(self.lookupSymbol))
+            print('Already synced data for {}, skipping.'.format(self.lookupSymbol))
             return []
 
         data = self._ProcessRateData(retriever_fn(self, start, end), end)
 
         with transaction.atomic():
             for day, price in data:
-                self.rates.update_or_create(day=day, defaults={'price':price})
+                self.rates.update_or_create(day=day, defaults={'price': price})
 
     def GetRateOnDay(self, day):
         return self.rates.get(day=day).price
@@ -146,11 +146,11 @@ class HoldingView:
             self.acc = today.acc
 
 class SecurityQuerySet(models.query.QuerySet):
-    def with_prices(self, user, start_date=None, by_account = False):
+    def with_prices(self, user, start_date=None, by_account=False):
         if not start_date:
             start_date = datetime.date.today()
 
-        kwcolumns = {'day' : F('rates__day'), 'price' : F('rates__price'), 'exch' : F('currency__rates__price')}
+        kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'), 'exch': F('currency__rates__price')}
         orderby = ['symbol', 'day']
         if by_account:
             kwcolumns['acc'] = F('holdings__account')
@@ -211,20 +211,20 @@ class Security(RateLookupMixin):
     @classmethod
     def CreateStock(cls, symbol, currency_str):
         return Security.objects.create(
-            symbol = symbol,
-            type = cls.Type.Stock,
-            currency_id = currency_str,
-            lookupSymbol = symbol
+            symbol=symbol,
+            type=cls.Type.Stock,
+            currency_id=currency_str,
+            lookupSymbol=symbol
         )
         return security
 
     @classmethod
     def CreateMutualFund(cls, symbol, currency_str):
         return Security.objects.create(
-            symbol = symbol,
-            type = cls.Type.MutualFund,
-            currency_id = currency_str,
-            lookupSymbol = symbol
+            symbol=symbol,
+            type=cls.Type.MutualFund,
+            currency_id=currency_str,
+            lookupSymbol=symbol
         )
         return security
 
@@ -238,9 +238,9 @@ class Security(RateLookupMixin):
         currency_str is the 3 digit currency code
         """
         return Security.objects.create(
-            symbol = optsymbol,
-            type = cls.Type.Option,
-            currency_id = currency_str
+            symbol=optsymbol,
+            type=cls.Type.Option,
+            currency_id=currency_str
             )
 
     @classmethod
@@ -254,11 +254,11 @@ class Security(RateLookupMixin):
         """
         optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime('%y%m%d'), callput[0], Decimal(strike)*1000)
         option, created = Security.objects.get_or_create(
-            symbol = optsymbol,
-            defaults = {
-            'description' : "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
-            'type' : cls.Type.Option,
-            'currency_id' : currency_str
+            symbol=optsymbol,
+            defaults={
+            'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
+            'type': cls.Type.Option,
+            'currency_id': currency_str
             })
         return option
 
@@ -299,7 +299,7 @@ class SecurityPriceManager(models.Manager):
             query = query.filter(day__gte=startdate)
 
         history = query.filter(
-            Q(security__holdings__enddate__gte=F('day'))|Q(security__holdings__enddate=None),
+            Q(security__holdings__enddate__gte=F('day')) | Q(security__holdings__enddate=None),
             security__holdings__account__client__user=user,
             security__holdings__startdate__lte=F('day'),
             security__currency__rates__day=F('day'))
@@ -342,7 +342,7 @@ class ExchangeRate(RateHistoryTableMixin):
 
 
 class DataProvider:
-    FAKED_VALS = {'DLR.U.TO':10.}
+    FAKED_VALS = {'DLR.U.TO': 10.}
 
     @classmethod
     def _FakeData(cls, lookup, start, end):
@@ -352,7 +352,7 @@ class DataProvider:
     @classmethod
     def _RetrievePandasData(cls, lookup, start, end):
         """ Returns a list of tuples (day, price) """
-        FAKED_VALS = {'DLR.U.TO':10.}
+        FAKED_VALS = {'DLR.U.TO': 10.}
         if lookup.lookupSymbol in cls.FAKED_VALS:
             index = pandas.date_range(start, end, freq='D').date
             return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
@@ -367,18 +367,18 @@ class DataProvider:
 
     @classmethod
     def GetAlphaVantageData(cls, lookup, start, end):
-        fake = {'DLR.U.TO':10., 'CAD':1.}
+        fake = {'DLR.U.TO': 10., 'CAD': 1.}
         if lookup.lookupSymbol in fake:
             index = pandas.date_range(start, end, freq='D').date
             return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        params={'function':'TIME_SERIES_DAILY', 'symbol':lookup.lookupSymbol, 'apikey':'P38D2XH1GFHST85V'}
+        params = {'function': 'TIME_SERIES_DAILY', 'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
         if (end - start).days > 100: params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
         json = r.json()
         if 'Time Series (Daily)' in json:
-            return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day,vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
+            return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
         return []
 
 
@@ -396,7 +396,7 @@ class DataProvider:
     @classmethod
     def GetLiveStockPrice(cls, symbol):
         symbol = symbol.split('.')[0]
-        params={'function':'TIME_SERIES_INTRADAY', 'symbol':symbol, 'apikey':'P38D2XH1GFHST85V', 'interval':'1min'}
+        params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': symbol, 'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
         r = requests.get('https://www.alphavantage.co/query', params=params)
         json = r.json()
         price = Decimal(0)
@@ -432,7 +432,7 @@ class DataProvider:
             stock.SyncRates(cls.GetAlphaVantageData)
 
         for option in Security.options.all():
-            option.SyncRates(lambda l,s,e: option.activities.values_list('tradeDate', 'price').distinct('tradeDate'))
+            option.SyncRates(lambda l, s, e: option.activities.values_list('tradeDate', 'price').distinct('tradeDate'))
 
         for fund in Security.mutualfunds.all():
             try:
@@ -454,12 +454,12 @@ class DataProvider:
             Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
 
-        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id':'2f666e800586440088f5fc22d688f520', 'symbols':'CAD'})
+        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
         Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
 
 
 class BaseClient(PolymorphicModel):
-    user = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clients')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clients')
     display_name = models.CharField(max_length=100, null=True)
 
     @property
@@ -511,7 +511,7 @@ class BaseClient(PolymorphicModel):
 
         date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
 
-        print ('Syncing all activities for {} in {} chunks.'.format(account, len(date_range)))
+        print('Syncing all activities for {} in {} chunks.'.format(account, len(date_range)))
         return sum(self._CreateRawActivities(account, start, end) for start, end in date_range)
 
     def Refresh(self):
@@ -532,7 +532,7 @@ class BaseClient(PolymorphicModel):
 class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
-    id = models.CharField(max_length=100, primary_key = True)
+    id = models.CharField(max_length=100, primary_key=True)
     taxable = models.BooleanField()
 
     class Meta:
@@ -589,7 +589,7 @@ class BaseAccount(PolymorphicModel):
         return self.holding_set.current().value_as_of(datetime.date.today())
 
     def GetDividendsInYear(self, year):
-        sum(account.activities.dividends().in_year(year).values_list('netAmount',flat=True))
+        sum(account.activities.dividends().in_year(year).values_list('netAmount', flat=True))
 
 
 class HoldingManager(models.Manager):
@@ -619,8 +619,8 @@ class HoldingManager(models.Manager):
 
         new_qty = previous_qty+qty_delta
         if new_qty:
-            print ("Creating {} {} {} {}".format(security, new_qty, date, None))
-            self.create(account=account,security=security, qty=new_qty, startdate=date, enddate=None)
+            print("Creating {} {} {} {}".format(security, new_qty, date, None))
+            self.create(account=account, security=security, qty=new_qty, startdate=date, enddate=None)
 
 class HoldingQuerySet(models.query.QuerySet):
     def current(self):
@@ -642,7 +642,7 @@ class HoldingQuerySet(models.query.QuerySet):
         if not filtered:
             print("HoldingQuerySet filtered out because of missing price data")
             return 0
-        return filtered.aggregate( val = Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price')) )['val']
+        return filtered.aggregate(val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price')))['val']
 
 class Holding(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE)
@@ -706,7 +706,7 @@ class ManualRawActivity(BaseRawActivity):
 
 class ActivityQuerySet(models.query.QuerySet):
     def dividends(self):
-        return self.filter(type = Activity.Type.Dividend)
+        return self.filter(type=Activity.Type.Dividend)
 
     def in_year(self, year):
         return self.filter(tradeDate__year=year)
@@ -771,7 +771,7 @@ class AllocationManager(models.Manager):
             alloc.current_pct = alloc.current_amt / total_value
             alloc.desired_amt = alloc.desired_pct * total_value
             alloc.buysell = alloc.desired_amt - alloc.current_amt
-        allocs.sort(key=lambda a:a.desired_pct, reverse=True)
+        allocs.sort(key=lambda a: a.desired_pct, reverse=True)
 
         missing = [s for s in securities if not s.allocation_set.exists()]
         for s in missing:

@@ -41,7 +41,7 @@ class TangerineRawActivity(BaseRawActivity):
                         price=self.price, netAmount=self.qty*self.price, type=activity_type, raw=self)
 
 class TangerineAccount(BaseAccount):
-    internal_display_name = models.CharField(max_length = 100)
+    internal_display_name = models.CharField(max_length=100)
     account_balance = models.DecimalField(max_digits=16, decimal_places=6)
 
     def __str__(self):
@@ -77,11 +77,11 @@ class TangerineClient(BaseClient):
         return r.json()
 
     def Authorize(self):
-        secrets_dict = {'username':self.username, 'password':self.password,
+        secrets_dict = {'username': self.username, 'password': self.password,
         'security_questions': {
-            self.securityq1:self.securitya1,
-            self.securityq2:self.securitya2,
-            self.securityq3:self.securitya3} }
+            self.securityq1: self.securitya1,
+            self.securityq2: self.securitya2,
+            self.securityq3: self.securitya3}}
 
         secrets = tangerine.tangerinelib.DictionaryBasedSecretProvider(secrets_dict)
         self.client = tangerine.tangerinelib.TangerineClient(secrets)
@@ -90,7 +90,7 @@ class TangerineClient(BaseClient):
         with self.client.login():
             accounts = self.client.list_accounts()
             for a in accounts:
-                TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={'type':a['description'], 'internal_display_name':a['display_name'], 'account_balance':a['account_balance']})
+                TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={'type': a['description'], 'internal_display_name': a['display_name'], 'account_balance': a['account_balance']})
 
     def _CreateRawActivities(self, account, start, end):
         with self.client.login():
@@ -98,12 +98,12 @@ class TangerineClient(BaseClient):
             count = 0
             for trans in transactions:
                 obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'], account=account, defaults={
-                    'day' : parser.parse(trans['transaction_date']).date(),
-                    'description' : trans['description'],
-                    'type' : trans['mutual_fund']['transaction_type'],
-                    'security' : trans['mutual_fund']['portfolio_name'],
-                    'qty' : trans['mutual_fund']['units'],
-                    'price' : trans['mutual_fund']['unit_price']
+                    'day': parser.parse(trans['transaction_date']).date(),
+                    'description': trans['description'],
+                    'type': trans['mutual_fund']['transaction_type'],
+                    'security': trans['mutual_fund']['portfolio_name'],
+                    'qty': trans['mutual_fund']['units'],
+                    'price': trans['mutual_fund']['unit_price']
                     })
                 if created: count += 1
             return count

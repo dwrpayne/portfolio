@@ -55,7 +55,7 @@ class GrsClient(BaseClient):
         self.session.close()
 
     def _CreateRawActivities(self, account, start, end):
-        response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId':account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'})
+        response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'})
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date() for tag in soup.find_all('td', class_='activities-d-lit1')]
         units = [Decimal(tag.contents[0]) for tag in soup.find_all('td', class_='activities-d-unitnum')]
@@ -72,9 +72,9 @@ class GrsClient(BaseClient):
         print("_GetRawPrices... {} {} {}".format(lookup.lookupSymbol, start_date, end_date))
         for start, end in arrow.Arrow.interval('day', arrow.get(start_date), arrow.get(end_date), 15):
             response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
-                data={'PlanFund': lookup.lookupSymbol, 'PlanDetail':'', 'BodyTitle':'',
-                    'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit':'Submit'},
-                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0' }
+                data={'PlanFund': lookup.lookupSymbol, 'PlanDetail': '', 'BodyTitle': '',
+                    'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
                 )
             soup = BeautifulSoup(response.text, 'html.parser')
             table_header = soup.find('tr', class_='table-header')

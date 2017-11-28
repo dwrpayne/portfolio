@@ -13,7 +13,7 @@ def colorize(amount):
         color = 'red'
     else:
         color = 'green'
-    return mark_safe('<font color="{}">{}</font>'.format(color,amount))
+    return mark_safe('<font color="{}">{}</font>'.format(color, amount))
 
 @register.filter()
 def currency(dollars):

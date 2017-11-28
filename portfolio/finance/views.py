@@ -26,10 +26,10 @@ def GetHoldingsContext(user):
         for account_view in view.account_data:
             account_view.percent = account_view.value_CAD / total_value * 100
 
-    holding_data.sort(key=lambda h:h.value_CAD, reverse=True)
+    holding_data.sort(key=lambda h: h.value_CAD, reverse=True)
 
     total = [(total_gain, total_gain / total_value, total_value)]
-    context = {'security_data':holding_data, 'total':total}
+    context = {'security_data': holding_data, 'total': total}
     return context
 
 def GetBalanceContext(user):
@@ -37,9 +37,9 @@ def GetBalanceContext(user):
     if not accounts.exists():
         return {}
 
-    account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance, a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in accounts ]
+    account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance, a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in accounts]
 
-    names,ids, sod,cur,cur_cash,change = list(zip(*account_data))
+    names, ids, sod, cur, cur_cash, change = list(zip(*account_data))
 
     total_data = [('Total', sum(sod), sum(cur), sum(cur_cash), sum(change))]
 
@@ -47,7 +47,7 @@ def GetBalanceContext(user):
     exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
     exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
 
-    context = {'account_data':account_data, 'total_data':total_data, 'exchange_live':exchange_live, 'exchange_delta':exchange_delta }
+    context = {'account_data': account_data, 'total_data': total_data, 'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
 
 def GeneratePlot(user):
@@ -57,7 +57,7 @@ def GeneratePlot(user):
 
     deposits = Activity.objects.filter(account__client__user=user)
     f = Q(type=Activity.Type.Deposit)
-    if user.username=='amie':
+    if user.username == 'amie':
         f = f | Q(type=Activity.Type.Transfer) | Q(type=Activity.Type.Buy)
 
     deposits = deposits.filter(f).values_list('tradeDate', 'netAmount')
@@ -106,9 +106,9 @@ def History(request):
     vals_list = SecurityPrice.objects.get_history(request.user, by_account=True)
     accounts = BaseAccount.objects.filter(client__user=request.user)
     ids = accounts.values_list('id', flat=True)
-    rows = defaultdict(lambda:{id:0 for id in ids})
-    for d,a,v in reversed(vals_list):
-        rows[d][a]=v
+    rows = defaultdict(lambda: {id: 0 for id in ids})
+    for d, a, v in reversed(vals_list):
+        rows[d][a] = v
 
     context = {
         'names': [a.display_name for a in accounts],
@@ -131,7 +131,7 @@ def Rebalance(request):
     context = {
         'allocs': allocs,
         'missing': missing,
-        'total' : total
+        'total': total
     }
 
     return render(request, 'finance/rebalance.html', context)
@@ -144,7 +144,7 @@ def accountdetail(request, account_id):
 
     activities = list(account.activities.all())
 
-    context = {'account':account, 'activities':activities}
+    context = {'account': account, 'activities': activities}
     return render(request, 'finance/account.html', context)
 
 @login_required
@@ -176,7 +176,7 @@ def securitydetail(request, symbol):
 
 
         for s, amt in act.GetHoldingEffect().items():
-            if s.symbol==symbol:
+            if s.symbol == symbol:
                 totalqty += amt
 
         act.totalqty = totalqty
@@ -189,7 +189,7 @@ def securitydetail(request, symbol):
 
     pendinggain = security.live_price_cad*totalqty - totalacb
 
-    context = {'activities':activities, 'symbol':symbol, 'pendinggain': pendinggain}
+    context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/security.html', context)
 
 @login_required

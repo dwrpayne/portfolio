@@ -64,7 +64,7 @@ class QuestradeRawActivity(BaseRawActivity):
                    ('Interest', '   '): Activity.Type.Interest
                    }
         if (type, action) in mapping: return mapping[(type, action)]
-        print ('No action type mapping for "{}" "{}"'.format(type, action))
+        print('No action type mapping for "{}" "{}"'.format(type, action))
         return Activity.Type.NotImplemented
 
     def GetCleanedJson(self):
@@ -82,22 +82,22 @@ class QuestradeRawActivity(BaseRawActivity):
 
         # Hack to fix invalid Questrade data just for me
         if not json['symbolId'] and not json['symbol']:
-            if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol']='XIU.TO'
-            elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol']='VUG'
-            elif 'SMALLCAP GROWTH ETF' in json['description']:             json['symbol']='VBK'
-            elif 'SMALL-CAP VALUE ETF' in json['description']:             json['symbol']='VBR'
-            elif 'ISHARES MSCI EAFE INDEX' in json['description']:         json['symbol']='XIN.TO'
-            elif 'AMERICAN CAPITAL AGENCY CORP' in json['description']:    json['symbol']='AGNC'
-            elif 'MSCI JAPAN INDEX FD' in json['description']:             json['symbol']='EWJ'
-            elif 'VANGUARD EMERGING' in json['description']:               json['symbol']='VWO'
-            elif 'VANGUARD MID-CAP GROWTH' in json['description']:         json['symbol']='VOT'
-            elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol']='XBB.TO'
-            elif 'ELECTRONIC ARTS INC' in json['description']:             json['symbol']='EA'
-            elif 'WESTJET AIRLINES' in json['description']:                json['symbol']='WJA.TO'
+            if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol'] = 'XIU.TO'
+            elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol'] = 'VUG'
+            elif 'SMALLCAP GROWTH ETF' in json['description']:             json['symbol'] = 'VBK'
+            elif 'SMALL-CAP VALUE ETF' in json['description']:             json['symbol'] = 'VBR'
+            elif 'ISHARES MSCI EAFE INDEX' in json['description']:         json['symbol'] = 'XIN.TO'
+            elif 'AMERICAN CAPITAL AGENCY CORP' in json['description']:    json['symbol'] = 'AGNC'
+            elif 'MSCI JAPAN INDEX FD' in json['description']:             json['symbol'] = 'EWJ'
+            elif 'VANGUARD EMERGING' in json['description']:               json['symbol'] = 'VWO'
+            elif 'VANGUARD MID-CAP GROWTH' in json['description']:         json['symbol'] = 'VOT'
+            elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol'] = 'XBB.TO'
+            elif 'ELECTRONIC ARTS INC' in json['description']:             json['symbol'] = 'EA'
+            elif 'WESTJET AIRLINES' in json['description']:                json['symbol'] = 'WJA.TO'
 
         if json['symbol'] == 'TWMJF': json['symbol'] = 'WEED.TO'
 
-        if json['action'] =='FXT':
+        if json['action'] == 'FXT':
             if 'AS OF ' in json['description']:
                 tradeDate = arrow.get(json['tradeDate'])
 
@@ -130,7 +130,7 @@ class QuestradeRawActivity(BaseRawActivity):
     def CreateActivity(self):
         json = self.GetCleanedJson()
 
-        create_args = {'account' : self.account, 'raw' : self}
+        create_args = {'account': self.account, 'raw': self}
         for item in ['description', 'tradeDate', 'type', 'security']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
@@ -179,7 +179,7 @@ class QuestradeClient(BaseClient):
         """ Check if we should refresh this questrade token. At time of writing their API docs state the access token is good for 30 minutes."""
         if not self.token_expiry: return True
         if not self.access_token: return True
-        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 600)) # We need refresh if we are less than 10 minutes from expiry.
+        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600)) # We need refresh if we are less than 10 minutes from expiry.
 
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
@@ -193,7 +193,7 @@ class QuestradeClient(BaseClient):
                 self.api_server = json['api_server'] + 'v1/'
                 self.refresh_token = json['refresh_token']
                 self.access_token = json['access_token']
-                self.token_expiry = timezone.now() + datetime.timedelta(seconds = json['expires_in'])
+                self.token_expiry = timezone.now() + datetime.timedelta(seconds=json['expires_in'])
                 # Make sure to save out to DB
                 self.save()
 
@@ -224,7 +224,7 @@ class QuestradeClient(BaseClient):
             json = self._GetRequest('accounts/{}/activities'.format(account.id), {'startTime': start.isoformat(), 'endTime': end.isoformat()})
         except:
             return 0
-        print( "Get activities from source returned: " + simplejson.dumps(json))
+        print("Get activities from source returned: " + simplejson.dumps(json))
         count = 0
         for activity_json in json['activities']:
             if QuestradeRawActivity.Add(activity_json, account):
@@ -233,7 +233,7 @@ class QuestradeClient(BaseClient):
 
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
-            json = self._GetRequest('accounts/%s/balances'%(a.id))
+            json = self._GetRequest('accounts/%s/balances' % (a.id))
             a.curBalanceSynced = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             a.sodBalanceSynced = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
             a.save()
@@ -331,7 +331,7 @@ rrsp_activity_data = [
 ('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', ''),
 ]
 
-sarah_tfsa_data= [
+sarah_tfsa_data = [
     ('1/1/2011', 'Deposit', 'VBR', 'USD', '0', '90', '', 'Faked past history - fix this with real data'),
     ('1/1/2011', 'Deposit', 'XSB.TO', 'CAD', '0', '85', '', 'Faked past history - fix this with real data'),
     ('1/1/2011', 'Deposit', 'XIN.TO', 'CAD', '0', '140', '', 'Faked past history - fix this with real data'),
@@ -349,7 +349,7 @@ def AddManualRawActivity():
         (51424829, rrsp_activity_data)]:
         account = BaseAccount.objects.get(id=account_id)
         for date, type, security, cash, price, qty, netAmount, description in data:
-            act=ManualRawActivity(day=parser.parse(date),
+            act = ManualRawActivity(day=parser.parse(date),
                 security=security,
                 type=type,
                 cash=cash,
