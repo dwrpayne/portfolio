@@ -80,7 +80,8 @@ class RateLookupMixin(models.Model):
 
     def _ProcessRateData(self, data, end_date):
         if isinstance(data, pandas.DataFrame):
-            if data.empty: return []
+            if data.empty:
+                return []
             data = pandas.Series(data[self.lookupColumn], data.index)
         else:
             # Expect iterator of day, price pairs
@@ -318,7 +319,8 @@ class SecurityPriceManager(models.Manager):
             security__currency__rates__day=F('day'))
 
         group_by = ['day']
-        if by_account: group_by.append('security__holdings__account')
+        if by_account:
+            group_by.append('security__holdings__account')
 
         return history.values(*group_by).order_by(*group_by).annotate(
                 val=Sum(F('price')*F('security__holdings__qty')
@@ -389,7 +391,8 @@ class DataProvider:
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
         params = {'function': 'TIME_SERIES_DAILY',
             'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
-        if (end - start).days > 100: params['outputsize'] = 'full'
+        if (end - start).days > 100:
+            params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
         json = r.json()
         if 'Time Series (Daily)' in json:
@@ -525,8 +528,10 @@ class BaseClient(PolymorphicModel):
         Returns the number of new raw activities created.
         """
         start = account.GetMostRecentActivityDate()
-        if start: start = arrow.get(start).shift(days=+1)
-        else: start = arrow.get('2011-02-01')
+        if start:
+            start = arrow.get(start).shift(days=+1)
+        else:
+            start = arrow.get('2011-02-01')
 
         date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
 

@@ -60,7 +60,8 @@ class QuestradeRawActivity(BaseRawActivity):
                    ('Dividends', 'NRT'): Activity.Type.Dividend,
                    ('Interest', '   '): Activity.Type.Interest
                    }
-        if (type, action) in mapping: return mapping[(type, action)]
+        if (type, action) in mapping:
+            return mapping[(type, action)]
         print('No action type mapping for "{}" "{}"'.format(type, action))
         return Activity.Type.NotImplemented
 
