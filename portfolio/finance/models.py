@@ -174,7 +174,7 @@ class SecurityQuerySet(models.query.QuerySet):
 
 class SecurityManager(models.Manager):
     def get_todays_changes(self, user, by_account=False):
-        data = self.with_prices(user, datetime.date.today() - \
+        data = self.with_prices(user, datetime.date.today() -
                                 datetime.timedelta(days=1), by_account)
         return list(map(HoldingView, data[::2], data[1::2]))
 
