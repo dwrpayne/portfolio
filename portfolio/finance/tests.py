@@ -31,11 +31,11 @@ class RateLookupMixinTests(TestCase):
     def check_process_rate_data_extend(self, input):
         data = self.tsla._ProcessRateData(input, datetime.date(2014,1,7))
         self.assertEqual(len(list(data)), 7)
-        
+
     def check_process_rate_data_ffill(self, input):
         data = self.tsla._ProcessRateData(input, datetime.date(2014,1,6))
         self.assertIn((datetime.date(2014,1,5),15), list(data))
-        
+
     def check_process_rate_data_works(self, input):
         data = self.tsla._ProcessRateData(input, datetime.date(2014,1,6))
         self.assertIn((datetime.date(2014,1,1),12), list(data))
@@ -43,19 +43,19 @@ class RateLookupMixinTests(TestCase):
     def test_process_rate_data_iterator_extend(self):
         pairs = [(datetime.date(2014,1,1),12),  (datetime.date(2014,1,2),13),   (datetime.date(2014,1,4),15),  (datetime.date(2014,1,6),19)]
         self.check_process_rate_data_extend(pairs)
-        
+
     def test_process_rate_data_iterator_ffill(self):
         pairs = [(datetime.date(2014,1,1),12),  (datetime.date(2014,1,2),13),   (datetime.date(2014,1,4),15),  (datetime.date(2014,1,6),19)]
         self.check_process_rate_data_ffill(pairs)
-        
+
     def test_process_rate_data_iterator_works(self):
         pairs = [(datetime.date(2014,1,1),12),  (datetime.date(2014,1,2),13),   (datetime.date(2014,1,4),15),  (datetime.date(2014,1,6),19)]
         self.check_process_rate_data_works(pairs)
-          
+
     def test_process_rate_data_dataframe_extend(self):
         frame = pandas.DataFrame({'open':[10,20,30,40], 'Close':[12,13,15,19], 'vol':[100,200,300,400]}, [datetime.date(2014,1,1), datetime.date(2014,1,2), datetime.date(2014,1,4), datetime.date(2014,1,6)])
         self.check_process_rate_data_extend(frame)
-          
+
     def test_process_rate_data_dataframe_ffill(self):
         frame = pandas.DataFrame({'open':[10,20,30,40], 'Close':[12,13,15,19], 'vol':[100,200,300,400]}, [datetime.date(2014,1,1), datetime.date(2014,1,2), datetime.date(2014,1,4), datetime.date(2014,1,6)])
         self.check_process_rate_data_ffill(frame)
@@ -69,7 +69,7 @@ class RateLookupMixinTests(TestCase):
         yield datetime.date(2014,1,2),13
         yield datetime.date(2014,1,4),15
         yield datetime.date(2014,1,6),19
-                
+
     def test_sync_rates_extending(self):
         self.tsla.SyncRates(self.get_data)
         self.assertEqual(self.tsla.rates.all().count(), (datetime.date.today() - datetime.date(2014,1,1)).days+1)
@@ -101,5 +101,5 @@ class SecurityModelTests(TestCase):
 
     def test_manager_stocks(self):
         self.assertEqual(len(Security.stocks.all()), 3)
-        
-            
+
+

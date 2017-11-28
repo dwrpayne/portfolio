@@ -4,7 +4,7 @@ from django.utils import timezone
 import requests
 from dateutil import parser
 import arrow
-import logging 
+import logging
 import datetime
 from decimal import Decimal
 import simplejson
@@ -19,23 +19,23 @@ from finance.models import BaseRawActivity, BaseAccount, BaseClient
 
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
-    
+
     class Meta:
         unique_together = ('baserawactivity_ptr', 'jsonstr')
         verbose_name_plural = 'Questrade Raw Activities'
-        
+
     def __str__(self):
         return self.jsonstr
-      
+
     @classmethod
-    def AllowDuplicate(cls, s):        
+    def AllowDuplicate(cls, s):
         # Hack to support actual duplicate transactions (no disambiguation available)
         return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
 
-    @classmethod 
+    @classmethod
     def Add(cls, json, account):
         """ Returns true if we added a new activity to the DB, false if it already existed. """
-        s = simplejson.dumps(json)        
+        s = simplejson.dumps(json)
         obj, created = QuestradeRawActivity.objects.get_or_create(jsonstr=s, account=account)
         if not created and cls.AllowDuplicate(s):
             s = s.replace('YOUR ACCOUNT   ', 'YOUR ACCOUNT X2')
@@ -66,13 +66,13 @@ class QuestradeRawActivity(BaseRawActivity):
         if (type, action) in mapping: return mapping[(type, action)]
         print ('No action type mapping for "{}" "{}"'.format(type, action))
         return Activity.Type.NotImplemented
-  
+
     def GetCleanedJson(self):
         json = simplejson.loads(self.jsonstr)
 
         if json['grossAmount'] == None:
             json['grossAmount'] = 0
-            
+
         # Handle Options cleanup
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
             callput, symbol, expiry, strike = json['description'].split()[:4]
@@ -80,7 +80,7 @@ class QuestradeRawActivity(BaseRawActivity):
             security = Security.CreateOption(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
 
-        # Hack to fix invalid Questrade data just for me   
+        # Hack to fix invalid Questrade data just for me
         if not json['symbolId'] and not json['symbol']:
             if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol']='XIU.TO'
             elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol']='VUG'
@@ -93,10 +93,10 @@ class QuestradeRawActivity(BaseRawActivity):
             elif 'VANGUARD MID-CAP GROWTH' in json['description']:         json['symbol']='VOT'
             elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol']='XBB.TO'
             elif 'ELECTRONIC ARTS INC' in json['description']:             json['symbol']='EA'
-            elif 'WESTJET AIRLINES' in json['description']:                json['symbol']='WJA.TO'   
-            
+            elif 'WESTJET AIRLINES' in json['description']:                json['symbol']='WJA.TO'
+
         if json['symbol'] == 'TWMJF': json['symbol'] = 'WEED.TO'
-            
+
         if json['action'] =='FXT':
             if 'AS OF ' in json['description']:
                 tradeDate = arrow.get(json['tradeDate'])
@@ -112,42 +112,42 @@ class QuestradeRawActivity(BaseRawActivity):
         json['type'] = self.GetActivityType(json['type'], json['action'])
         json['qty'] = json['quantity']
         del json['quantity']
-                        
+
         if json['currency'] == json['symbol']:
             json['symbol'] = None
 
-            
+
         if json['symbol']:
-            try: 
+            try:
                 json['security'] = Security.objects.get(symbol=json['symbol'])
             except:
                 json['security'] = Security.CreateStock(json['symbol'], json['currency'])
         else:
             json['security'] = None
-            
+
         return json
-        
-    def CreateActivity(self): 
+
+    def CreateActivity(self):
         json = self.GetCleanedJson()
-                
+
         create_args = {'account' : self.account, 'raw' : self}
         for item in ['description', 'tradeDate', 'type', 'security']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
-            create_args[item] = Decimal(str(json[item])) 
-            
+            create_args[item] = Decimal(str(json[item]))
+
         create_args['cash_id'] = json['currency']+' Cash'
-            
+
         activity = Activity(**create_args)
-        return activity     
+        return activity
 
 class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
-            
+
     def __str__(self):
         return "{} {} {}".format(self.client, self.id, self.type)
-    
+
     def __repr__(self):
         return 'QuestradeAccount<{},{},{}>'.format(self.client, self.id, self.type)
 
@@ -158,15 +158,15 @@ class QuestradeAccount(BaseAccount):
     @property
     def yesterday_balance(self):
         return self.sodBalanceSynced
-                
-class QuestradeClient(BaseClient):    
+
+class QuestradeClient(BaseClient):
     username = models.CharField(max_length=32)
     refresh_token = models.CharField(max_length=100)
     access_token = models.CharField(max_length=100, null=True, blank=True)
     api_server = models.CharField(max_length=100, null=True, blank=True)
     token_expiry = models.DateTimeField(null=True, blank=True)
     authorization_lock = threading.Lock()
-                    
+
     def __repr__(self):
         return "QuestradeClient<{}>".format(self.display_name)
 
@@ -180,7 +180,7 @@ class QuestradeClient(BaseClient):
         if not self.token_expiry: return True
         if not self.access_token: return True
         return self.token_expiry < (timezone.now() - datetime.timedelta(seconds = 600)) # We need refresh if we are less than 10 minutes from expiry.
-    
+
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
 
@@ -199,7 +199,7 @@ class QuestradeClient(BaseClient):
 
         self.session = requests.Session()
         self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
-        
+
     def CloseSession(self):
         self.session.close()
 
@@ -207,7 +207,7 @@ class QuestradeClient(BaseClient):
         r = self.session.get(self.api_server + url, params=params)
         r.raise_for_status()
         return r.json()
-        
+
     @api_response('accounts')
     def GetAccounts(self):
         return self._GetRequest('accounts')
@@ -217,7 +217,7 @@ class QuestradeClient(BaseClient):
             QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
 
         AddManualRawActivity()
-        
+
     def _CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0, microsecond=0)
         try:
@@ -233,7 +233,7 @@ class QuestradeClient(BaseClient):
 
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
-            json = self._GetRequest('accounts/%s/balances'%(a.id))           
+            json = self._GetRequest('accounts/%s/balances'%(a.id))
             a.curBalanceSynced = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             a.sodBalanceSynced = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
             a.save()
@@ -349,14 +349,14 @@ def AddManualRawActivity():
         (51424829, rrsp_activity_data)]:
         account = BaseAccount.objects.get(id=account_id)
         for date, type, security, cash, price, qty, netAmount, description in data:
-            act=ManualRawActivity(day=parser.parse(date), 
-                security=security, 
-                type=type, 
+            act=ManualRawActivity(day=parser.parse(date),
+                security=security,
+                type=type,
                 cash=cash,
-                qty=qty if qty else '0', 
-                price=price if price else '0', 
-                netAmount=netAmount if netAmount else '0', 
-                description=description, 
+                qty=qty if qty else '0',
+                price=price if price else '0',
+                netAmount=netAmount if netAmount else '0',
+                description=description,
                 account=account)
 
             act.save()

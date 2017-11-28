@@ -14,7 +14,7 @@ def SyncClientAccountBalances(client_id):
     from .models import BaseClient
     with BaseClient.objects.get(pk=client_id) as client:
         client.SyncCurrentAccountBalances()
-    
+
 @shared_task
 def LiveSecurityUpdateTask():
     from .models import DataProvider
@@ -24,7 +24,7 @@ def LiveSecurityUpdateTask():
 def LiveExchangeUpdateTask():
     from .models import DataProvider
     DataProvider.SyncAllExchangeRates()
-    
+
 @shared_task
 def DailyUpdateTask():
     from .models import DataProvider
@@ -35,4 +35,4 @@ def GetLiveUpdateTaskGroup(user):
     tasks = [LiveSecurityUpdateTask.si()]
     tasks += [SyncClientAccountBalances.s(client.id) for client in user.clients.all()]
     return group(tasks)
-    
+

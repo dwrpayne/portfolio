@@ -35,11 +35,11 @@ class ClientModelTests(TestCase):
     def test_make_security_preexisting(self):
         self.client.EnsureSecuritiesExist([38526])
         self.client.EnsureSecuritiesExist([38526,8049])
-        self.assertEqual(len(Security.objects.all()), 2)        
+        self.assertEqual(len(Security.objects.all()), 2)
 
 class ActivityModelTests(TestCase):
     @classmethod
-    def setUpClass(cls): 
+    def setUpClass(cls):
         cls.cad = Currency.objects.get(code='CAD')
         cls.vti = Security.objects.create(symbol='VTI', currency_id='USD')
         json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
@@ -60,16 +60,16 @@ class ActivityModelTests(TestCase):
 
     def test_buy_quantity(self):
         self.assertEqual(self.buy.qty,11)
-                
+
     def test_buy_price(self):
         self.assertEqual(self.buy.price,Decimal('87.12'))
 
     def test_buy_effect_cash(self):
         self.assertEqual(self.buy.GetHoldingEffect()['CashUSD'], Decimal('-958.32'))
-        
+
     def test_dep_effect_cash_2(self):
         self.assertNotIn('USD', self.dep.GetHoldingEffect())
-        
+
     def test_buy_effect_stock(self):
         self.assertEqual(self.buy.GetHoldingEffect()['VTI'], 11)
 
@@ -81,25 +81,25 @@ class ActivityModelTests(TestCase):
 
     def test_dep_quantity(self):
         self.assertEqual(self.dep.qty,0)
-                
+
     def test_dep_price(self):
         self.assertEqual(self.dep.price,0)
 
     def test_dep_effect_cash(self):
         self.assertEqual(self.dep.GetHoldingEffect()['CashCAD'], 1000)
-        
+
     def test_dep_effect_cash_2(self):
         self.assertNotIn('CAD', self.dep.GetHoldingEffect())
 
     def test_dep_security(self):
         self.assertEqual(self.dep.security, self.cad)
-        
+
 
 class AccountModelTests(TestCase):
     @classmethod
     def setUpClass(cls):
         c = QuestradeClient.objects.create(username='test', refresh_token='test_token')
-        cls.account = QuestradeAccount.objects.create(client=c, id=0, type='')        
+        cls.account = QuestradeAccount.objects.create(client=c, id=0, type='')
         Security.objects.create(symbol='VTI', currency_id='USD')
         DataProvider.SyncAllSecurities()
         json={'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
@@ -122,7 +122,7 @@ class AccountModelTests(TestCase):
 
     def test_value_before(self):
         self.assertEqual(self.account.GetValueAtDate('2011-01-01'), 0)
-        
+
     def test_value_after_1(self):
         self.assertEqual(self.account.GetValueAtDate('2013-07-15'), 1000)
 
@@ -135,7 +135,7 @@ class AccountModelTests(TestCase):
     def test_value_after_4(self):
         self.assertEqual(self.account.GetValueAtDate('2014-07-15'), Decimal('2252.46261'))
 
-        
+
 
 class SecurityModelTests(TestCase):
     @classmethod
@@ -156,37 +156,37 @@ class SecurityModelTests(TestCase):
 
     def test_manager_stocks(self):
         self.assertEqual(len(Security.stocks.all()), 3)
-        
-            
+
+
 class DataProviderTests(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.cad = Currency.objects.get(code='CAD')
         cls.usd = Currency.objects.get(code='USD')
-        cls.tsla = Security.objects.create(symbol='TSLA', currency_id='USD')        
+        cls.tsla = Security.objects.create(symbol='TSLA', currency_id='USD')
         DataProvider.SyncAllSecurities()
 
     @classmethod
-    def tearDownClass(cls):   
-        Currency.objects.all().delete()     
+    def tearDownClass(cls):
+        Currency.objects.all().delete()
         Security.objects.all().delete()
         ExchangeRate.objects.all().delete()
-        
+
     def test_exchange_rates_holiday(self):
         self.assertEqual( DataProvider.GetExchangeRate('USD', '2015-01-01'), Decimal('1.160100') )
 
     def test_exchange_rates_normal_1(self):
         self.assertEqual( DataProvider.GetExchangeRate('USD', '2014-12-31'), Decimal('1.160100') )
-        
+
     def test_exchange_rates_normal_2(self):
         self.assertEqual( DataProvider.GetExchangeRate('USD', '2014-12-30'), Decimal('1.159700') )
-        
+
     def test_exchange_rates_up_to_date(self):
         self.assertTrue( datetime.date.today() - self.usd.GetLatestEntry() < datetime.timedelta(days=14))
-        
+
     def test_stock_price_up_to_date(self):
         self.assertTrue( datetime.date.today() - self.tsla.GetLatestEntry() < datetime.timedelta(days=5))
-        
+
     def test_stock_price_holiday(self):
         self.assertEqual( self.tsla.GetPrice('2015-01-01'), Decimal('222.41') )
 

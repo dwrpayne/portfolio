@@ -50,7 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django_celery_results',
     'django_celery_beat',
-    
+
 ]
 
 SENTRY_DSN = 'https://c0e0ce1a5e2d44c782de20861b36a0cb:c430a68a5fbe48559bf744a92b52a212@sentry.io/249441'

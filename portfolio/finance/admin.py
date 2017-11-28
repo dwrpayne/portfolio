@@ -13,26 +13,26 @@ def MakeNormalizedFloat(field, desc):
     display.admin_order_field = field
     return display
 
-class ManualRawActivityAdmin(admin.ModelAdmin):    
-    list_display = ['account', 'day', 'type', 'security', 'qty', 'price', 'cash', 'netAmount']    
-    list_filter = ['account', 'day', 'security', 'type']   
+class ManualRawActivityAdmin(admin.ModelAdmin):
+    list_display = ['account', 'day', 'type', 'security', 'qty', 'price', 'cash', 'netAmount']
+    list_filter = ['account', 'day', 'security', 'type']
 admin.site.register(ManualRawActivity, ManualRawActivityAdmin)
 
-class ActivityAdmin(admin.ModelAdmin):    
+class ActivityAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     display_price = MakeNormalizedFloat('price', 'Price')
 
     list_display = ['account', 'tradeDate', 'type', 'security', 'display_qty', 'display_price', 'cash', 'netAmount']
-    list_filter = ['account', 'tradeDate', ('security', admin.RelatedOnlyFieldListFilter), 'type', ('cash', admin.RelatedOnlyFieldListFilter)]        
+    list_filter = ['account', 'tradeDate', ('security', admin.RelatedOnlyFieldListFilter), 'type', ('cash', admin.RelatedOnlyFieldListFilter)]
     search_fields = ['description']
 admin.site.register(Activity, ActivityAdmin)
 
-    
+
 class HoldingAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     list_display = ['account', 'security', 'display_qty', 'startdate', 'enddate']
-    list_filter = ['account', 'security', 'enddate']      
-admin.site.register(Holding, HoldingAdmin)    
+    list_filter = ['account', 'security', 'enddate']
+admin.site.register(Holding, HoldingAdmin)
 
 class CurrencyAdmin(admin.ModelAdmin):
     list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn', 'live_price']
@@ -44,25 +44,25 @@ class SecurityAdmin(admin.ModelAdmin):
     def first_update_day(self, obj):
         return obj.rates.earliest().day
     latest_update_day.short_description = "Latest Price"
-    list_filter = ['currency', 'type']      
+    list_filter = ['currency', 'type']
     list_display = ['symbol', 'symbolid', 'type', 'currency', 'live_price', 'first_update_day', 'latest_update_day', 'lookupSymbol', 'description']
 admin.site.register(Security, SecurityAdmin)
 
 class SecurityPriceAdmin(admin.ModelAdmin):
     list_display = ['security', 'day', 'price']
-    list_filter = ['day', 'security']        
+    list_filter = ['day', 'security']
 admin.site.register(SecurityPrice, SecurityPriceAdmin)
 
 class ExchangeRateAdmin(admin.ModelAdmin):
     list_display = ['currency', 'day', 'price']
-    list_filter = ['day', 'currency']        
+    list_filter = ['day', 'currency']
 admin.site.register(ExchangeRate, ExchangeRateAdmin)
 
 
 admin.site.register(BaseAccount)
 admin.site.register(BaseClient)
 
-    
+
 class AllocationAdmin(admin.ModelAdmin):
     list_display = ['user', 'desired_pct', 'list_securities']
 
@@ -73,7 +73,7 @@ class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
     verbose_name_plural = 'User Profile'
-    
+
 class UserAdmin(BaseUserAdmin):
     inlines = (UserProfileInline, )
 

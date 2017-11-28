@@ -14,7 +14,7 @@ def colorize(amount):
     else:
         color = 'green'
     return mark_safe('<font color="{}">{}</font>'.format(color,amount))
-    
+
 @register.filter()
 def currency(dollars):
     prefix = "" if dollars > -0.004 else "-"

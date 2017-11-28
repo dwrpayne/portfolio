@@ -13,13 +13,13 @@ import plotly
 import plotly.graph_objs as go
 import simplejson
 
-def GetHoldingsContext(user):    
+def GetHoldingsContext(user):
     total_value = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today())
     total_yesterday = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today() - datetime.timedelta(days=1))
     total_gain = total_value - total_yesterday
-    
-    holding_data = Security.objects.get_todays_changes(user)    
-    account_data = Security.objects.get_todays_changes(user, True)    
+
+    holding_data = Security.objects.get_todays_changes(user)
+    account_data = Security.objects.get_todays_changes(user, True)
     for view in holding_data:
         view.percent = view.value_CAD / total_value * 100
         view.account_data = [d for d in account_data if d.symbol == view.symbol]
@@ -27,7 +27,7 @@ def GetHoldingsContext(user):
             account_view.percent = account_view.value_CAD / total_value * 100
 
     holding_data.sort(key=lambda h:h.value_CAD, reverse=True)
-            
+
     total = [(total_gain, total_gain / total_value, total_value)]
     context = {'security_data':holding_data, 'total':total}
     return context
@@ -36,7 +36,7 @@ def GetBalanceContext(user):
     accounts = BaseAccount.objects.filter(client__user=user)
     if not accounts.exists():
         return {}
-   
+
     account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance, a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in accounts ]
 
     names,ids, sod,cur,cur_cash,change = list(zip(*account_data))
@@ -73,7 +73,7 @@ def GeneratePlot(user):
     trace2 = go.Scatter(name='Deposits', x=dates, y=running_totals, mode='lines+markers')
 
     plotly_url = plotly.plotly.plot([trace, trace2], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
-    user.userprofile.plotly_url = plotly_url    
+    user.userprofile.plotly_url = plotly_url
     user.userprofile.save()
 
 @login_required
@@ -82,7 +82,7 @@ def Portfolio(request):
         GeneratePlot(request.user)
 
     plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(request.user.userprofile.plotly_url)
-    if request.is_ajax():        
+    if request.is_ajax():
         if 'refresh-live' in request.GET:
             result = GetLiveUpdateTaskGroup(request.user)()
             result.get()
@@ -145,7 +145,7 @@ def accountdetail(request, account_id):
     activities = list(account.activities.all())
 
     context = {'account':account, 'activities':activities}
-    return render(request, 'finance/account.html', context)    
+    return render(request, 'finance/account.html', context)
 
 @login_required
 def securitydetail(request, symbol):
@@ -174,23 +174,23 @@ def securitydetail(request, symbol):
         else:
             act.acbchange = -(prevacbpershare) * abs(act.qty)
 
-                                
+
         for s, amt in act.GetHoldingEffect().items():
             if s.symbol==symbol:
                 totalqty += amt
-        
-        act.totalqty = totalqty     
+
+        act.totalqty = totalqty
 
         totalacb += act.acbchange
         totalacb = max(0, totalacb)
         act.totalacb = totalacb
         act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
 
-    
+
     pendinggain = security.live_price_cad*totalqty - totalacb
 
     context = {'activities':activities, 'symbol':symbol, 'pendinggain': pendinggain}
-    return render(request, 'finance/security.html', context)    
+    return render(request, 'finance/security.html', context)
 
 @login_required
 def index(request):

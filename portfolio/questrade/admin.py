@@ -4,7 +4,7 @@ from .models import QuestradeClient, QuestradeAccount, QuestradeRawActivity
 
 class QuestradeRawActivityAdmin(admin.ModelAdmin):
     list_display = ['account', 'jsonstr']
-    list_filter = ['account']      
+    list_filter = ['account']
     search_fields = ['jsonstr']
 admin.site.register(QuestradeRawActivity, QuestradeRawActivityAdmin)
 
