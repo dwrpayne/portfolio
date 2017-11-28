@@ -92,7 +92,7 @@ class GrsClient(BaseClient):
                 values = [tag.contents[0]
                           for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
                 for date, value in zip(dates, values):
-                    if not 'Unknown' in value:
+                    if 'Unknown' not in value:
                         yield parser.parse(date).date(), Decimal(value[1:])
         return
 

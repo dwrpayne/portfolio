@@ -98,7 +98,7 @@ class RateLookupMixin(models.Model):
         return data.iteritems()
 
     def SyncRates(self, retriever_fn):
-        """ 
+        """
         retriever_fn is the function that will retrieve the rates.
         It gets passed (lookup, start, end) and is expected to return an iterator of (day, price) pairs or a pandas dataframe
         """
@@ -166,7 +166,7 @@ class SecurityQuerySet(models.query.QuerySet):
         query = self.filter(holdings__account__client__user=user, holdings__enddate=None,
                             rates__day__gte=start_date, currency__rates__day=F('rates__day')
                             ).annotate(qty=Sum('holdings__qty'), **kwcolumns
-                                       ).order_by(*orderby)
+                            ).order_by(*orderby)
         for s in query:
             s.value = s.price * s.exch * s.qty
         return query
@@ -229,7 +229,6 @@ class Security(RateLookupMixin):
             currency_id=currency_str,
             lookupSymbol=symbol
         )
-        return security
 
     @classmethod
     def CreateMutualFund(cls, symbol, currency_str):
@@ -239,7 +238,6 @@ class Security(RateLookupMixin):
             currency_id=currency_str,
             lookupSymbol=symbol
         )
-        return security
 
     @classmethod
     def CreateOptionRaw(cls, optsymbol, currency_str):
@@ -254,7 +252,7 @@ class Security(RateLookupMixin):
             symbol=optsymbol,
             type=cls.Type.Option,
             currency_id=currency_str
-            )
+        )
 
     @classmethod
     def CreateOption(cls, callput, symbol, expiry, strike, currency_str):
@@ -266,7 +264,7 @@ class Security(RateLookupMixin):
         currency_str is the 3 digit currency code
         """
         optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
-            '%y%m%d'), callput[0], Decimal(strike)*1000)
+            '%y%m%d'), callput[0], Decimal(strike) * 1000)
         option, created = Security.objects.get_or_create(
             symbol=optsymbol,
             defaults={
@@ -323,8 +321,8 @@ class SecurityPriceManager(models.Manager):
             group_by.append('security__holdings__account')
 
         return history.values(*group_by).order_by(*group_by).annotate(
-                val=Sum(F('price')*F('security__holdings__qty')
-                        * F('security__currency__rates__price'))
+                val=Sum(F('price') * F('security__holdings__qty') *
+                    F('security__currency__rates__price'))
         ).values_list(*group_by, 'val')
 
 
@@ -613,7 +611,7 @@ class BaseAccount(PolymorphicModel):
         return self.holding_set.current().value_as_of(datetime.date.today())
 
     def GetDividendsInYear(self, year):
-        sum(account.activities.dividends().in_year(year).values_list('netAmount', flat=True))
+        sum(self.activities.dividends().in_year(year).values_list('netAmount', flat=True))
 
 
 class HoldingManager(models.Manager):
@@ -633,7 +631,7 @@ class HoldingManager(models.Manager):
             current_holding = self.get(security=security, enddate=None)
             current_holding.enddate = date - datetime.timedelta(days=1)
             previous_qty = current_holding.qty
-            #print ("Updated old {} enddate({}) prev {}".format(security, current_holding.enddate, previous_qty))
+            # print ("Updated old {} enddate({}) prev {}".format(security, current_holding.enddate, previous_qty))
             current_holding.save(update_fields=['enddate'])
 
         except Holding.MultipleObjectsReturned:
@@ -641,7 +639,7 @@ class HoldingManager(models.Manager):
         except Holding.DoesNotExist:
             pass
 
-        new_qty = previous_qty+qty_delta
+        new_qty = previous_qty + qty_delta
         if new_qty:
             print("Creating {} {} {} {}".format(security, new_qty, date, None))
             self.create(account=account, security=security,
@@ -726,7 +724,8 @@ class ManualRawActivity(BaseRawActivity):
                 else:
                     security = Security.CreateStock(self.security, self.cash)
 
-        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, cash_id=self.cash+' Cash', qty=self.qty,
+        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, 
+                     cash_id=self.cash + ' Cash', qty=self.qty,
                      price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
 
         if not a.cash_id:

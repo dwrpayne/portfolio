@@ -39,7 +39,7 @@ class TangerineRawActivity(BaseRawActivity):
             activity_type = Activity.Type.Dividend
 
         return Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
-                        price=self.price, netAmount=self.qty*self.price, type=activity_type, raw=self)
+                        price=self.price, netAmount=self.qty * self.price, type=activity_type, raw=self)
 
 
 class TangerineAccount(BaseAccount):

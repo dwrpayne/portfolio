@@ -1,6 +1,5 @@
 from django.shortcuts import redirect, render
 from django.http import HttpResponse
-from django.db.models.aggregates import Sum
 from django.db.models import F, Q, Sum
 from django.contrib.auth.decorators import login_required
 
@@ -41,7 +40,7 @@ def GetBalanceContext(user):
         return {}
 
     account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance,
-                     a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in accounts]
+                     a.cur_cash_balance, a.cur_balance - a.yesterday_balance) for a in accounts]
 
     names, ids, sod, cur, cur_cash, change = list(zip(*account_data))
 
@@ -182,8 +181,7 @@ def securitydetail(request, symbol):
 
         act.capgain = 0
         if act.qty < 0:
-            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - \
-                           ((prevacbpershare) * abs(act.qty))
+            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - ((prevacbpershare) * abs(act.qty))
 
         if act.qty > 0:
             act.acbchange = act.cadprice * act.qty + act.commission
@@ -201,7 +199,7 @@ def securitydetail(request, symbol):
         act.totalacb = totalacb
         act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
 
-    pendinggain = security.live_price_cad*totalqty - totalacb
+    pendinggain = security.live_price_cad * totalqty - totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/security.html', context)
@@ -211,7 +209,7 @@ def securitydetail(request, symbol):
 def index(request):
     context = {}
     last_update_days = SecurityPrice.objects.filter(
-            day__gt=datetime.date.today()-datetime.timedelta(days=30)
+            day__gt=datetime.date.today() - datetime.timedelta(days=30)
         ).order_by('security', '-day').distinct('security').filter(
             security__holdings__enddate=None, security__holdings__account__client__user=request.user
         ).values_list('day', flat=True)

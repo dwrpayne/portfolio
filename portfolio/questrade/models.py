@@ -11,7 +11,7 @@ import threading
 from utils.api import api_response
 
 from finance.models import Activity, Security
-from finance.models import BaseRawActivity, BaseAccount, BaseClient
+from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
 
 
 class QuestradeRawActivity(BaseRawActivity):
@@ -68,7 +68,7 @@ class QuestradeRawActivity(BaseRawActivity):
     def GetCleanedJson(self):
         json = simplejson.loads(self.jsonstr)
 
-        if json['grossAmount'] == None:
+        if json['grossAmount'] is None:
             json['grossAmount'] = 0
 
         # Handle Options cleanup
@@ -100,8 +100,8 @@ class QuestradeRawActivity(BaseRawActivity):
                 tradeDate = arrow.get(json['tradeDate'])
 
                 asof = arrow.get(json['description'].split('AS OF ')[1].split(' ')[0], 'MM/DD/YY')
-                #print("FXT Transaction at {} (asof date: {}). Timedelta is {}".format(tradeDate, asof, tradeDate-asof))
-                if (tradeDate-asof).days > 365:
+                # print("FXT Transaction at {} (asof date: {}). Timedelta is {}".format(tradeDate, asof, tradeDate-asof))
+                if (tradeDate - asof).days > 365:
                     asof = asof.shift(years=+1)
 
                 json['tradeDate'] = tradeDate.replace(
@@ -134,7 +134,7 @@ class QuestradeRawActivity(BaseRawActivity):
         for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item]))
 
-        create_args['cash_id'] = json['currency']+' Cash'
+        create_args['cash_id'] = json['currency'] + ' Cash'
 
         activity = Activity(**create_args)
         return activity
@@ -245,96 +245,96 @@ class QuestradeClient(BaseClient):
 
 
 tfsa_activity_data = [
-('6/3/2009', 'Deposit', '', 'CAD', '', '', '1000', ''),
-('6/8/2009', 'Deposit', '', 'CAD', '', '', '4000', ''),
-('6/15/2009', 'Buy', 'GE', 'CAD', '13.73', '150', '-2299.38', 'CONV TO CAD @ 1.1138 %US PREM'),
-('6/15/2009', 'Buy', 'IGR', 'CAD', '5.25', '200', '-1175', 'CONV TO CAD @ 1.1138 %US PREM'),
-('6/15/2009', 'Buy', 'VUG', 'CAD', '44.58', '30', '-1495.11', 'CONV TO CAD @ 1.1138 %US PREM'),
-('6/15/2009', 'Sell', 'GE    090718C00014000', 'CAD',
- '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
-('6/30/2009', 'Dividend', 'IGR', 'CAD', '', '', '8.82', 'CONVERT TO CAD @ 1.15350'),
-('6/30/2009', 'Dividend', 'VUG', 'CAD', '', '', '4.27', 'CONVERT TO CAD @ 1.15350'),
-('7/7/2009', 'Buy', 'EA    090721C00021000', 'CAD', '', '1', '-94.33', 'CONV TO CAD @1.1653 %US PREM'),
-('7/17/2009', 'Expiry', 'GE    090718C00014000', 'CAD', '', '1', '', ''),
-('7/17/2009', 'Expiry', 'EA    090721C00021000', 'CAD', '', '-1', '', ''),
-('7/27/2009', 'Dividend', 'GE', 'CAD', '', '', '13.69', 'CONVERT TO CAD @ 1.07400'),
-('7/31/2009', 'Dividend', 'IGR', 'CAD', '', '', '8.2', 'CONVERT TO CAD @ 1.07250'),
-('8/10/2009', 'Sell', 'GE', 'CAD', '14', '-50', '740.48', 'CONV TO CAD @1.0654 %US PREM'),
-('8/10/2009', 'Sell', 'IGR', 'CAD', '6.08', '-200', '1290.21', 'CONV TO CAD @1.0654 %US PREM'),
-('8/10/2009', 'Buy', 'IGR', 'CAD', '6.07', '100', '-651.97', 'CONV TO CAD @1.0654 %US PREM'),
-('8/10/2009', 'Buy', 'WJA.TO', 'CAD', '10.69', '100', '-1073.95', ''),
-('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.5', ''),
-('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.03', ''),
-('8/25/2009', 'Buy', 'HXU.TO', 'CAD', '15.36', '20', '-312.22', ''),
-('8/31/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.15', 'CONVERT TO CAD @ 1.08750'),
-('9/10/2009', 'Sell', 'HXU.TO', 'CAD', '16.12', '-20', '317.38', ''),
-('9/18/2009', 'Fee', '', 'CAD', '', '', '-2.5', ''),
-('9/18/2009', 'Fee', '', 'CAD', '', '', '-0.13', ''),
-('9/21/2009', 'Sell', 'GE', 'CAD', '16.722', '-100', '1785.64', 'CONV TO CAD @1.071 %US PREM'),
-('9/21/2009', 'Buy', 'VBK', 'CAD', '57.75', '34', '-2108.21', 'CONV TO CAD @1.071 %US PREM'),
-('9/30/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.06', 'CONVERT TO CAD @ 1.06250'),
-('9/30/2009', 'Dividend', 'VUG', 'CAD', '', '30', '3.85', 'CONVERT TO CAD @ 1.06250'),
-('10/14/2009', 'Fee', '', 'CAD', '', '', '-1.5', ''),
-('10/14/2009', 'Fee', '', 'CAD', '', '', '-0.08', ''),
-('10/30/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.09', 'CONVERT TO CAD @ 1.07100'),
-('11/30/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.01', 'CONVERT TO CAD @ 1.04850'),
-('12/7/2009', 'Buy', 'ECA.TO', 'CAD', '56.13', '33', '-1857.36', ''),
-('12/7/2009', 'Sell', 'ECA.TO', 'CAD', '56.24', '-33', '1850.85', ''),
-('12/7/2009', 'Sell', 'IGR', 'CAD', '6.14', '-100', '643.38', 'CONV'),
-('12/7/2009', 'Buy', 'MCD', 'CAD', '62.91', '28', '-1866.06', 'CONV TO CAD @1.0564 %US PREM'),
-('12/7/2009', 'Sell', 'WJA.TO', 'CAD', '12', '-100', '1195.05', ''),
-('12/11/2009', 'Sell', 'MCD', 'CAD', '58.9', '-1', '58.9', 'CONV TO CAD @1.058 %US PREM'),
-('12/29/2009', 'Dividend', 'VUG', 'CAD', '', '30', '4.72', 'CONVERT TO CAD @ 1.03600'),
-('12/31/2009', 'Dividend', 'VBK', 'CAD', '', '34', '6.87', 'CONVERT TO CAD @ 1.03900'),
-('1/5/2010', 'Deposit', '', 'CAD', '', '', '5000', ''),
-('1/11/2010', 'Buy', 'VUG', 'CAD', '45.08', '88', '-4941.21', 'CONV TO CAD @1.0372 %US PREM'),
-('1/29/2010', 'Buy', 'ATVI', 'CAD', '10.08', '175', '-1888.71', 'CONV TO CAD @1.0677 %US PREM'),
-('1/29/2010', 'Sell', 'MCD', 'CAD', '63.39', '-27', '1822.08', 'CONV TO CAD @1.0677 %US PREM'),
-('3/31/2010', 'Dividend', 'VUG', 'CAD', '', '118', '14.67', 'CONVERT TO CAD @ 1.00850'),
-('4/5/2010', 'Dividend', 'ATVI', 'CAD', '', '175', '22.27', 'CONVERT TO CAD @ 0.99800'),
-('6/30/2010', 'Dividend', 'VUG', 'USD', '', '118', '14.94', ''),
-('9/30/2010', 'Dividend', 'VUG', 'USD', '', '118', '20.36', ''),
-('11/12/2010', 'Sell', 'ATVI', 'USD', '', '-175', '2065.28', ''),
-('11/15/2010', 'Buy', 'AGNC', 'USD', '', '70', '-2051.05', ''),
-('12/15/2010', 'Fee', '', 'CAD', '', '', '4.95', ''),
-('12/31/2010', 'Dividend', 'VBK', 'USD', '', '', '10.41', ''),
-('12/31/2010', 'Dividend', 'VUG', 'USD', '', '', '20.36', ''),
-('1/27/2011', 'Dividend', 'AGNC', 'USD', '', '', '83.3', ''),
- ]
+    ('6/3/2009', 'Deposit', '', 'CAD', '', '', '1000', ''),
+    ('6/8/2009', 'Deposit', '', 'CAD', '', '', '4000', ''),
+    ('6/15/2009', 'Buy', 'GE', 'CAD', '13.73', '150', '-2299.38', 'CONV TO CAD @ 1.1138 %US PREM'),
+    ('6/15/2009', 'Buy', 'IGR', 'CAD', '5.25', '200', '-1175', 'CONV TO CAD @ 1.1138 %US PREM'),
+    ('6/15/2009', 'Buy', 'VUG', 'CAD', '44.58', '30', '-1495.11', 'CONV TO CAD @ 1.1138 %US PREM'),
+    ('6/15/2009', 'Sell', 'GE    090718C00014000', 'CAD',
+     '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
+    ('6/30/2009', 'Dividend', 'IGR', 'CAD', '', '', '8.82', 'CONVERT TO CAD @ 1.15350'),
+    ('6/30/2009', 'Dividend', 'VUG', 'CAD', '', '', '4.27', 'CONVERT TO CAD @ 1.15350'),
+    ('7/7/2009', 'Buy', 'EA    090721C00021000', 'CAD', '', '1', '-94.33', 'CONV TO CAD @1.1653 %US PREM'),
+    ('7/17/2009', 'Expiry', 'GE    090718C00014000', 'CAD', '', '1', '', ''),
+    ('7/17/2009', 'Expiry', 'EA    090721C00021000', 'CAD', '', '-1', '', ''),
+    ('7/27/2009', 'Dividend', 'GE', 'CAD', '', '', '13.69', 'CONVERT TO CAD @ 1.07400'),
+    ('7/31/2009', 'Dividend', 'IGR', 'CAD', '', '', '8.2', 'CONVERT TO CAD @ 1.07250'),
+    ('8/10/2009', 'Sell', 'GE', 'CAD', '14', '-50', '740.48', 'CONV TO CAD @1.0654 %US PREM'),
+    ('8/10/2009', 'Sell', 'IGR', 'CAD', '6.08', '-200', '1290.21', 'CONV TO CAD @1.0654 %US PREM'),
+    ('8/10/2009', 'Buy', 'IGR', 'CAD', '6.07', '100', '-651.97', 'CONV TO CAD @1.0654 %US PREM'),
+    ('8/10/2009', 'Buy', 'WJA.TO', 'CAD', '10.69', '100', '-1073.95', ''),
+    ('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.5', ''),
+    ('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.03', ''),
+    ('8/25/2009', 'Buy', 'HXU.TO', 'CAD', '15.36', '20', '-312.22', ''),
+    ('8/31/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.15', 'CONVERT TO CAD @ 1.08750'),
+    ('9/10/2009', 'Sell', 'HXU.TO', 'CAD', '16.12', '-20', '317.38', ''),
+    ('9/18/2009', 'Fee', '', 'CAD', '', '', '-2.5', ''),
+    ('9/18/2009', 'Fee', '', 'CAD', '', '', '-0.13', ''),
+    ('9/21/2009', 'Sell', 'GE', 'CAD', '16.722', '-100', '1785.64', 'CONV TO CAD @1.071 %US PREM'),
+    ('9/21/2009', 'Buy', 'VBK', 'CAD', '57.75', '34', '-2108.21', 'CONV TO CAD @1.071 %US PREM'),
+    ('9/30/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.06', 'CONVERT TO CAD @ 1.06250'),
+    ('9/30/2009', 'Dividend', 'VUG', 'CAD', '', '30', '3.85', 'CONVERT TO CAD @ 1.06250'),
+    ('10/14/2009', 'Fee', '', 'CAD', '', '', '-1.5', ''),
+    ('10/14/2009', 'Fee', '', 'CAD', '', '', '-0.08', ''),
+    ('10/30/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.09', 'CONVERT TO CAD @ 1.07100'),
+    ('11/30/2009', 'Dividend', 'IGR', 'CAD', '', '100', '4.01', 'CONVERT TO CAD @ 1.04850'),
+    ('12/7/2009', 'Buy', 'ECA.TO', 'CAD', '56.13', '33', '-1857.36', ''),
+    ('12/7/2009', 'Sell', 'ECA.TO', 'CAD', '56.24', '-33', '1850.85', ''),
+    ('12/7/2009', 'Sell', 'IGR', 'CAD', '6.14', '-100', '643.38', 'CONV'),
+    ('12/7/2009', 'Buy', 'MCD', 'CAD', '62.91', '28', '-1866.06', 'CONV TO CAD @1.0564 %US PREM'),
+    ('12/7/2009', 'Sell', 'WJA.TO', 'CAD', '12', '-100', '1195.05', ''),
+    ('12/11/2009', 'Sell', 'MCD', 'CAD', '58.9', '-1', '58.9', 'CONV TO CAD @1.058 %US PREM'),
+    ('12/29/2009', 'Dividend', 'VUG', 'CAD', '', '30', '4.72', 'CONVERT TO CAD @ 1.03600'),
+    ('12/31/2009', 'Dividend', 'VBK', 'CAD', '', '34', '6.87', 'CONVERT TO CAD @ 1.03900'),
+    ('1/5/2010', 'Deposit', '', 'CAD', '', '', '5000', ''),
+    ('1/11/2010', 'Buy', 'VUG', 'CAD', '45.08', '88', '-4941.21', 'CONV TO CAD @1.0372 %US PREM'),
+    ('1/29/2010', 'Buy', 'ATVI', 'CAD', '10.08', '175', '-1888.71', 'CONV TO CAD @1.0677 %US PREM'),
+    ('1/29/2010', 'Sell', 'MCD', 'CAD', '63.39', '-27', '1822.08', 'CONV TO CAD @1.0677 %US PREM'),
+    ('3/31/2010', 'Dividend', 'VUG', 'CAD', '', '118', '14.67', 'CONVERT TO CAD @ 1.00850'),
+    ('4/5/2010', 'Dividend', 'ATVI', 'CAD', '', '175', '22.27', 'CONVERT TO CAD @ 0.99800'),
+    ('6/30/2010', 'Dividend', 'VUG', 'USD', '', '118', '14.94', ''),
+    ('9/30/2010', 'Dividend', 'VUG', 'USD', '', '118', '20.36', ''),
+    ('11/12/2010', 'Sell', 'ATVI', 'USD', '', '-175', '2065.28', ''),
+    ('11/15/2010', 'Buy', 'AGNC', 'USD', '', '70', '-2051.05', ''),
+    ('12/15/2010', 'Fee', '', 'CAD', '', '', '4.95', ''),
+    ('12/31/2010', 'Dividend', 'VBK', 'USD', '', '', '10.41', ''),
+    ('12/31/2010', 'Dividend', 'VUG', 'USD', '', '', '20.36', ''),
+    ('1/27/2011', 'Dividend', 'AGNC', 'USD', '', '', '83.3', ''),
+]
 
 rrsp_activity_data = [
-('11/2/2009', 'Transfer', '', 'CAD', '', '', '6951.09', 'RE: SEC.146(16) ITA'),
-('11/12/2009', 'Buy', 'XIU.TO', 'CAD', '16.77', '200', '-3359.69', ''),
-('11/12/2009', 'Buy', 'VWO', 'CAD', '39.66', '80', '-3430.38', 'CONV TO CAD @1.0795 %US PREM'),
-('12/31/2009', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.17', ''),
-('12/31/2009', 'Dividend', 'VWO', 'CAD', '', '80', '45.3', 'CONVERT TO CAD @ 1.03900'),
-('2/24/2010', 'Deposit', '', 'CAD', '', '', '6000', ''),
-('3/2/2010', 'Buy', 'VOT', 'CAD', '47.83', '120', '-6121.97', ''),
-('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.5', ''),
-('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.03', ''),
-('3/31/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '24.34', ''),
-('4/1/2010', 'Deposit', '', 'CAD', '', '', '6000', ''),
-('4/13/2010', 'Buy', 'VWO', 'CAD', '43.33', '140', '-6119.72', 'CONV TO CAD @1.008 %US PREM'),
-('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.5', ''),
-('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.03', ''),
-('6/17/2010', 'Deposit', '', 'CAD', '', '', '5000', ''),
-('6/24/2010', 'FX', '', 'CAD', '', '', '-4764.75', ''),
-('6/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.81', ''),
-('6/24/2010', 'FX', '', 'USD', '', '', '4543.92', ''),
-('6/29/2010', 'Buy', 'EA', 'USD', '15.129', '300', '-4543.92', ''),
-('9/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '22.21', ''),
-('10/4/2010', 'Sell', 'EA    101120C00018000', 'USD', '44', '-3', '119.04', ''),
-('11/19/2010', 'Expiry', 'EA    101120C00018000', 'USD', '', '3', '', ''),
-('12/31/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '20.76', ''),
-('12/29/2010', 'Dividend', 'VWO', 'USD', '', '220', '179.3', ''),
-('12/31/2010', 'Dividend', 'VOT', 'USD', '', '120', '38.64', ''),
-('1/25/2011', 'Deposit', '', 'CAD', '', '', '7000', ''),
-('1/26/2011', 'FX', '', 'CAD', '', '', '187.4', ''),
-('1/31/2011', 'Buy', 'XSB.TO', 'CAD', '28.81', '260', '-7496.51', ''),
-('1/12/2011', 'Sell', 'EA  110219C00017000', 'USD', '40', '-3', '107.04', ''),
-('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
-('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', ''),
-('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', ''),
+    ('11/2/2009', 'Transfer', '', 'CAD', '', '', '6951.09', 'RE: SEC.146(16) ITA'),
+    ('11/12/2009', 'Buy', 'XIU.TO', 'CAD', '16.77', '200', '-3359.69', ''),
+    ('11/12/2009', 'Buy', 'VWO', 'CAD', '39.66', '80', '-3430.38', 'CONV TO CAD @1.0795 %US PREM'),
+    ('12/31/2009', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.17', ''),
+    ('12/31/2009', 'Dividend', 'VWO', 'CAD', '', '80', '45.3', 'CONVERT TO CAD @ 1.03900'),
+    ('2/24/2010', 'Deposit', '', 'CAD', '', '', '6000', ''),
+    ('3/2/2010', 'Buy', 'VOT', 'CAD', '47.83', '120', '-6121.97', ''),
+    ('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.5', ''),
+    ('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.03', ''),
+    ('3/31/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '24.34', ''),
+    ('4/1/2010', 'Deposit', '', 'CAD', '', '', '6000', ''),
+    ('4/13/2010', 'Buy', 'VWO', 'CAD', '43.33', '140', '-6119.72', 'CONV TO CAD @1.008 %US PREM'),
+    ('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.5', ''),
+    ('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.03', ''),
+    ('6/17/2010', 'Deposit', '', 'CAD', '', '', '5000', ''),
+    ('6/24/2010', 'FX', '', 'CAD', '', '', '-4764.75', ''),
+    ('6/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.81', ''),
+    ('6/24/2010', 'FX', '', 'USD', '', '', '4543.92', ''),
+    ('6/29/2010', 'Buy', 'EA', 'USD', '15.129', '300', '-4543.92', ''),
+    ('9/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '22.21', ''),
+    ('10/4/2010', 'Sell', 'EA    101120C00018000', 'USD', '44', '-3', '119.04', ''),
+    ('11/19/2010', 'Expiry', 'EA    101120C00018000', 'USD', '', '3', '', ''),
+    ('12/31/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '20.76', ''),
+    ('12/29/2010', 'Dividend', 'VWO', 'USD', '', '220', '179.3', ''),
+    ('12/31/2010', 'Dividend', 'VOT', 'USD', '', '120', '38.64', ''),
+    ('1/25/2011', 'Deposit', '', 'CAD', '', '', '7000', ''),
+    ('1/26/2011', 'FX', '', 'CAD', '', '', '187.4', ''),
+    ('1/31/2011', 'Buy', 'XSB.TO', 'CAD', '28.81', '260', '-7496.51', ''),
+    ('1/12/2011', 'Sell', 'EA  110219C00017000', 'USD', '40', '-3', '107.04', ''),
+    ('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
+    ('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', ''),
+    ('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', ''),
 ]
 
 sarah_tfsa_data = [
@@ -349,8 +349,6 @@ sarah_tfsa_data = [
     ('1/1/2011', 'Transfer', '', 'USD', '', '', '97.15',
      'Faked past history - fix this with real data'),
     ]
-
-from finance.models import ManualRawActivity
 
 
 def AddManualRawActivity():

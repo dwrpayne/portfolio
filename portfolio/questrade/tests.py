@@ -1,7 +1,9 @@
 from django.test import TestCase
 
-from .models import *
+from .models import QuestradeClient, QuestradeAccount
+from finance.models import Security, Currency, Activity, ExchangeRate, DataProvider
 from decimal import Decimal
+import datetime
 import unittest
 
 
@@ -11,7 +13,7 @@ def setUpModule():
 
     Currency.objects.create(code='CAD', rateLookup='CADBASE')
     Currency.objects.create(code='USD', rateLookup='DEXCAUS')
-    #QuestradeClient.CreateClient('test', '123457890')
+    # QuestradeClient.CreateClient('test', '123457890')
 
 
 def tearDownModule():
