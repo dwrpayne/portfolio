@@ -60,7 +60,7 @@ class RateLookupMixin(models.Model):
             return (self.earliest_price_needed, self.latest_price_needed)
 
         if earliest > self.earliest_price_needed:
-            return (self.earliest_price_needed, self.latest_price_needed)
+            return (self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed)
 
         if latest < self.latest_price_needed:
             return (latest - datetime.timedelta(days=7), self.latest_price_needed)
@@ -174,8 +174,7 @@ class SecurityQuerySet(models.query.QuerySet):
 
 class SecurityManager(models.Manager):
     def get_todays_changes(self, user, by_account=False):
-        data = self.with_prices(user, datetime.date.today() -
-                                datetime.timedelta(days=1), by_account)
+        data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
         return list(map(HoldingView, data[::2], data[1::2]))
 
 

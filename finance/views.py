@@ -121,8 +121,8 @@ def History(request):
         rows[d][a] = v
 
     context = {
-        'names': [a.display_name for a in accounts],
-        'rows': rows.items(),
+        'names': [a.display_name for a in accounts] + ['Total'],
+        'rows': [(date, vals.values(), sum(vals.values())) for date, vals in rows.items()],
     }
 
     return render(request, 'finance/history.html', context)

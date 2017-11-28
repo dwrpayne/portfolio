@@ -12,12 +12,13 @@
         </tr>
         </thead>
         <tbody>
-       {% for date, vals in rows %}
+       {% for date, vals, total in rows %}
         <tr>
             <td>{{date}}</td>
-             {% for val in vals.values %}
+             {% for val in vals %}
             <td>{{val | currencyround}}</td>
             {% endfor %}
+            <td>{{total | currencyround}}</td>
         </tr>
         {% endfor %}
         </tbody>
