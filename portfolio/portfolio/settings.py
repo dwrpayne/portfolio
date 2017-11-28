@@ -97,7 +97,7 @@ SHELL_PLUS_PRE_IMPORTS = [
     'datetime',
     'arrow',
     'simplejson',
-     'plotly',
+    'plotly',
     ('plotly', 'graph_objs'),
     ('collections', 'defaultdict'),
     ('dateutil', 'parser'),
@@ -112,7 +112,7 @@ WSGI_APPLICATION = 'portfolio.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',  # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
         'NAME': 'finance',                      # Or path to database file if using sqlite3.
         'USER': 'financeuser',                      # Not used with sqlite3.
         'PASSWORD': 'finance',                  # Not used with sqlite3.

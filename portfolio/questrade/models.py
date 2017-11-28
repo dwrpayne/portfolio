@@ -177,7 +177,7 @@ class QuestradeClient(BaseClient):
         """ Check if we should refresh this questrade token. At time of writing their API docs state the access token is good for 30 minutes."""
         if not self.token_expiry: return True
         if not self.access_token: return True
-        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600)) # We need refresh if we are less than 10 minutes from expiry.
+        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600))  # We need refresh if we are less than 10 minutes from expiry.
 
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
@@ -342,10 +342,10 @@ from finance.models import ManualRawActivity
 
 def AddManualRawActivity():
     ManualRawActivity.objects.all().delete()
-    for account_id, data in [
-        (51407958, tfsa_activity_data),
-        (51419220, sarah_tfsa_data),
-        (51424829, rrsp_activity_data)]:
+    for account_id, data in [(51407958, tfsa_activity_data),
+                             (51419220, sarah_tfsa_data),
+                             (51424829, rrsp_activity_data)
+                             ]:
         account = BaseAccount.objects.get(id=account_id)
         for date, type, security, cash, price, qty, netAmount, description in data:
             act = ManualRawActivity(day=parser.parse(date),

@@ -26,6 +26,7 @@ app.conf.timezone = 'Canada/Pacific'
 def debug_task(self):
     print('Request: {0!r}'.format(self.request))
 
+
 app.conf.beat_schedule = {
     'sync-daily-client-prices': {
         'task': 'finance.tasks.DailyUpdateTask',

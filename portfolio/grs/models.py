@@ -77,7 +77,7 @@ class GrsClient(BaseClient):
                                          data={'PlanFund': lookup.lookupSymbol, 'PlanDetail': '', 'BodyTitle': '',
                                                'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
                                          headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
-                )
+                                         )
             soup = BeautifulSoup(response.text, 'html.parser')
             table_header = soup.find('tr', class_='table-header')
             if table_header:
