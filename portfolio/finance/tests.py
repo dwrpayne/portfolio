@@ -104,5 +104,3 @@ class SecurityModelTests(TestCase):
 
     def test_manager_stocks(self):
         self.assertEqual(len(Security.stocks.all()), 3)
-
-

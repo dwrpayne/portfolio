@@ -41,4 +41,3 @@ def GetLiveUpdateTaskGroup(user):
     tasks = [LiveSecurityUpdateTask.si()]
     tasks += [SyncClientAccountBalances.s(client.id) for client in user.clients.all()]
     return group(tasks)
-

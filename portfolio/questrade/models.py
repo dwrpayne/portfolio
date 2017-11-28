@@ -362,4 +362,3 @@ def AddManualRawActivity():
             b = act.CreateActivity()
             b.save()
         account.RegenerateHoldings()
-

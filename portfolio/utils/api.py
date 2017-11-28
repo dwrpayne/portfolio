@@ -21,4 +21,3 @@ def api_response(root_key='', check_response_status=True):
             return response_json[root_key]
         return wrapper
     return decorator
-

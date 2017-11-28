@@ -354,8 +354,6 @@ class ExchangeRate(RateHistoryTableMixin):
 
 
 class DataProvider:
-    FAKED_VALS = {'DLR.U.TO': 10.}
-
     @classmethod
     def _FakeData(cls, lookup, start, end):
         for day in pandas.date_range(start, end).date:
@@ -365,7 +363,7 @@ class DataProvider:
     def _RetrievePandasData(cls, lookup, start, end):
         """ Returns a list of tuples (day, price) """
         FAKED_VALS = {'DLR.U.TO': 10.}
-        if lookup.lookupSymbol in cls.FAKED_VALS:
+        if lookup.lookupSymbol in FAKED_VALS:
             index = pandas.date_range(start, end, freq='D').date
             return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
 
@@ -818,4 +816,3 @@ class UserProfile(models.Model):
 
     def GetHeldSecurities(self):
         return Security.objects.filter(holdings__in=Holding.objects.owned_by(self.user).current()).distinct()
-
