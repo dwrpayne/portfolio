@@ -103,7 +103,8 @@ class QuestradeRawActivity(BaseRawActivity):
                 if (tradeDate-asof).days > 365:
                     asof = asof.shift(years=+1)
 
-                json['tradeDate'] = tradeDate.replace(year=asof.year, month=asof.month, day=asof.day).isoformat()
+                json['tradeDate'] = tradeDate.replace(
+                    year=asof.year, month=asof.month, day=asof.day).isoformat()
 
         json['tradeDate'] = str(parser.parse(json['tradeDate']).date())
         json['type'] = self.GetActivityType(json['type'], json['action'])
@@ -177,7 +178,8 @@ class QuestradeClient(BaseClient):
         """ Check if we should refresh this questrade token. At time of writing their API docs state the access token is good for 30 minutes."""
         if not self.token_expiry: return True
         if not self.access_token: return True
-        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600))  # We need refresh if we are less than 10 minutes from expiry.
+        # We need refresh if we are less than 10 minutes from expiry.
+        return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600))
 
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
@@ -212,14 +214,16 @@ class QuestradeClient(BaseClient):
 
     def SyncAccounts(self):
         for account_json in self.GetAccounts():
-            QuestradeAccount.objects.update_or_create(type=account_json['type'], id=account_json['number'], client=self)
+            QuestradeAccount.objects.update_or_create(
+                type=account_json['type'], id=account_json['number'], client=self)
 
         AddManualRawActivity()
 
     def _CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0, microsecond=0)
         try:
-            json = self._GetRequest('accounts/{}/activities'.format(account.id), {'startTime': start.isoformat(), 'endTime': end.isoformat()})
+            json = self._GetRequest('accounts/{}/activities'.format(account.id),
+                                    {'startTime': start.isoformat(), 'endTime': end.isoformat()})
         except:
             return 0
         print("Get activities from source returned: " + simplejson.dumps(json))
@@ -232,8 +236,10 @@ class QuestradeClient(BaseClient):
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
             json = self._GetRequest('accounts/%s/balances' % (a.id))
-            a.curBalanceSynced = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-            a.sodBalanceSynced = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
+            a.curBalanceSynced = next(
+                currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
+            a.sodBalanceSynced = next(
+                currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
             a.save()
 
 
@@ -243,7 +249,8 @@ tfsa_activity_data = [
 ('6/15/2009', 'Buy', 'GE', 'CAD', '13.73', '150', '-2299.38', 'CONV TO CAD @ 1.1138 %US PREM'),
 ('6/15/2009', 'Buy', 'IGR', 'CAD', '5.25', '200', '-1175', 'CONV TO CAD @ 1.1138 %US PREM'),
 ('6/15/2009', 'Buy', 'VUG', 'CAD', '44.58', '30', '-1495.11', 'CONV TO CAD @ 1.1138 %US PREM'),
-('6/15/2009', 'Sell', 'GE    090718C00014000', 'CAD', '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
+('6/15/2009', 'Sell', 'GE    090718C00014000', 'CAD',
+ '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
 ('6/30/2009', 'Dividend', 'IGR', 'CAD', '', '', '8.82', 'CONVERT TO CAD @ 1.15350'),
 ('6/30/2009', 'Dividend', 'VUG', 'CAD', '', '', '4.27', 'CONVERT TO CAD @ 1.15350'),
 ('7/7/2009', 'Buy', 'EA    090721C00021000', 'CAD', '', '1', '-94.33', 'CONV TO CAD @1.1653 %US PREM'),
@@ -330,11 +337,16 @@ rrsp_activity_data = [
 ]
 
 sarah_tfsa_data = [
-    ('1/1/2011', 'Deposit', 'VBR', 'USD', '0', '90', '', 'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Deposit', 'XSB.TO', 'CAD', '0', '85', '', 'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Deposit', 'XIN.TO', 'CAD', '0', '140', '', 'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Transfer', '', 'CAD', '', '', '147.25', 'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Transfer', '', 'USD', '', '', '97.15', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'VBR', 'USD', '0', '90', '',
+     'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'XSB.TO', 'CAD', '0', '85',
+     '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'XIN.TO', 'CAD', '0', '140',
+     '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Transfer', '', 'CAD', '', '', '147.25',
+     'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Transfer', '', 'USD', '', '', '97.15',
+     'Faked past history - fix this with real data'),
     ]
 
 from finance.models import ManualRawActivity

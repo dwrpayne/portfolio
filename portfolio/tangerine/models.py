@@ -93,7 +93,8 @@ class TangerineClient(BaseClient):
         with self.client.login():
             accounts = self.client.list_accounts()
             for a in accounts:
-                TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={'type': a['description'], 'internal_display_name': a['display_name'], 'account_balance': a['account_balance']})
+                TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={
+                                                       'type': a['description'], 'internal_display_name': a['display_name'], 'account_balance': a['account_balance']})
 
     def _CreateRawActivities(self, account, start, end):
         with self.client.login():

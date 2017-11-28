@@ -155,7 +155,8 @@ class SecurityQuerySet(models.query.QuerySet):
         if not start_date:
             start_date = datetime.date.today()
 
-        kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'), 'exch': F('currency__rates__price')}
+        kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'),
+                              'exch': F('currency__rates__price')}
         orderby = ['symbol', 'day']
         if by_account:
             kwcolumns['acc'] = F('holdings__account')
@@ -172,7 +173,8 @@ class SecurityQuerySet(models.query.QuerySet):
 
 class SecurityManager(models.Manager):
     def get_todays_changes(self, user, by_account=False):
-        data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
+        data = self.with_prices(user, datetime.date.today() - \
+                                datetime.timedelta(days=1), by_account)
         return list(map(HoldingView, data[::2], data[1::2]))
 
 
@@ -262,7 +264,8 @@ class Security(RateLookupMixin):
         strike is a Decimal
         currency_str is the 3 digit currency code
         """
-        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime('%y%m%d'), callput[0], Decimal(strike)*1000)
+        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
+            '%y%m%d'), callput[0], Decimal(strike)*1000)
         option, created = Security.objects.get_or_create(
             symbol=optsymbol,
             defaults={
@@ -318,7 +321,8 @@ class SecurityPriceManager(models.Manager):
         if by_account: group_by.append('security__holdings__account')
 
         return history.values(*group_by).order_by(*group_by).annotate(
-                val=Sum(F('price')*F('security__holdings__qty') * F('security__currency__rates__price'))
+                val=Sum(F('price')*F('security__holdings__qty')
+                        * F('security__currency__rates__price'))
         ).values_list(*group_by, 'val')
 
 
@@ -383,7 +387,8 @@ class DataProvider:
             return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        params = {'function': 'TIME_SERIES_DAILY', 'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
+        params = {'function': 'TIME_SERIES_DAILY',
+            'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
         if (end - start).days > 100: params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
         json = r.json()
@@ -405,7 +410,8 @@ class DataProvider:
     @classmethod
     def GetLiveStockPrice(cls, symbol):
         symbol = symbol.split('.')[0]
-        params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': symbol, 'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
+        params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': symbol,
+            'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
         r = requests.get('https://www.alphavantage.co/query', params=params)
         json = r.json()
         price = Decimal(0)
@@ -441,7 +447,8 @@ class DataProvider:
             stock.SyncRates(cls.GetAlphaVantageData)
 
         for option in Security.options.all():
-            option.SyncRates(lambda l, s, e: option.activities.values_list('tradeDate', 'price').distinct('tradeDate'))
+            option.SyncRates(lambda l, s, e: option.activities.values_list(
+                'tradeDate', 'price').distinct('tradeDate'))
 
         for fund in Security.mutualfunds.all():
             try:
@@ -460,15 +467,18 @@ class DataProvider:
     @classmethod
     def SyncAllExchangeRates(cls):
         for currency in Currency.objects.all():
-            Security.objects.get_or_create(symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
+            Security.objects.get_or_create(
+                symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
             currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
 
-        r = requests.get('https://openexchangerates.org/api/latest.json', params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
+        r = requests.get('https://openexchangerates.org/api/latest.json',
+                         params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
         Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
 
 
 class BaseClient(PolymorphicModel):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clients')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             on_delete=models.CASCADE, related_name='clients')
     display_name = models.CharField(max_length=100, null=True)
 
     @property
@@ -629,7 +639,8 @@ class HoldingManager(models.Manager):
         new_qty = previous_qty+qty_delta
         if new_qty:
             print("Creating {} {} {} {}".format(security, new_qty, date, None))
-            self.create(account=account, security=security, qty=new_qty, startdate=date, enddate=None)
+            self.create(account=account, security=security,
+                        qty=new_qty, startdate=date, enddate=None)
 
 
 class HoldingQuerySet(models.query.QuerySet):
@@ -648,7 +659,8 @@ class HoldingQuerySet(models.query.QuerySet):
     def value_as_of(self, date):
         if not self:
             return 0
-        filtered = self.at_date(date).filter(security__rates__day=date, security__currency__rates__day=date)
+        filtered = self.at_date(date).filter(security__rates__day=date,
+                                security__currency__rates__day=date)
         if not filtered:
             print("HoldingQuerySet filtered out because of missing price data")
             return 0
@@ -731,13 +743,16 @@ class ActivityQuerySet(models.query.QuerySet):
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
     tradeDate = models.DateField()
-    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='activities')
+    security = models.ForeignKey(Security, on_delete=models.CASCADE,
+                                 null=True, related_name='activities')
     description = models.CharField(max_length=1000)
-    cash = models.ForeignKey(Security, on_delete=models.CASCADE, null=True, related_name='dontaccess_cash')
+    cash = models.ForeignKey(Security, on_delete=models.CASCADE,
+                             null=True, related_name='dontaccess_cash')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
-    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
+    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell',
+                   'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)
     raw = models.OneToOneField(BaseRawActivity, on_delete=models.CASCADE)
 
@@ -745,7 +760,8 @@ class Activity(models.Model):
     objects.use_for_related_fields = True
 
     class Meta:
-        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty', 'price', 'netAmount', 'type', 'description')
+        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty',
+                           'price', 'netAmount', 'type', 'description')
         verbose_name_plural = 'Activities'
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']
@@ -795,7 +811,8 @@ class AllocationManager(models.Manager):
 
 
 class Allocation(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='allocations')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             on_delete=models.CASCADE, related_name='allocations')
     securities = models.ManyToManyField(Security)
     desired_pct = models.DecimalField(max_digits=6, decimal_places=4)
     objects = AllocationManager()

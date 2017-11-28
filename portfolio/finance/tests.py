@@ -24,7 +24,8 @@ def tearDownModule():
 class RateLookupMixinTests(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tsla = Security.objects.create(symbol='TSLA', currency_id='USD', lookupColumn='Close', lookupSymbol='TSLA', lookupSource='yahoo')
+        cls.tsla = Security.objects.create(
+            symbol='TSLA', currency_id='USD', lookupColumn='Close', lookupSymbol='TSLA', lookupSource='yahoo')
 
     @classmethod
     def tearDownClass(cls):
@@ -43,27 +44,33 @@ class RateLookupMixinTests(TestCase):
         self.assertIn((datetime.date(2014, 1, 1), 12), list(data))
 
     def test_process_rate_data_iterator_extend(self):
-        pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),   (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
+        pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),
+                  (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
         self.check_process_rate_data_extend(pairs)
 
     def test_process_rate_data_iterator_ffill(self):
-        pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),   (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
+        pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),
+                  (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
         self.check_process_rate_data_ffill(pairs)
 
     def test_process_rate_data_iterator_works(self):
-        pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),   (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
+        pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),
+                  (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
         self.check_process_rate_data_works(pairs)
 
     def test_process_rate_data_dataframe_extend(self):
-        frame = pandas.DataFrame({'open': [10, 20, 30, 40], 'Close': [12, 13, 15, 19], 'vol': [100, 200, 300, 400]}, [datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.date(2014, 1, 4), datetime.date(2014, 1, 6)])
+        frame = pandas.DataFrame({'open': [10, 20, 30, 40], 'Close': [12, 13, 15, 19], 'vol': [100, 200, 300, 400]}, [
+                                 datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.date(2014, 1, 4), datetime.date(2014, 1, 6)])
         self.check_process_rate_data_extend(frame)
 
     def test_process_rate_data_dataframe_ffill(self):
-        frame = pandas.DataFrame({'open': [10, 20, 30, 40], 'Close': [12, 13, 15, 19], 'vol': [100, 200, 300, 400]}, [datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.date(2014, 1, 4), datetime.date(2014, 1, 6)])
+        frame = pandas.DataFrame({'open': [10, 20, 30, 40], 'Close': [12, 13, 15, 19], 'vol': [100, 200, 300, 400]}, [
+                                 datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.date(2014, 1, 4), datetime.date(2014, 1, 6)])
         self.check_process_rate_data_ffill(frame)
 
     def test_process_rate_data_dataframe_works(self):
-        frame = pandas.DataFrame({'open': [10, 20, 30, 40], 'Close': [12, 13, 15, 19], 'vol': [100, 200, 300, 400]}, [datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.date(2014, 1, 4), datetime.date(2014, 1, 6)])
+        frame = pandas.DataFrame({'open': [10, 20, 30, 40], 'Close': [12, 13, 15, 19], 'vol': [100, 200, 300, 400]}, [
+                                 datetime.date(2014, 1, 1), datetime.date(2014, 1, 2), datetime.date(2014, 1, 4), datetime.date(2014, 1, 6)])
         self.check_process_rate_data_works(frame)
 
     def get_data(self, lookup, start, end):
@@ -74,7 +81,8 @@ class RateLookupMixinTests(TestCase):
 
     def test_sync_rates_extending(self):
         self.tsla.SyncRates(self.get_data)
-        self.assertEqual(self.tsla.rates.all().count(), (datetime.date.today() - datetime.date(2014, 1, 1)).days+1)
+        self.assertEqual(self.tsla.rates.all().count(),
+                         (datetime.date.today() - datetime.date(2014, 1, 1)).days+1)
 
     def test_sync_rates_today(self):
         self.tsla.SyncRates(DataProvider._RetrieveData)
@@ -93,7 +101,8 @@ class SecurityModelTests(TestCase):
         Security.objects.create(symbol='TSLA', currency_id='USD')
         Security.objects.create(symbol='MSFT', currency_id='USD')
         Security.objects.create(symbol='VUN.TO', currency_id='CAD')
-        Security.objects.create(symbol='ATVI  23400827IU4', currency_id='USD', type=Security.Type.Option)
+        Security.objects.create(symbol='ATVI  23400827IU4',
+                                currency_id='USD', type=Security.Type.Option)
 
     @classmethod
     def tearDownClass(cls):

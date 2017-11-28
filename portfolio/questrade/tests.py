@@ -45,12 +45,14 @@ class ActivityModelTests(TestCase):
     def setUpClass(cls):
         cls.cad = Currency.objects.get(code='CAD')
         cls.vti = Security.objects.create(symbol='VTI', currency_id='USD')
-        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy',
+            'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
         c = QuestradeClient.objects.create(username='test', refresh_token='test_token')
         a = QuestradeAccount.objects.create(client=c, id=0, type='')
         cls.buy = Activity.CreateFromJson(json, a)
 
-        json = {'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23T00:00:00.000000-04:00', 'settlementDate': '2013-07-23T00:00:00.000000-04:00', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+        json = {'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23T00:00:00.000000-04:00', 'settlementDate': '2013-07-23T00:00:00.000000-04:00', 'action': 'DEP',
+            'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         cls.dep = Activity.CreateFromJson(json, a)
 
     @classmethod
@@ -105,11 +107,14 @@ class AccountModelTests(TestCase):
         cls.account = QuestradeAccount.objects.create(client=c, id=0, type='')
         Security.objects.create(symbol='VTI', currency_id='USD')
         DataProvider.SyncAllSecurities()
-        json = {'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+        json = {'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0,
+            'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         Activity.CreateFromJson(json, cls.account)
-        json = {'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23', 'settlementDate': '2013-07-23', 'action': 'DEP', 'symbol': 'USD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'USD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+        json = {'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23', 'settlementDate': '2013-07-23', 'action': 'DEP', 'symbol': 'USD', 'symbolId': 0,
+            'description': '2666275025 CUCBC DIR DEP', 'currency': 'USD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         Activity.CreateFromJson(json, cls.account)
-        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01', 'settlementDate': '2013-08-01', 'action': 'Buy', 'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+        json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01', 'settlementDate': '2013-08-01', 'action': 'Buy', 'symbol': 'VTI',
+            'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
         Activity.CreateFromJson(json, cls.account)
         cls.account.RegenerateDBHoldings()
 
@@ -145,7 +150,8 @@ class SecurityModelTests(TestCase):
         Security.objects.create(symbol='TSLA', currency_id='USD')
         Security.objects.create(symbol='MSFT', currency_id='USD')
         Security.objects.create(symbol='VUN.TO', currency_id='CAD')
-        Security.objects.create(symbol='ATVI  23400827IU4', currency_id='USD', type=Security.Type.Option)
+        Security.objects.create(symbol='ATVI  23400827IU4',
+                                currency_id='USD', type=Security.Type.Option)
 
     @classmethod
     def tearDownClass(cls):
@@ -184,10 +190,12 @@ class DataProviderTests(TestCase):
         self.assertEqual(DataProvider.GetExchangeRate('USD', '2014-12-30'), Decimal('1.159700'))
 
     def test_exchange_rates_up_to_date(self):
-        self.assertTrue(datetime.date.today() - self.usd.GetLatestEntry() < datetime.timedelta(days=14))
+        self.assertTrue(datetime.date.today() - self.usd.GetLatestEntry()
+                        < datetime.timedelta(days=14))
 
     def test_stock_price_up_to_date(self):
-        self.assertTrue(datetime.date.today() - self.tsla.GetLatestEntry() < datetime.timedelta(days=5))
+        self.assertTrue(datetime.date.today() - self.tsla.GetLatestEntry()
+                        < datetime.timedelta(days=5))
 
     def test_stock_price_holiday(self):
         self.assertEqual(self.tsla.GetPrice('2015-01-01'), Decimal('222.41'))

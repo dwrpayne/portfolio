@@ -16,7 +16,8 @@ import simplejson
 
 def GetHoldingsContext(user):
     total_value = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today())
-    total_yesterday = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today() - datetime.timedelta(days=1))
+    total_yesterday = Holding.objects.current().owned_by(user).value_as_of(
+        datetime.date.today() - datetime.timedelta(days=1))
     total_gain = total_value - total_yesterday
 
     holding_data = Security.objects.get_todays_changes(user)
@@ -39,17 +40,21 @@ def GetBalanceContext(user):
     if not accounts.exists():
         return {}
 
-    account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance, a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in accounts]
+    account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance,
+                     a.cur_cash_balance, a.cur_balance-a.yesterday_balance) for a in accounts]
 
     names, ids, sod, cur, cur_cash, change = list(zip(*account_data))
 
     total_data = [('Total', sum(sod), sum(cur), sum(cur_cash), sum(change))]
 
     exchange_live = 1/Currency.objects.get(code='USD').live_price
-    exchange_yesterday = 1/Currency.objects.get(code='USD').GetRateOnDay(datetime.date.today() - datetime.timedelta(days=1))
+    exchange_yesterday = 1/ \
+        Currency.objects.get(code='USD').GetRateOnDay(
+            datetime.date.today() - datetime.timedelta(days=1))
     exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
 
-    context = {'account_data': account_data, 'total_data': total_data, 'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
+    context = {'account_data': account_data, 'total_data': total_data,
+        'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
 
 
@@ -74,7 +79,8 @@ def GeneratePlot(user):
 
     trace2 = go.Scatter(name='Deposits', x=dates, y=running_totals, mode='lines+markers')
 
-    plotly_url = plotly.plotly.plot([trace, trace2], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
+    plotly_url = plotly.plotly.plot(
+        [trace, trace2], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
     user.userprofile.plotly_url = plotly_url
     user.userprofile.save()
 
@@ -84,7 +90,8 @@ def Portfolio(request):
     if not request.user.userprofile.plotly_url:
         GeneratePlot(request.user)
 
-    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(request.user.userprofile.plotly_url)
+    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(
+        request.user.userprofile.plotly_url)
     if request.is_ajax():
         if 'refresh-live' in request.GET:
             result = GetLiveUpdateTaskGroup(request.user)()
@@ -174,7 +181,8 @@ def securitydetail(request, symbol):
 
         act.capgain = 0
         if act.qty < 0:
-            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - ((prevacbpershare) * abs(act.qty))
+            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - \
+                           ((prevacbpershare) * abs(act.qty))
 
         if act.qty > 0:
             act.acbchange = act.cadprice * act.qty + act.commission
