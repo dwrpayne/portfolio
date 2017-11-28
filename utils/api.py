@@ -14,8 +14,6 @@ def api_response(root_key='', check_response_status=True):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             response_json = fn(*args, **kwargs)
-            if check_response_status and response_json['response_status']['status_code'] != 'SUCCESS':
-                raise APIResponseError(response_json)
             if not root_key:
                 return response_json
             return response_json[root_key]

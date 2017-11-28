@@ -216,7 +216,7 @@ class QuestradeClient(BaseClient):
     def SyncAccounts(self):
         for account_json in self.GetAccounts():
             QuestradeAccount.objects.update_or_create(
-                type=account_json['type'], id=account_json['number'], client=self)
+                type=account_json['type'], id=account_json['number'], client=self, taxable=False)
 
         AddManualRawActivity()
 
