@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "portfolio", "portfolio\portfolio.pyproj", "{8E230B2C-D464-41BE-8280-DBD05B24D18A}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "portfolio", "portfolio.pyproj", "{8E230B2C-D464-41BE-8280-DBD05B24D18A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -20,6 +20,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {BC82B581-761F-4BDB-9BB9-B3EDD3789CBB}
+		SolutionGuid = {10D2FC0C-312A-4E36-A4E1-508468F7E000}
 	EndGlobalSection
 EndGlobal
