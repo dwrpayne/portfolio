@@ -36,5 +36,5 @@
         {% endfor %}
         </tbody>
     </table>
-    Current USD exchange: {{exchange_live|floatformat:4}} {{exchange_delta | percentage | colorize}}
+    Current USD exchange: {{exchange_live|floatformat:4}} {{exchange_delta | percentage | parens | colorize}}
 </div>

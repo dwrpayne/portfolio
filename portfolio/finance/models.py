@@ -147,7 +147,10 @@ class HoldingView:
             self.acc = today.acc
 
 class SecurityQuerySet(models.query.QuerySet):
-    def with_prices(self, user, start_date=datetime.date.today(), by_account = False):
+    def with_prices(self, user, start_date=None, by_account = False):
+        if not start_date:
+            start_date = datetime.date.today()
+
         kwcolumns = {'day' : F('rates__day'), 'price' : F('rates__price'), 'exch' : F('currency__rates__price')}
         orderby = ['symbol', 'day']
         if by_account:
