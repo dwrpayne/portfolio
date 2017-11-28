@@ -63,11 +63,11 @@ class GrsClient(BaseClient):
                                      'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'})
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date()
-                                    for tag in soup.find_all('td', class_='activities-d-lit1')]
+                       for tag in soup.find_all('td', class_='activities-d-lit1')]
         units = [Decimal(tag.contents[0])
-                         for tag in soup.find_all('td', class_='activities-d-unitnum')]
+                 for tag in soup.find_all('td', class_='activities-d-unitnum')]
         prices = [Decimal(tag.contents[0])
-                          for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
+                  for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
         count = 0
         with transaction.atomic():
             for day, qty, price in zip(trans_dates, units, prices):
@@ -90,7 +90,7 @@ class GrsClient(BaseClient):
             if table_header:
                 dates = [tag.contents[0] for tag in table_header.find_all('td')[1:]]
                 values = [tag.contents[0]
-                    for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
+                          for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
                 for date, value in zip(dates, values):
                     if not 'Unknown' in value:
                         yield parser.parse(date).date(), Decimal(value[1:])

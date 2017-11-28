@@ -28,9 +28,9 @@ class ActivityAdmin(admin.ModelAdmin):
     display_price = MakeNormalizedFloat('price', 'Price')
 
     list_display = ['account', 'tradeDate', 'type', 'security',
-        'display_qty', 'display_price', 'cash', 'netAmount']
+                    'display_qty', 'display_price', 'cash', 'netAmount']
     list_filter = ['account', 'tradeDate', ('security', admin.RelatedOnlyFieldListFilter),
-                                            'type', ('cash', admin.RelatedOnlyFieldListFilter)]
+                   'type', ('cash', admin.RelatedOnlyFieldListFilter)]
     search_fields = ['description']
 
 
@@ -62,7 +62,7 @@ class SecurityAdmin(admin.ModelAdmin):
     latest_update_day.short_description = "Latest Price"
     list_filter = ['currency', 'type']
     list_display = ['symbol', 'symbolid', 'type', 'currency', 'live_price',
-        'first_update_day', 'latest_update_day', 'lookupSymbol', 'description']
+                    'first_update_day', 'latest_update_day', 'lookupSymbol', 'description']
 
 
 admin.site.register(Security, SecurityAdmin)

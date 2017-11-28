@@ -46,13 +46,13 @@ class ActivityModelTests(TestCase):
         cls.cad = Currency.objects.get(code='CAD')
         cls.vti = Security.objects.create(symbol='VTI', currency_id='USD')
         json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01T00:00:00.000000-04:00', 'settlementDate': '2013-08-01T00:00:00.000000-04:00', 'action': 'Buy',
-            'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+                'symbol': 'VTI', 'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
         c = QuestradeClient.objects.create(username='test', refresh_token='test_token')
         a = QuestradeAccount.objects.create(client=c, id=0, type='')
         cls.buy = Activity.CreateFromJson(json, a)
 
         json = {'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23T00:00:00.000000-04:00', 'settlementDate': '2013-07-23T00:00:00.000000-04:00', 'action': 'DEP',
-            'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+                'symbol': 'CAD', 'symbolId': 0, 'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         cls.dep = Activity.CreateFromJson(json, a)
 
     @classmethod
@@ -108,13 +108,13 @@ class AccountModelTests(TestCase):
         Security.objects.create(symbol='VTI', currency_id='USD')
         DataProvider.SyncAllSecurities()
         json = {'tradeDate': '2013-07-13T00:00:00.000000-04:00', 'transactionDate': '2013-07-13', 'settlementDate': '2013-07-13', 'action': 'DEP', 'symbol': 'CAD', 'symbolId': 0,
-            'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+                'description': '2666275025 CUCBC DIR DEP', 'currency': 'CAD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         Activity.CreateFromJson(json, cls.account)
         json = {'tradeDate': '2013-07-23T00:00:00.000000-04:00', 'transactionDate': '2013-07-23', 'settlementDate': '2013-07-23', 'action': 'DEP', 'symbol': 'USD', 'symbolId': 0,
-            'description': '2666275025 CUCBC DIR DEP', 'currency': 'USD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
+                'description': '2666275025 CUCBC DIR DEP', 'currency': 'USD', 'quantity': 0, 'price': 0, 'grossAmount': 0, 'commission': 0, 'netAmount': 1000, 'type': 'Deposits'}
         Activity.CreateFromJson(json, cls.account)
         json = {'tradeDate': '2013-07-29T00:00:00.000000-04:00', 'transactionDate': '2013-08-01', 'settlementDate': '2013-08-01', 'action': 'Buy', 'symbol': 'VTI',
-            'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
+                'symbolId': 40571, 'description': '', 'currency': 'USD', 'quantity': 11, 'price': 87.12, 'grossAmount': -958.32, 'commission': 0, 'netAmount': -958.32, 'type': 'Trades'}
         Activity.CreateFromJson(json, cls.account)
         cls.account.RegenerateDBHoldings()
 

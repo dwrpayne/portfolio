@@ -48,13 +48,13 @@ def GetBalanceContext(user):
     total_data = [('Total', sum(sod), sum(cur), sum(cur_cash), sum(change))]
 
     exchange_live = 1/Currency.objects.get(code='USD').live_price
-    exchange_yesterday = 1/ \
+    exchange_yesterday = 1 / \
         Currency.objects.get(code='USD').GetRateOnDay(
             datetime.date.today() - datetime.timedelta(days=1))
     exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
 
     context = {'account_data': account_data, 'total_data': total_data,
-        'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
+               'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
 
 

@@ -157,7 +157,7 @@ class SecurityQuerySet(models.query.QuerySet):
             start_date = datetime.date.today()
 
         kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'),
-                              'exch': F('currency__rates__price')}
+                     'exch': F('currency__rates__price')}
         orderby = ['symbol', 'day']
         if by_account:
             kwcolumns['acc'] = F('holdings__account')
@@ -270,9 +270,9 @@ class Security(RateLookupMixin):
         option, created = Security.objects.get_or_create(
             symbol=optsymbol,
             defaults={
-            'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
-            'type': cls.Type.Option,
-            'currency_id': currency_str
+                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
+                'type': cls.Type.Option,
+                'currency_id': currency_str
             })
         return option
 
@@ -390,7 +390,7 @@ class DataProvider:
 
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
         params = {'function': 'TIME_SERIES_DAILY',
-            'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
+                  'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
         if (end - start).days > 100:
             params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
@@ -414,7 +414,7 @@ class DataProvider:
     def GetLiveStockPrice(cls, symbol):
         symbol = symbol.split('.')[0]
         params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': symbol,
-            'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
+                  'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
         r = requests.get('https://www.alphavantage.co/query', params=params)
         json = r.json()
         price = Decimal(0)
@@ -665,7 +665,7 @@ class HoldingQuerySet(models.query.QuerySet):
         if not self:
             return 0
         filtered = self.at_date(date).filter(security__rates__day=date,
-                                security__currency__rates__day=date)
+                                             security__currency__rates__day=date)
         if not filtered:
             print("HoldingQuerySet filtered out because of missing price data")
             return 0

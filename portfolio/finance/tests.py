@@ -45,17 +45,17 @@ class RateLookupMixinTests(TestCase):
 
     def test_process_rate_data_iterator_extend(self):
         pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),
-                  (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
+                 (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
         self.check_process_rate_data_extend(pairs)
 
     def test_process_rate_data_iterator_ffill(self):
         pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),
-                  (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
+                 (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
         self.check_process_rate_data_ffill(pairs)
 
     def test_process_rate_data_iterator_works(self):
         pairs = [(datetime.date(2014, 1, 1), 12),  (datetime.date(2014, 1, 2), 13),
-                  (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
+                 (datetime.date(2014, 1, 4), 15),  (datetime.date(2014, 1, 6), 19)]
         self.check_process_rate_data_works(pairs)
 
     def test_process_rate_data_dataframe_extend(self):

@@ -82,9 +82,9 @@ class TangerineClient(BaseClient):
     def Authorize(self):
         secrets_dict = {'username': self.username, 'password': self.password,
                         'security_questions': {
-            self.securityq1: self.securitya1,
-            self.securityq2: self.securitya2,
-            self.securityq3: self.securitya3}}
+                            self.securityq1: self.securitya1,
+                            self.securityq2: self.securitya2,
+                            self.securityq3: self.securitya3}}
 
         secrets = tangerine.tangerinelib.DictionaryBasedSecretProvider(secrets_dict)
         self.client = tangerine.tangerinelib.TangerineClient(secrets)
