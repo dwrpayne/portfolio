@@ -26,6 +26,7 @@ arrow = {git = "https://github.com/dwrpayne/arrow.git", ref = "interval_fix"}
 "beautifulsoup4" = "*"
 werkzeug = "*"
 django-debug-toolbar = "*"
+eventlet = "*"
 
 
 [dev-packages]
