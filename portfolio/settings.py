@@ -51,14 +51,6 @@ INSTALLED_APPS = [
 
 ]
 
-SENTRY_DSN = 'https://c0e0ce1a5e2d44c782de20861b36a0cb:c430a68a5fbe48559bf744a92b52a212@sentry.io/249441'
-if SENTRY_DSN:
-    INSTALLED_APPS += ('raven.contrib.django.raven_compat',)
-    RAVEN_CONFIG = {
-        'dsn': SENTRY_DSN,
-    }
-
-
 MIDDLEWARE = [
     'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',

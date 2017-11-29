@@ -16,10 +16,6 @@ import requests
 from pandas_datareader import data as pdr
 
 
-class ActivitySyncException(Exception):
-    pass
-
-
 class RateHistoryTableMixin(models.Model):
     """
     A mixin class for rate history.
@@ -142,6 +138,9 @@ class HoldingView:
         yesterday_price_CAD = yesterday.price * yesterday.exch
         self.today_price = today.price
         today_price_CAD = today.price * today.exch
+        if today.type == Security.Type.Cash:
+            yesterday_price = yesterday.exch
+            self.today_price = today.exch
         self.price_delta = self.today_price - yesterday_price
         self.percent_delta = self.price_delta / yesterday_price
         self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
