@@ -375,7 +375,7 @@ class DataProvider:
                 return pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
             except:
                 pass
-        return
+        return []
 
     @classmethod
     def GetAlphaVantageData(cls, lookup, start, end):

@@ -19,9 +19,6 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
 
-app.conf.timezone = 'Canada/Pacific'
-
-
 @app.task(bind=True)
 def debug_task(self):
     print('Request: {0!r}'.format(self.request))
@@ -42,6 +39,6 @@ app.conf.beat_schedule = {
     },
     'sync-live-prices': {
         'task': 'finance.tasks.LiveSecurityUpdateTask',
-        'schedule': crontab(minute='*', hour='6-15', day_of_week='mon-fri')
+        'schedule': crontab(minute='*', hour='*', day_of_week='mon-fri')
     },
 }
