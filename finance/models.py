@@ -174,6 +174,13 @@ class SecurityQuerySet(models.query.QuerySet):
 class SecurityManager(models.Manager):
     def get_todays_changes(self, user, by_account=False):
         data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
+        symbols = data.values_list('symbol', flat=True)
+
+        # Verify data
+        assert data.latest('day').day == datetime.date.today(), "Missing all of today's prices! Maybe exchange rates aren't synced?"
+        for s in set(symbols):
+            assert data.filter(symbol=s).last().day == datetime.date.today(), "Missing a price for {} - need to sync it!".format(s)
+
         return list(map(HoldingView, data[::2], data[1::2]))
 
 

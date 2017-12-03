@@ -39,6 +39,6 @@ app.conf.beat_schedule = {
     },
     'sync-live-prices': {
         'task': 'finance.tasks.LiveSecurityUpdateTask',
-        'schedule': crontab(minute='*', hour='*', day_of_week='mon-fri')
+        'schedule': crontab(minute='*/5', hour='*')
     },
 }

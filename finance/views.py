@@ -112,7 +112,8 @@ def Portfolio(request):
 
 
 @login_required
-def History(request):
+def History(request, period):
+
     vals_list = SecurityPrice.objects.get_history(request.user, by_account=True)
     accounts = BaseAccount.objects.filter(client__user=request.user)
     ids = accounts.values_list('id', flat=True)
