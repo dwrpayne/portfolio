@@ -2,6 +2,7 @@ from django.shortcuts import redirect, render
 from django.http import HttpResponse
 from django.db.models import F, Q, Sum
 from django.contrib.auth.decorators import login_required
+from django.db.models.expressions import RawSQL
 
 from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, Allocation, Activity
 from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
@@ -113,12 +114,18 @@ def Portfolio(request):
 
 @login_required
 def History(request, period):
-
-    vals_list = SecurityPrice.objects.get_history(request.user, by_account=True)
+    vals = SecurityPrice.objects.get_history(request.user, by_account=True)
+    if period == 'month':
+        vals = list(vals.filter(
+            day=RawSQL("DATE_TRUNC('month', \"finance_securityprice\".\"day\") + INTERVAL '1 MONTH - 1 day'", ())
+            )) + list(vals.filter(day=datetime.date.today()))
+    elif period == 'year':
+        vals = list(vals.filter(day__day=31, day__month=12)) + list(vals.filter(day=datetime.date.today()))
+        
     accounts = BaseAccount.objects.filter(client__user=request.user)
     ids = accounts.values_list('id', flat=True)
     rows = defaultdict(lambda: {id: 0 for id in ids})
-    for d, a, v in reversed(vals_list):
+    for d, a, v in reversed(vals):
         rows[d][a] = v
 
     context = {
