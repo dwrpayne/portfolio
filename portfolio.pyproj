@@ -141,6 +141,9 @@
     <Compile Include="tangerine\views.py" />
     <Compile Include="tangerine\__init__.py" />
     <Compile Include="utils\api.py" />
+    <Compile Include="utils\dates.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="utils\__init__.py" />
   </ItemGroup>
   <ItemGroup>

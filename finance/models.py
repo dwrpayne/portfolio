@@ -1,7 +1,8 @@
 from django.db import models, transaction
 from django.core.exceptions import ObjectDoesNotExist
 from polymorphic.models import PolymorphicModel
-from django.db.models import F, Q, Sum
+from django.db.models import F, Q, Sum, Case, When
+from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.conf import settings
 
@@ -10,6 +11,7 @@ from decimal import Decimal
 import datetime
 from model_utils import Choices
 import arrow
+import utils.dates
 import pandas
 from dateutil import parser
 import requests
@@ -560,7 +562,8 @@ class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.CharField(max_length=100, primary_key=True)
-    taxable = models.BooleanField()
+    taxable = models.BooleanField(default=True)
+    display_name = models.CharField(max_length=100, editable=False, default='')
 
     class Meta:
         ordering = ['id']
@@ -571,9 +574,9 @@ class BaseAccount(PolymorphicModel):
     def __str__(self):
         return "{} {} {}".format(self.client, self.id, self.type)
 
-    @cached_property
-    def display_name(self):
-        return "{} {}".format(self.client, self.type)
+    def save(self, *args, **kwargs):
+        self.display_name = "{} {}".format(self.client, self.type)
+        super().save(*args, **kwargs)
 
     @property
     def cur_cash_balance(self):
@@ -655,7 +658,7 @@ class HoldingQuerySet(models.query.QuerySet):
     def current(self):
         return self.filter(enddate=None)
 
-    def owned_by(self, user):
+    def for_user(self, user):
         return self.filter(account__client__user=user)
 
     def at_date(self, date):
@@ -663,6 +666,39 @@ class HoldingQuerySet(models.query.QuerySet):
 
     def cash(self):
         return self.filter(security__type=Security.Type.Cash)
+
+    def ordered(self):
+        return self.order_by('day')
+
+    def by_day(self):
+        enddate_fixed = Case(When(enddate=None, then=datetime.date.today()), default='enddate')
+        return self.filter(
+            security__rates__day__range=(F('startdate'), enddate_fixed),
+            security__currency__rates__day=F('security__rates__day')
+        ).annotate(day=F('security__rates__day'))
+    
+    def by_month(self):
+        return self.by_day().filter( day__in=utils.dates.month_ends(self.earliest().startdate) )
+
+    def by_year(self):
+        return self.by_day().filter( day__in=utils.dates.year_ends(self.earliest().startdate) )
+
+    def with_values(self):
+        return self.annotate(
+            val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price'))
+        )
+
+    def with_account_values(self):
+        return self.values('day', 'account_id').annotate(
+            val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price'))
+        ).values_list('day', 'account__display_name', 'val')
+
+    def with_total_values(self):
+        return self.values('day').annotate( 
+            val=Sum(
+                F('qty') * F('security__rates__price') * F('security__currency__rates__price')
+            )
+        ).values_list('day','val')
 
     def value_as_of(self, date):
         if not self:
@@ -693,6 +729,9 @@ class Holding(models.Model):
             models.Index(fields=['startdate']),
             models.Index(fields=['enddate']),
         ]
+
+    def __str__(self):
+        return "{} {} {}, {} - {}".format(self.account, self.qty, self.security, self.startdate, self.enddate)
 
     def __repr__(self):
         return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
@@ -739,14 +778,23 @@ class ManualRawActivity(BaseRawActivity):
 
 
 class ActivityQuerySet(models.query.QuerySet):
-    def dividends(self):
-        return self.filter(type=Activity.Type.Dividend)
-
     def in_year(self, year):
         return self.filter(tradeDate__year=year)
 
-    def owned_by(self, user):
+    def for_user(self, user):
         return self.filter(account__client__user=user)
+
+    def deposits(self):
+        #TODO: hack for accounts that have deposit=buy type.
+        # Figure out a better way to handle this.
+        q = Q(type=Activity.Type.Deposit)
+        q_extended = q | Q(type=Activity.Type.Transfer) | Q(type=Activity.Type.Buy)
+        return self.filter(
+            (Q(account__client_id__in=[7,8]) & q_extended) | 
+            (~Q(account__client_id__in=[7,8]) & q))
+    
+    def dividends(self):
+        return self.filter(type=Activity.Type.Dividend)
 
 
 class Activity(models.Model):
@@ -841,4 +889,4 @@ class UserProfile(models.Model):
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
 
     def GetHeldSecurities(self):
-        return Security.objects.filter(holdings__in=Holding.objects.owned_by(self.user).current()).distinct()
+        return Security.objects.filter(holdings__in=Holding.objects.for_user(self.user).current()).distinct()

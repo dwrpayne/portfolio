@@ -87,6 +87,7 @@ SHELL_PLUS_PRE_IMPORTS = [
     'datetime',
     'arrow',
     'simplejson',
+    'pandas',
     'plotly',
     ('plotly', 'graph_objs'),
     ('collections', 'defaultdict'),

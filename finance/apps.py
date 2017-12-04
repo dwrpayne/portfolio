@@ -11,4 +11,5 @@ class financeConfig(AppConfig):
         
         buf = ctypes.create_unicode_buffer(1024)
         ctypes.windll.kernel32.GetConsoleTitleW(ctypes.byref(buf), 1024)
-        ctypes.windll.kernel32.SetConsoleTitleW('{} {}'.format(buf.value, os.getpid()))
+        words = ' '.join(word for word in buf.value.split() if not word.isdigit())
+        ctypes.windll.kernel32.SetConsoleTitleW('{} {}'.format(words, os.getpid()))

@@ -11,12 +11,14 @@ from collections import defaultdict
 from decimal import Decimal
 import plotly
 import plotly.graph_objs as go
+import pandas
 import simplejson
+from itertools import accumulate
 
 
 def GetHoldingsContext(user):
-    total_value = Holding.objects.current().owned_by(user).value_as_of(datetime.date.today())
-    total_yesterday = Holding.objects.current().owned_by(user).value_as_of(
+    total_value = Holding.objects.current().for_user(user).value_as_of(datetime.date.today())
+    total_yesterday = Holding.objects.current().for_user(user).value_as_of(
         datetime.date.today() - datetime.timedelta(days=1))
     total_gain = total_value - total_yesterday
 
@@ -57,30 +59,25 @@ def GetBalanceContext(user):
                'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
 
+from bisect import bisect_left 
 
 def GeneratePlot(user):
-    pairs = SecurityPrice.objects.get_history(user)
+    pairs = Holding.objects.for_user(user).by_day().with_total_values().ordered()
     dates, vals = list(zip(*pairs))
     trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
+    
+    deposits = Activity.objects.for_user(user).deposits().values_list('tradeDate', 'netAmount')
+    deposit_dates, amounts = list(zip(*list(deposits)))
+    running_deposits=list(accumulate(amounts))
+    trace2 = go.Scatter(name='Deposits', x=deposit_dates, y=running_deposits, mode='lines+markers')
 
-    deposits = Activity.objects.filter(account__client__user=user)
-    f = Q(type=Activity.Type.Deposit)
-    if user.username == 'amie':
-        f = f | Q(type=Activity.Type.Transfer) | Q(type=Activity.Type.Buy)
-
-    deposits = deposits.filter(f).values_list('tradeDate', 'netAmount')
-    dates, amounts = list(zip(*list(deposits)))
-
-    running_totals = []
-    total = 0
-    for a in amounts:
-        total += a
-        running_totals.append(total)
-
-    trace2 = go.Scatter(name='Deposits', x=dates, y=running_totals, mode='lines+markers')
+    growth_vals = [val - running_deposits[
+        min(len(deposit_dates)-1, bisect_left(deposit_dates, date))
+        ] for date,val in pairs]
+    trace3 = go.Scatter(name='Growth', x=dates, y=growth_vals, mode='lines+markers')
 
     plotly_url = plotly.plotly.plot(
-        [trace, trace2], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
+        [trace, trace2, trace3], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
     user.userprofile.plotly_url = plotly_url
     user.userprofile.save()
 
@@ -114,23 +111,21 @@ def Portfolio(request):
 
 @login_required
 def History(request, period):
-    vals = SecurityPrice.objects.get_history(request.user, by_account=True)
-    if period == 'month':
-        vals = list(vals.filter(
-            day=RawSQL("DATE_TRUNC('month', \"finance_securityprice\".\"day\") + INTERVAL '1 MONTH - 1 day'", ())
-            )) + list(vals.filter(day=datetime.date.today()))
-    elif period == 'year':
-        vals = list(vals.filter(day__day=31, day__month=12)) + list(vals.filter(day=datetime.date.today()))
-        
-    accounts = BaseAccount.objects.filter(client__user=request.user)
-    ids = accounts.values_list('id', flat=True)
-    rows = defaultdict(lambda: {id: 0 for id in ids})
-    for d, a, v in reversed(vals):
-        rows[d][a] = v
+    holdings = Holding.objects.for_user(request.user)
+    if period == 'year':
+        vals = holdings.by_year().with_account_values()
+    elif period == 'month':
+        vals = holdings.by_month().with_account_values()
+    elif period == 'day':
+        vals = holdings.by_day().with_account_values()
+
+    df = pandas.DataFrame(list(vals), columns=['day','account','value'], dtype='float')
+    table = df.pivot_table(index='day', columns='account', values='value', fill_value=0)
+    rows = table.iloc[::-1].iterrows()
 
     context = {
-        'names': [a.display_name for a in accounts] + ['Total'],
-        'rows': [(date, vals.values(), sum(vals.values())) for date, vals in rows.items()],
+        'names': list(table.columns) + ['Total'],
+        'rows': ((date, vals, sum(vals)) for date, vals in rows),
     }
 
     return render(request, 'finance/history.html', context)

@@ -28,6 +28,7 @@ werkzeug = "*"
 django-debug-toolbar = "*"
 eventlet = "*"
 ipython = "*"
+pendulum = "*"
 
 
 [dev-packages]
