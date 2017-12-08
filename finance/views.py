@@ -4,8 +4,10 @@ from django.db.models import F, Q, Sum
 from django.contrib.auth.decorators import login_required
 from django.db.models.expressions import RawSQL
 
-from .models import BaseAccount, DataProvider, Holding, Security, SecurityPrice, Currency, Allocation, Activity
+from .models import BaseAccount, DataProvider, Holding, HoldingDetail, Security, SecurityPrice, Currency, Allocation, Activity
 from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
+from .services import GetRebalanceInfo, GeneratePlot
+
 import datetime
 from collections import defaultdict
 from decimal import Decimal
@@ -13,13 +15,11 @@ import plotly
 import plotly.graph_objs as go
 import pandas
 import simplejson
-from itertools import accumulate
-
+import numpy
 
 def GetHoldingsContext(user):
-    total_value = Holding.objects.current().for_user(user).value_as_of(datetime.date.today())
-    total_yesterday = Holding.objects.current().for_user(user).value_as_of(
-        datetime.date.today() - datetime.timedelta(days=1))
+    total_value = HoldingDetail.objects.for_user(user).today().total_values().first()[1]
+    total_yesterday = HoldingDetail.objects.for_user(user).yesterday().total_values().first()[1]
     total_gain = total_value - total_yesterday
 
     holding_data = Security.objects.get_todays_changes(user)
@@ -59,36 +59,12 @@ def GetBalanceContext(user):
                'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
 
-from bisect import bisect_left 
-
-def GeneratePlot(user):
-    pairs = Holding.objects.for_user(user).by_day().with_total_values().ordered()
-    dates, vals = list(zip(*pairs))
-    trace = go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers')
-    
-    deposits = Activity.objects.for_user(user).deposits().values_list('tradeDate', 'netAmount')
-    deposit_dates, amounts = list(zip(*list(deposits)))
-    running_deposits=list(accumulate(amounts))
-    trace2 = go.Scatter(name='Deposits', x=deposit_dates, y=running_deposits, mode='lines+markers')
-
-    growth_vals = [val - running_deposits[
-        min(len(deposit_dates)-1, bisect_left(deposit_dates, date))
-        ] for date,val in pairs]
-    trace3 = go.Scatter(name='Growth', x=dates, y=growth_vals, mode='lines+markers')
-
-    plotly_url = plotly.plotly.plot(
-        [trace, trace2, trace3], filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
-    user.userprofile.plotly_url = plotly_url
-    user.userprofile.save()
-
 
 @login_required
 def Portfolio(request):
-    if not request.user.userprofile.plotly_url:
+    if not request.user.userprofile.portfolio_iframe:
         GeneratePlot(request.user)
 
-    plotly_html = '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(
-        request.user.userprofile.plotly_url)
     if request.is_ajax():
         if 'refresh-live' in request.GET:
             result = GetLiveUpdateTaskGroup(request.user)()
@@ -96,7 +72,6 @@ def Portfolio(request):
 
         elif 'refresh-plot' in request.GET:
             GeneratePlot(request.user)
-            plotly_html = plotly.tools.get_embed(request.user.userprofile.plotly_url)
 
         elif 'refresh-account' in request.GET:
             for client in request.user.clients.all():
@@ -105,22 +80,23 @@ def Portfolio(request):
             DataProvider.SyncAllSecurities()
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
-    overall_context['plotly_embed_html'] = plotly_html
+    overall_context['plotly_embed_html'] = request.user.userprofile.portfolio_iframe
     return render(request, 'finance/portfolio.html', overall_context)
 
 
 @login_required
 def History(request, period):
-    holdings = Holding.objects.for_user(request.user)
+    holdings = HoldingDetail.objects.for_user(request.user)
     if period == 'year':
-        vals = holdings.by_year().with_account_values()
+        holdings = holdings.year_end()
     elif period == 'month':
-        vals = holdings.by_month().with_account_values()
-    elif period == 'day':
-        vals = holdings.by_day().with_account_values()
+        holdings = holdings.month_end()
 
-    df = pandas.DataFrame(list(vals), columns=['day','account','value'], dtype='float')
-    table = df.pivot_table(index='day', columns='account', values='value', fill_value=0)
+    vals = holdings.account_values()
+
+    array = numpy.rec.array(list(vals), dtype=[('account','S20'),('day','S10'),('val','f4')])
+    df = pandas.DataFrame(array)
+    table = df.pivot_table(index='day', columns='account', values='val', fill_value=0)
     rows = table.iloc[::-1].iterrows()
 
     context = {
@@ -133,7 +109,7 @@ def History(request, period):
 
 @login_required
 def Rebalance(request):
-    allocs, missing = Allocation.objects.get_rebalance_info(request.user)
+    allocs, missing = GetRebalanceInfo(request.user)
 
     total = [sum(a.desired_pct for a in allocs),
              sum(a.current_pct for a in allocs),
@@ -157,7 +133,7 @@ def accountdetail(request, account_id):
     if not account.client.user == request.user:
         return HttpResponse('Unauthorized', status=401)
 
-    activities = list(account.activities.all())
+    activities = reversed(list(account.activities.all()))
 
     context = {'account': account, 'activities': activities}
     return render(request, 'finance/account.html', context)

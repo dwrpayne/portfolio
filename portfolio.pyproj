@@ -44,6 +44,9 @@
     <Compile Include="finance\apps.py" />
     <Compile Include="finance\migrations\__init__.py" />
     <Compile Include="finance\models.py" />
+    <Compile Include="finance\services.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="finance\tasks.py">
       <SubType>Code</SubType>
     </Compile>
@@ -142,6 +145,9 @@
     <Compile Include="tangerine\__init__.py" />
     <Compile Include="utils\api.py" />
     <Compile Include="utils\dates.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="utils\misc.py">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="utils\__init__.py" />

@@ -10,18 +10,17 @@ def SyncClientPrices(client_id):
         with client:
             client.SyncPrices()
 
-
 @shared_task(max_retries=5, default_retry_delay=5, autoretry_for=(ConnectionError,))
 def SyncClientAccountBalances(client_id):
     from .models import BaseClient
     with BaseClient.objects.get(pk=client_id) as client:
         client.SyncCurrentAccountBalances()
 
-
 @shared_task
 def LiveSecurityUpdateTask():
-    from .models import DataProvider
+    from .models import DataProvider, HoldingDetail
     DataProvider.SyncLiveSecurities()
+    HoldingDetail.Refresh()
 
 
 @shared_task

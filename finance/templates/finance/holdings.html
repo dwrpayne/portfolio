@@ -20,7 +20,7 @@
             {% for holding_view in security_data %}
             <tr>
                 <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter}}" >&gt;</div></td>
-                <td><a href="{% url 'finance:securitydetail' symbol %}">{{holding_view.symbol}}</a></td>
+                <td><a href="{% url 'finance:securitydetail' holding_view.symbol %}">{{holding_view.symbol}}</a></td>
                 <td>{{holding_view.today_price | floatformat:2}}</td>
                 <td>{{holding_view.price_delta | floatformat:2 | colorize}} {{holding_view.percent_delta | percentage | parens | colorize}}</td>
                 <td>{{holding_view.qty | floatformat:0}}</td>

@@ -1,4 +1,4 @@
-from django.db import models, transaction
+from django.db import models, transaction, connection
 from django.core.exceptions import ObjectDoesNotExist
 from polymorphic.models import PolymorphicModel
 from django.db.models import F, Q, Sum, Case, When
@@ -580,7 +580,10 @@ class BaseAccount(PolymorphicModel):
 
     @property
     def cur_cash_balance(self):
-        return self.holding_set.current().cash().value_as_of(datetime.date.today())
+        query = self.holdingdetail_set.cash().today().total_values()
+        if query:
+            return query.first()[1]
+        return 0
 
     @property
     def cur_balance(self):
@@ -613,10 +616,10 @@ class BaseAccount(PolymorphicModel):
             return None
 
     def GetValueAtDate(self, date):
-        return self.holding_set.at_date(date).value_as_of(date)
+        return self.holdingdetail_set.at_date(date).total_values().first()[1]
 
     def GetValueToday(self):
-        return self.holding_set.current().value_as_of(datetime.date.today())
+        return self.holdingdetail_set.today().total_values().first()[1]
 
     def GetDividendsInYear(self, year):
         sum(self.activities.dividends().in_year(year).values_list('netAmount', flat=True))
@@ -652,7 +655,7 @@ class HoldingManager(models.Manager):
             print("Creating {} {} {} {}".format(security, new_qty, date, None))
             self.create(account=account, security=security,
                         qty=new_qty, startdate=date, enddate=None)
-
+            
 
 class HoldingQuerySet(models.query.QuerySet):
     def current(self):
@@ -660,56 +663,7 @@ class HoldingQuerySet(models.query.QuerySet):
 
     def for_user(self, user):
         return self.filter(account__client__user=user)
-
-    def at_date(self, date):
-        return self.filter(startdate__lte=date).exclude(enddate__lt=date)
-
-    def cash(self):
-        return self.filter(security__type=Security.Type.Cash)
-
-    def ordered(self):
-        return self.order_by('day')
-
-    def by_day(self):
-        enddate_fixed = Case(When(enddate=None, then=datetime.date.today()), default='enddate')
-        return self.filter(
-            security__rates__day__range=(F('startdate'), enddate_fixed),
-            security__currency__rates__day=F('security__rates__day')
-        ).annotate(day=F('security__rates__day'))
-    
-    def by_month(self):
-        return self.by_day().filter( day__in=utils.dates.month_ends(self.earliest().startdate) )
-
-    def by_year(self):
-        return self.by_day().filter( day__in=utils.dates.year_ends(self.earliest().startdate) )
-
-    def with_values(self):
-        return self.annotate(
-            val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price'))
-        )
-
-    def with_account_values(self):
-        return self.values('day', 'account_id').annotate(
-            val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price'))
-        ).values_list('day', 'account__display_name', 'val')
-
-    def with_total_values(self):
-        return self.values('day').annotate( 
-            val=Sum(
-                F('qty') * F('security__rates__price') * F('security__currency__rates__price')
-            )
-        ).values_list('day','val')
-
-    def value_as_of(self, date):
-        if not self:
-            return 0
-        filtered = self.at_date(date).filter(security__rates__day=date,
-                                             security__currency__rates__day=date)
-        if not filtered:
-            print("HoldingQuerySet filtered out because of missing price data")
-            return 0
-        return filtered.aggregate(val=Sum(F('qty') * F('security__rates__price') * F('security__currency__rates__price')))['val']
-
+        
 
 class Holding(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE)
@@ -847,32 +801,11 @@ class Activity(models.Model):
         return effect
 
 
-class AllocationManager(models.Manager):
-    def get_rebalance_info(self, user):
-        securities = Security.objects.with_prices(user)
-        total_value = sum(s.value for s in securities)
-
-        allocs = list(user.allocations.all().prefetch_related('securities'))
-        for alloc in allocs:
-            alloc.current_amt = sum(s.value for s in securities if s in alloc.securities.all())
-            alloc.current_pct = alloc.current_amt / total_value
-            alloc.desired_amt = alloc.desired_pct * total_value
-            alloc.buysell = alloc.desired_amt - alloc.current_amt
-        allocs.sort(key=lambda a: a.desired_pct, reverse=True)
-
-        missing = [s for s in securities if not s.allocation_set.exists()]
-        for s in missing:
-            s.current_pct = s.value / total_value
-
-        return allocs, missing
-
-
 class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='allocations')
     securities = models.ManyToManyField(Security)
     desired_pct = models.DecimalField(max_digits=6, decimal_places=4)
-    objects = AllocationManager()
 
     def __str__(self):
         return "{} - {} - {}".format(self.user, self.desired_pct, self.list_securities())
@@ -890,3 +823,82 @@ class UserProfile(models.Model):
 
     def GetHeldSecurities(self):
         return Security.objects.filter(holdings__in=Holding.objects.for_user(self.user).current()).distinct()
+
+    def GetAccounts(self):
+        return BaseAccount.objects.filter(client__user=self.user)
+
+    @property
+    def portfolio_iframe(self):
+        if self.plotly_url: 
+            return '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(self.plotly_url)
+        return None
+
+
+class HoldingDetailQuerySet(models.query.QuerySet):    
+    def for_user(self, user):
+        return self.filter(account__client__user=user)
+    
+    def at_date(self, date):
+        return self.filter(day=date)
+
+    def today(self):
+        return self.at_date(datetime.date.today())
+
+    def yesterday(self):
+        return self.at_date(datetime.date.today() - datetime.timedelta(days=1))
+    
+    def cash(self):
+        return self.filter(type=Security.Type.Cash)
+
+    def ordered(self):
+        return self.order_by('day')
+
+    def month_end(self):
+        return self.filter( day__in=utils.dates.month_ends(self.earliest().day) )
+    
+    def year_end(self):
+        return self.filter( day__in=utils.dates.year_ends(self.earliest().day) )
+
+    def account_values(self):
+        return self.values_list('account','day').annotate(Sum(F('value')))
+
+    def total_values(self):
+        return self.values_list('day').annotate(Sum('value'))
+
+
+class HoldingDetail(models.Model):
+    account = models.ForeignKey(BaseAccount, on_delete=models.DO_NOTHING)
+    security = models.ForeignKey(Security, on_delete=models.DO_NOTHING)
+    day = models.DateField()
+    qty = models.DecimalField(max_digits=16, decimal_places=6)
+    price = models.DecimalField(max_digits=16, decimal_places=6)
+    exch = models.DecimalField(max_digits=16, decimal_places=6)
+    cad = models.DecimalField(max_digits=16, decimal_places=6)
+    value = models.DecimalField(max_digits=16, decimal_places=6)
+    type = models.CharField(max_length=30)
+
+    objects = HoldingDetailQuerySet.as_manager()
+
+    @classmethod
+    def Refresh(cls):
+        cursor = connection.cursor()
+        try:
+            cursor.execute("REFRESH MATERIALIZED VIEW finance_holdingdetail;")
+            connection.commit()
+        finally:
+            cursor.close()
+
+    class Meta:
+        managed = False
+        db_table = 'finance_holdingdetail'
+        get_latest_by = 'day'
+
+    def __str__(self):
+        return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
+            self.account_id, self.day, self.security_id, self.qty, 
+            self.price, self.exch, self.cad, self.value, self.type)
+
+    def __repr__(self):
+        return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
+            self.account_id, self.day, self.security_id, self.qty, 
+            self.price, self.exch, self.cad, self.value, self.type)
