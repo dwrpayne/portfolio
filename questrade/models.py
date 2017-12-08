@@ -137,7 +137,7 @@ class QuestradeRawActivity(BaseRawActivity):
 
         create_args['cash_id'] = json['currency'] + ' Cash'
 
-        return Activity.objects.create(**create_args)
+        Activity.objects.create(**create_args)
 
 
 class QuestradeAccount(BaseAccount):
@@ -157,6 +157,11 @@ class QuestradeAccount(BaseAccount):
     @property
     def yesterday_balance(self):
         return self.sodBalanceSynced
+
+    def UpdateSyncedBalances(self, current, sod):
+        self.curBalanceSynced = current
+        self.sodBalanceSynced = sod
+        self.save()
 
 
 class QuestradeClient(BaseClient):
@@ -215,9 +220,9 @@ class QuestradeClient(BaseClient):
 
     def SyncAccounts(self):
         for account_json in self.GetAccounts():
-            QuestradeAccount.objects.update_or_create(
-                type=account_json['type'], id=account_json['number'], client=self, taxable=False)
-
+            QuestradeAccount.objects.get_or_create(
+                type=account_json['type'], id=account_json['number'], client=self, defaults={'taxable' : False})
+            
         AddManualRawActivity()
 
     def _CreateRawActivities(self, account, start, end):
@@ -237,11 +242,10 @@ class QuestradeClient(BaseClient):
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
             json = self._GetRequest('accounts/%s/balances' % (a.id))
-            a.curBalanceSynced = next(
-                currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-            a.sodBalanceSynced = next(
-                currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-            a.save()
+            current = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
+            sod = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
+            a.UpdateSyncedBalances(current, sod)
+
 
 
 tfsa_activity_data = [
@@ -333,7 +337,8 @@ rrsp_activity_data = [
     ('1/31/2011', 'Buy', 'XSB.TO', 'CAD', '28.81', '260', '-7496.51', ''),
     ('1/12/2011', 'Sell', 'EA  110219C00017000', 'USD', '40', '-3', '107.04', ''),
     ('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
-    ('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', '')
+    ('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', ''),
+    ('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', '')
 ]
 
 sarah_tfsa_data = [
@@ -358,7 +363,7 @@ def AddManualRawActivity():
                              ]:
         account = BaseAccount.objects.get(id=account_id)
         for date, type, security, cash, price, qty, netAmount, description in data:
-            act = ManualRawActivity(day=parser.parse(date),
+            act = ManualRawActivity.objects.create(day=parser.parse(date),
                                     security=security,
                                     type=type,
                                     cash=cash,
@@ -368,7 +373,4 @@ def AddManualRawActivity():
                                     description=description,
                                     account=account)
 
-            act.save()
-            b = act.CreateActivity()
-            b.save()
-        account.RegenerateHoldings()
+            act.CreateActivity()

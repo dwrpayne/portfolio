@@ -164,7 +164,7 @@ def capgains(request, symbol):
         act.cadprice = act.exch * act.price
         if not act.cadprice:
             act.cadprice = act.security.GetPriceCAD(act.tradeDate)
-        act.commission = abs(act.exch * Decimal(simplejson.loads(act.raw.jsonstr)['commission']))
+        act.commission = 0#abs(act.exch * Decimal(simplejson.loads(act.raw.jsonstr)['commission']))
 
         prevacbpershare = totalacb / totalqty if totalqty else 0
 

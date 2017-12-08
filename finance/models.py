@@ -181,17 +181,17 @@ class SecurityManager(models.Manager):
             security = self.CreateStock(symbol, currency)
 
     def CreateStock(self, symbol, currency_str):
-        return Security.objects.create(
+        return super().create(
             symbol=symbol,
-            type=cls.Type.Stock,
+            type=self.model.Type.Stock,
             currency_id=currency_str,
             lookupSymbol=symbol
         )
 
     def CreateMutualFund(self, symbol, currency_str):
-        return Security.objects.create(
+        return super().create(
             symbol=symbol,
-            type=cls.Type.MutualFund,
+            type=self.model.Type.MutualFund,
             currency_id=currency_str,
             lookupSymbol=symbol
         )
@@ -204,9 +204,9 @@ class SecurityManager(models.Manager):
         strike is a Decimal
         currency_str is the 3 digit currency code
         """
-        return Security.objects.create(
+        return super().create(
             symbol=optsymbol,
-            type=cls.Type.Option,
+            type=self.model.Type.Option,
             currency_id=currency_str
         )
 
@@ -220,11 +220,11 @@ class SecurityManager(models.Manager):
         """
         optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
             '%y%m%d'), callput[0], Decimal(strike) * 1000)
-        option, created = Security.objects.get_or_create(
+        option, created = super().get_or_create(
             symbol=optsymbol,
             defaults={
                 'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
-                'type': cls.Type.Option,
+                'type': self.model.Type.Option,
                 'currency_id': currency_str
             })
         return option
@@ -546,6 +546,7 @@ class BaseClient(PolymorphicModel):
         return sum(self._CreateRawActivities(account, start, end) for start, end in date_range)
 
     def Refresh(self):
+        self.SyncAccounts()
         for account in self.accounts.all():
             new_activities = self.SyncActivities(account)
             # TODO: Better error handling when we can't actually sync new activities from server. Should we still regen here?
@@ -596,7 +597,8 @@ class BaseAccount(PolymorphicModel):
         return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
     def RegenerateActivities(self):
-        Activity.objects.RegenerateFromRaw(self.rawactivities.all())
+        self.activities.all().delete()
+        Activity.objects.GenerateFromRaw(self.rawactivities.all())
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
@@ -629,21 +631,13 @@ class HoldingManager(models.Manager):
     def add_effect(self, account, security, qty_delta, date):
         previous_qty = 0
         try:
-            samedate_q = self.filter(security=security, startdate=date, enddate=None)
-            if samedate_q:
-                obj = samedate_q[0]
-                obj.qty += qty_delta
-                if obj.qty == 0:
-                    obj.delete()
-                else:
-                    obj.save()
-                return
-
             current_holding = self.get(security=security, enddate=None)
-            current_holding.enddate = date - datetime.timedelta(days=1)
-            previous_qty = current_holding.qty
-            # print ("Updated old {} enddate({}) prev {}".format(security, current_holding.enddate, previous_qty))
-            current_holding.save(update_fields=['enddate'])
+            if current_holding.startdate == date:
+                current_holding.AddQty(qty_delta)
+                return
+            else:
+                current_holding.SetEndsOn(date - datetime.timedelta(days=1))
+                previous_qty = current_holding.qty
 
         except Holding.MultipleObjectsReturned:
             print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(security))
@@ -690,6 +684,17 @@ class Holding(models.Model):
     def __repr__(self):
         return "Holding({},{},{},{},{})".format(self.account, self.security, self.qty, self.startdate, self.enddate)
 
+    def AddQty(self, qty_delta):
+        self.qty += qty_delta
+        if self.qty == 0:
+            self.delete()
+        else:
+            self.save()
+
+    def SetEndsOn(self, date):        
+        self.enddate = date
+        self.save(update_fields=['enddate'])
+
 
 class BaseRawActivity(PolymorphicModel):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
@@ -716,10 +721,10 @@ class ManualRawActivity(BaseRawActivity):
         if self.security:
             try:
                 security = Security.objects.get(symbol=self.security)
-            except:
+            except Security.DoesNotExist:
                 security = Security.objects.create(self.security, self.cash)
 
-        return Activity.objects.create(account=self.account, tradeDate=self.day, security=security, 
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, 
                     description=self.description, cash_id=self.cash + ' Cash', qty=self.qty,
                     price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
     
@@ -729,10 +734,10 @@ class ActivityManager(models.Manager):
             kwargs['cash_id'] = None
         super().create(*args, **kwargs)
 
-    def RegenerateFromRaw(self, rawactivities):
-        self.activities.all().delete()
-        for raw in rawactivities.all(): 
-            raw.CreateActivity()
+    def GenerateFromRaw(self, rawactivities):
+        with transaction.atomic():
+            for raw in rawactivities: 
+                raw.CreateActivity()
 
 class ActivityQuerySet(models.query.QuerySet):
     def in_year(self, year):
@@ -742,13 +747,7 @@ class ActivityQuerySet(models.query.QuerySet):
         return self.filter(account__client__user=user)
 
     def deposits(self):
-        #TODO: hack for accounts that have deposit=buy type.
-        # Figure out a better way to handle this.
-        q = Q(type=Activity.Type.Deposit)
-        q_extended = q | Q(type=Activity.Type.Transfer) | Q(type=Activity.Type.Buy)
-        return self.filter(
-            (Q(account__client_id__in=[7,8]) & q_extended) | 
-            (~Q(account__client_id__in=[7,8]) & q))
+        return self.filter(type=Activity.Type.Deposit)
     
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)
@@ -768,7 +767,7 @@ class Activity(models.Model):
     Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell',
                    'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)
-    raw = models.OneToOneField(BaseRawActivity, on_delete=models.CASCADE)
+    raw = models.ForeignKey(BaseRawActivity, on_delete=models.CASCADE)
 
     
     objects = ActivityManager.from_queryset(ActivityQuerySet)()

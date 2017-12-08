@@ -17,10 +17,10 @@ class TangerineRawActivity(BaseRawActivity):
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
     def __str__(self):
-        return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.security, self.price)
+        return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.symbol, self.price)
 
     def __repr__(self):
-        return 'TangerineRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.security, self.qty, self.price)
+        return 'TangerineRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.symbol, self.qty, self.price)
 
     def CreateActivity(self):
         if self.security == 'Tangerine Equity Growth Portfolio':
@@ -38,8 +38,14 @@ class TangerineRawActivity(BaseRawActivity):
         else:
             activity_type = Activity.Type.Dividend
 
-        return Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
-                        price=self.price, netAmount=self.qty * self.price, type=activity_type, raw=self)
+            
+        total_cost = self.qty*self.price
+
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description='Generated Deposit', qty=self.qty,
+                        price=self.price, netAmount=-total_cost, type=Activity.Type.Deposit, raw=self)
+            
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
+                        price=self.price, netAmount=total_cost, type=activity_type, raw=self)
 
 
 class TangerineAccount(BaseAccount):

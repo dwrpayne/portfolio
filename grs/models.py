@@ -14,9 +14,7 @@ class GrsRawActivity(BaseRawActivity):
     symbol = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
-
-    class Meta:
-        unique_together = ('baserawactivity_ptr', 'day', 'symbol', 'qty', 'price')
+    description = models.CharField(max_length=256)
 
     def __str__(self):
         return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.symbol, self.price)
@@ -30,8 +28,16 @@ class GrsRawActivity(BaseRawActivity):
         except:
             security = Security.CreateMutualFund(self.symbol, 'CAD')
 
-        return Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description='', qty=self.qty,
-                        price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
+        total_cost = self.qty*self.price
+
+            
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=None, 
+                                       description='Generated Deposit', qty=0, raw=self,
+                                       price=0, netAmount=total_cost, type=Activity.Type.Deposit)
+
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, 
+                                       description=self.description, qty=self.qty, raw=self,
+                                       price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
 
 
 class GrsAccount(BaseAccount):
@@ -69,16 +75,18 @@ class GrsClient(BaseClient):
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date()
                        for tag in soup.find_all('td', class_='activities-d-lit1')]
+        descriptions = [tag.contents[0]
+                       for tag in soup.find_all('td', class_='activities-d-lit2')]
         units = [Decimal(tag.contents[0])
                  for tag in soup.find_all('td', class_='activities-d-unitnum')]
         prices = [Decimal(tag.contents[0])
                   for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
         count = 0
         with transaction.atomic():
-            for day, qty, price in zip(trans_dates, units, prices):
-                obj, created = GrsRawActivity.objects.get_or_create(
-                    account=account, day=day, qty=qty, price=price, symbol='ETP')
-                if created: count += 1
+            for day, qty, price, desc in zip(trans_dates, units, prices, descriptions):
+                GrsRawActivity.objects.create(
+                    account=account, day=day, qty=qty, price=price, symbol='ETP', description=desc)
+                count += 1
         return count
 
     def _GetRawPrices(self, lookup, start_date, end_date):
