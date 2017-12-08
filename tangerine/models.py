@@ -12,7 +12,7 @@ class TangerineRawActivity(BaseRawActivity):
     description = models.CharField(max_length=1000)
     activity_id = models.CharField(max_length=32, unique=True)
     type = models.CharField(max_length=32)
-    security = models.CharField(max_length=100)
+    symbol = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
@@ -38,7 +38,7 @@ class TangerineRawActivity(BaseRawActivity):
         else:
             activity_type = Activity.Type.Dividend
 
-        return Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
+        return Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
                         price=self.price, netAmount=self.qty * self.price, type=activity_type, raw=self)
 
 

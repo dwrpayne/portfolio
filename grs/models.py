@@ -11,21 +11,26 @@ from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, S
 
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
-    security = models.ForeignKey(Security, on_delete=models.CASCADE, null=True)
+    symbol = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
 
     class Meta:
-        unique_together = ('baserawactivity_ptr', 'day', 'security', 'qty', 'price')
+        unique_together = ('baserawactivity_ptr', 'day', 'symbol', 'qty', 'price')
 
     def __str__(self):
-        return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.security, self.price)
+        return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.symbol, self.price)
 
     def __repr__(self):
-        return 'GrsRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.security, self.qty, self.price)
+        return 'GrsRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.symbol, self.qty, self.price)
 
-    def CreateActivity(self):
-        return Activity(account=self.account, tradeDate=self.day, security=self.security, description='', qty=self.qty,
+    def CreateActivity(self):        
+        try:
+            security = Security.objects.get(symbol=self.symbol)
+        except:
+            security = Security.CreateMutualFund(self.symbol, 'CAD')
+
+        return Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description='', qty=self.qty,
                         price=self.price, netAmount=0, type=Activity.Type.Buy, raw=self)
 
 

@@ -73,9 +73,10 @@ class QuestradeRawActivity(BaseRawActivity):
 
         # Handle Options cleanup
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
+
             callput, symbol, expiry, strike = json['description'].split()[:4]
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
-            security = Security.CreateOption(callput, symbol, expiry, strike, json['currency'])
+            security = Security.objects.CreateOption(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
 
         # Hack to fix invalid Questrade data just for me
@@ -136,8 +137,7 @@ class QuestradeRawActivity(BaseRawActivity):
 
         create_args['cash_id'] = json['currency'] + ' Cash'
 
-        activity = Activity(**create_args)
-        return activity
+        return Activity.objects.create(**create_args)
 
 
 class QuestradeAccount(BaseAccount):

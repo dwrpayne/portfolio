@@ -139,8 +139,18 @@ def accountdetail(request, account_id):
     return render(request, 'finance/account.html', context)
 
 
+
 @login_required
 def securitydetail(request, symbol):
+    security = Security.objects.get(symbol=symbol)
+    activities = reversed(list(security.activities.filter(account__client__user=request.user)))
+
+    context = {'activities': activities, 'symbol' : symbol}
+    return render(request, 'finance/security.html', context)
+
+
+@login_required
+def capgains(request, symbol):
     security = Security.objects.get(symbol=symbol)
     activities = security.activities.filter(
         account__client__user=request.user, account__taxable=True, security__currency__rates__day=F('tradeDate')
@@ -181,7 +191,7 @@ def securitydetail(request, symbol):
     pendinggain = security.live_price_cad * totalqty - totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
-    return render(request, 'finance/security.html', context)
+    return render(request, 'finance/capgains.html', context)
 
 
 @login_required

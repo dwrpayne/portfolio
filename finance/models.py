@@ -174,6 +174,62 @@ class SecurityQuerySet(models.query.QuerySet):
 
 
 class SecurityManager(models.Manager):
+    def create(self, symbol, currency, **kwargs):
+        if len(symbol) >= 20:
+            security = self.CreateOptionRaw(symbol, currency)
+        else:
+            security = self.CreateStock(symbol, currency)
+
+    def CreateStock(self, symbol, currency_str):
+        return Security.objects.create(
+            symbol=symbol,
+            type=cls.Type.Stock,
+            currency_id=currency_str,
+            lookupSymbol=symbol
+        )
+
+    def CreateMutualFund(self, symbol, currency_str):
+        return Security.objects.create(
+            symbol=symbol,
+            type=cls.Type.MutualFund,
+            currency_id=currency_str,
+            lookupSymbol=symbol
+        )
+
+    def CreateOptionRaw(self, optsymbol, currency_str):
+        """
+        callput is either 'call' or 'put'.
+        symbol is the base symbol of the underlying
+        expiry is a datetime.date
+        strike is a Decimal
+        currency_str is the 3 digit currency code
+        """
+        return Security.objects.create(
+            symbol=optsymbol,
+            type=cls.Type.Option,
+            currency_id=currency_str
+        )
+
+    def CreateOption(self, callput, symbol, expiry, strike, currency_str):
+        """
+        callput is either 'call' or 'put'.
+        symbol is the base symbol of the underlying
+        expiry is a datetime.date
+        strike is a Decimal
+        currency_str is the 3 digit currency code
+        """
+        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
+            '%y%m%d'), callput[0], Decimal(strike) * 1000)
+        option, created = Security.objects.get_or_create(
+            symbol=optsymbol,
+            defaults={
+                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
+                'type': cls.Type.Option,
+                'currency_id': currency_str
+            })
+        return option
+
+
     def get_todays_changes(self, user, by_account=False):
         data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
         symbols = data.values_list('symbol', flat=True)
@@ -205,7 +261,6 @@ class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
 
-
 class Security(RateLookupMixin):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
 
@@ -227,59 +282,6 @@ class Security(RateLookupMixin):
 
     def __repr(self):
         return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)
-
-    @classmethod
-    def CreateStock(cls, symbol, currency_str):
-        return Security.objects.create(
-            symbol=symbol,
-            type=cls.Type.Stock,
-            currency_id=currency_str,
-            lookupSymbol=symbol
-        )
-
-    @classmethod
-    def CreateMutualFund(cls, symbol, currency_str):
-        return Security.objects.create(
-            symbol=symbol,
-            type=cls.Type.MutualFund,
-            currency_id=currency_str,
-            lookupSymbol=symbol
-        )
-
-    @classmethod
-    def CreateOptionRaw(cls, optsymbol, currency_str):
-        """
-        callput is either 'call' or 'put'.
-        symbol is the base symbol of the underlying
-        expiry is a datetime.date
-        strike is a Decimal
-        currency_str is the 3 digit currency code
-        """
-        return Security.objects.create(
-            symbol=optsymbol,
-            type=cls.Type.Option,
-            currency_id=currency_str
-        )
-
-    @classmethod
-    def CreateOption(cls, callput, symbol, expiry, strike, currency_str):
-        """
-        callput is either 'call' or 'put'.
-        symbol is the base symbol of the underlying
-        expiry is a datetime.date
-        strike is a Decimal
-        currency_str is the 3 digit currency code
-        """
-        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
-            '%y%m%d'), callput[0], Decimal(strike) * 1000)
-        option, created = Security.objects.get_or_create(
-            symbol=optsymbol,
-            defaults={
-                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
-                'type': cls.Type.Option,
-                'currency_id': currency_str
-            })
-        return option
 
     class Meta:
         verbose_name_plural = 'Securities'
@@ -594,9 +596,7 @@ class BaseAccount(PolymorphicModel):
         return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
     def RegenerateActivities(self):
-        self.activities.all().delete()
-        all_activities = [raw.CreateActivity() for raw in self.rawactivities.all()]
-        Activity.objects.bulk_create([a for a in all_activities if a is not None])
+        Activity.objects.RegenerateFromRaw(self.rawactivities.all())
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
@@ -717,19 +717,22 @@ class ManualRawActivity(BaseRawActivity):
             try:
                 security = Security.objects.get(symbol=self.security)
             except:
-                if len(self.security) >= 20:
-                    security = Security.CreateOptionRaw(self.security, self.cash)
-                else:
-                    security = Security.CreateStock(self.security, self.cash)
+                security = Security.objects.create(self.security, self.cash)
 
-        a = Activity(account=self.account, tradeDate=self.day, security=security, description=self.description, 
-                     cash_id=self.cash + ' Cash', qty=self.qty,
-                     price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
+        return Activity.objects.create(account=self.account, tradeDate=self.day, security=security, 
+                    description=self.description, cash_id=self.cash + ' Cash', qty=self.qty,
+                    price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
+    
+class ActivityManager(models.Manager):
+    def create(self, *args, **kwargs):
+        if 'cash_id' in kwargs and not kwargs['cash_id']:
+            kwargs['cash_id'] = None
+        super().create(*args, **kwargs)
 
-        if not a.cash_id:
-            a.cash = None
-        return a
-
+    def RegenerateFromRaw(self, rawactivities):
+        self.activities.all().delete()
+        for raw in rawactivities.all(): 
+            raw.CreateActivity()
 
 class ActivityQuerySet(models.query.QuerySet):
     def in_year(self, year):
@@ -767,7 +770,8 @@ class Activity(models.Model):
     type = models.CharField(max_length=100, choices=Type)
     raw = models.OneToOneField(BaseRawActivity, on_delete=models.CASCADE)
 
-    objects = ActivityQuerySet.as_manager()
+    
+    objects = ActivityManager.from_queryset(ActivityQuerySet)()
     objects.use_for_related_fields = True
 
     class Meta:
@@ -822,7 +826,10 @@ class UserProfile(models.Model):
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
 
     def GetHeldSecurities(self):
-        return Security.objects.filter(holdings__in=Holding.objects.for_user(self.user).current()).distinct()
+        return Holding.objects.for_user(self.user).current().values_list('security_id', flat=True).distinct()
+    
+    def GetTaxableSecurities(self):
+        return Holding.objects.filter(account__taxable=True).for_user(self.user).current().values_list('security_id', flat=True).distinct()
 
     def GetAccounts(self):
         return BaseAccount.objects.filter(client__user=self.user)

@@ -4,7 +4,7 @@ from .models import TangerineClient, TangerineRawActivity, TangerineAccount
 
 
 class TangerineRawActivityAdmin(admin.ModelAdmin):
-    list_display = ['account', 'day', 'security', 'qty', 'price', 'description']
+    list_display = ['account', 'day', 'symbol', 'qty', 'price', 'description']
 
 
 admin.site.register(TangerineRawActivity, TangerineRawActivityAdmin)

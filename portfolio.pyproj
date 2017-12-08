@@ -182,6 +182,7 @@
     <Content Include=".env" />
     <Content Include=".gitignore" />
     <Content Include="finance\templates\finance\base.html" />
+    <Content Include="finance\templates\finance\capgains.html" />
     <Content Include="finance\templates\finance\security.html" />
     <Content Include="finance\templates\finance\account.html" />
     <Content Include="finance\templates\finance\index.html" />

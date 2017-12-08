@@ -20,12 +20,21 @@
                 </li>       
                 <li class="{% navactive request 'finance:rebalance' %}">
                     <a href="{% url 'finance:rebalance' %}">Rebalance</a></li>
+                <li class="dropdown {% navactive request 'finance:capgains' %}">
+                    <a class="dropdown-toggle" data-toggle="dropdown" href="#">Capital Gains
+                    <span class="caret"></span></a>
+                    <ul class="dropdown-menu">
+                        {% for security in request.user.userprofile.GetTaxableSecurities %}
+                        <li><a href="{% url 'finance:capgains' security %}">{{security}}</a></li>
+                        {% endfor %}
+                    </ul>
+                </li>     
                 <li class="dropdown {% navactive request 'finance:securitydetail' %}">
                     <a class="dropdown-toggle" data-toggle="dropdown" href="#">Security Details
                     <span class="caret"></span></a>
                     <ul class="dropdown-menu">
                         {% for security in request.user.userprofile.GetHeldSecurities %}
-                        <li><a href="{% url 'finance:securitydetail' security.symbol %}">{{security.symbol}}</a></li>
+                        <li><a href="{% url 'finance:securitydetail' security %}">{{security}}</a></li>
                         {% endfor %}
                     </ul>
                 </li>     

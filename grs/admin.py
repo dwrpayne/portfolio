@@ -6,7 +6,7 @@ admin.site.register(GrsClient)
 
 
 class GrsRawActivityAdmin(admin.ModelAdmin):
-    list_display = ['account', 'day', 'security', 'qty', 'price']
+    list_display = ['account', 'day', 'symbol', 'qty', 'price']
 
 
 admin.site.register(GrsRawActivity, GrsRawActivityAdmin)

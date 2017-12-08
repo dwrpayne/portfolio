@@ -15,11 +15,14 @@
                 <tr>
                     <th>Date</th>
                     <th>Type</th>
-                    <th>Security</th>
                     <th>Units</th>
                     <th>Price</th>
-                    <th>Total</th>
-                    <th>Description</th>
+                    <th>Commission</th>
+                    <th>Cap Gain</th>
+                    <th>Total Units</th>
+                    <th>ACB change</th>
+                    <th>New ACB</th>
+                    <th>ACB / Share</th>
                 </tr>
             </thead>
             <tbody>
@@ -27,15 +30,19 @@
                 <tr>
                     <td>{{activity.tradeDate}}</td>
                     <td>{{activity.type}}</td>
-                    <td>{{activity.security_id}}</td>
-                    <td>{{activity.qty | floatformat:2}}</td>
-                    <td>{{activity.price | currency}}</td>
-                    <td>{{activity.netAmount | currency}}</td>
-                    <td>{{activity.description}}</td>
+                    <td>{{activity.qty | floatformat:0}}</td>
+                    <td>{{activity.cadprice | floatformat:2}}</td>
+                    <td>{{activity.commission | floatformat:2}}</td>
+                    <td>{{activity.capgain | currency}}</td>
+                    <td>{{activity.totalqty | floatformat:0}}</td>
+                    <td>{{activity.acbchange | currency }}</td>
+                    <td>{{activity.totalacb | currency}}</td>
+                    <td>{{activity.acbpershare | currency}}</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
+        <br />Pending Gain: {{pendinggain | currency}}
     </div>
 </div>
 {% endblock content %}
