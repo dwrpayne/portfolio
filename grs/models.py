@@ -77,7 +77,7 @@ class GrsClient(BaseClient):
         with transaction.atomic():
             for day, qty, price in zip(trans_dates, units, prices):
                 obj, created = GrsRawActivity.objects.get_or_create(
-                    account=account, day=day, qty=qty, price=price, security_id='ETP')
+                    account=account, day=day, qty=qty, price=price, symbol='ETP')
                 if created: count += 1
         return count
 
