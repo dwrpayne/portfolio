@@ -17,26 +17,26 @@
         {% endfor %}
         </tfoot>
         <tbody>
-            {% for holding_view in security_data %}
+            {% for holding_detail in holding_data %}
             <tr>
                 <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter}}" >&gt;</div></td>
-                <td><a href="{% url 'finance:securitydetail' holding_view.symbol %}">{{holding_view.symbol}}</a></td>
-                <td>{{holding_view.today_price | floatformat:2}}</td>
-                <td>{{holding_view.price_delta | floatformat:2 | colorize}} {{holding_view.percent_delta | percentage | parens | colorize}}</td>
-                <td>{{holding_view.qty | floatformat:0}}</td>
-                <td>{{holding_view.this_gain | currency | colorize}}</td>
-                <td>{{holding_view.value_CAD | currency}}</td>
-                <td>{{holding_view.percent | floatformat:1}}</td>
+                <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
+                <td>{{holding_detail.price | floatformat:2}}</td>
+                <td>{{holding_detail.price_delta | floatformat:2 | colorize}} {{holding_detail.percent_gain | percentage | parens | colorize}}</td>
+                <td>{{holding_detail.total_qty | floatformat:0}}</td>
+                <td>{{holding_detail.value_delta | currency | colorize}}</td>
+                <td>{{holding_detail.total_val | currency}}</td>
+                <td>{{holding_detail.percent | floatformat:1}}</td>
             </tr>
-                {% for account in holding_view.account_data %}
+                {% for account in holding_detail.account_data %}
                 <tr class="collapse holdings-table-child-{{forloop.parentloop.counter}}">
                     <td></td>
-                    <td>{{account.acc}}</td>
-                    <td>{{account.today_price | floatformat:2}}</td>
-                    <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_delta | percentage | parens | colorize}}</td>
-                    <td>{{account.qty | floatformat:0}}</td>
-                    <td>{{account.this_gain | currency | colorize}}</td>
-                    <td>{{account.value_CAD | currency}}</td>
+                    <td>{{account.account}}</td>
+                    <td>{{account.price | floatformat:2}}</td>
+                    <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_gain | percentage | parens | colorize}}</td>
+                    <td>{{account.total_qty | floatformat:0}}</td>
+                    <td>{{account.value_delta | currency | colorize}}</td>
+                    <td>{{account.total_val | currency}}</td>
                     <td>{{account.percent | floatformat:1}}</td>
                 </tr>
                 {% endfor %}

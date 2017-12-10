@@ -1,10 +1,12 @@
 from django.db import models, transaction, connection
 from django.core.exceptions import ObjectDoesNotExist
-from polymorphic.models import PolymorphicModel
 from django.db.models import F, Q, Sum, Case, When
 from django.db.models.expressions import RawSQL
 from django.utils.functional import cached_property
 from django.conf import settings
+from polymorphic.models import PolymorphicModel
+from polymorphic.query import PolymorphicQuerySet
+from polymorphic.manager import PolymorphicManager
 
 from collections import defaultdict
 from decimal import Decimal
@@ -126,11 +128,31 @@ class Currency(RateLookupMixin):
 
     class Meta:
         verbose_name_plural = 'Currencies'
+        
+    def GetTodaysChange(self):
+        rates = self.rates.filter(
+            day__gte=datetime.date.today()-datetime.timedelta(days=1)
+            ).values_list('price', flat=True)
+        yesterday = 1/rates[0]
+        today = 1/rates[1]
+        return (today, (today-yesterday)/yesterday)        
+                
 
-    def GetExchangeRate(self, day):
-        return self.GetRate(day)
+class ExchangeRate(RateHistoryTableMixin):
+    currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name='rates')
 
+    class Meta:
+        unique_together = ('currency', 'day')
+        get_latest_by = 'day'
+        indexes = [
+            models.Index(fields=['currency']),
+            models.Index(fields=['day'])
+        ]
 
+    def __str__(self):
+        return "{} {} {}".format(self.currency, self.day, self.price)
+
+    
 class HoldingView:
     def __init__(self, yesterday, today):
         assert yesterday.symbol == today.symbol
@@ -349,22 +371,7 @@ class SecurityPrice(RateHistoryTableMixin):
 
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
-
-
-class ExchangeRate(RateHistoryTableMixin):
-    currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name='rates')
-
-    class Meta:
-        unique_together = ('currency', 'day')
-        get_latest_by = 'day'
-        indexes = [
-            models.Index(fields=['currency']),
-            models.Index(fields=['day'])
-        ]
-
-    def __str__(self):
-        return "{} {} {}".format(self.currency, self.day, self.price)
-
+    
 
 class DataProvider:
     @classmethod
@@ -561,12 +568,23 @@ class BaseClient(PolymorphicModel):
         pass
 
 
+class BaseAccountQuerySet(PolymorphicQuerySet):
+    def for_user(self, user):
+        return self.filter(client__user=user)
+
+    def get_balance_totals(self):
+        properties = ['cur_balance', 'cur_cash_balance', 'yesterday_balance', 'today_balance_change']
+        return {p : sum(getattr(a, p) for a in self) for p in properties}
+
+
 class BaseAccount(PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.CharField(max_length=100, primary_key=True)
     taxable = models.BooleanField(default=True)
     display_name = models.CharField(max_length=100, editable=False, default='')
+
+    objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
 
     class Meta:
         ordering = ['id']
@@ -595,6 +613,11 @@ class BaseAccount(PolymorphicModel):
     @property
     def yesterday_balance(self):
         return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
+
+    @property
+    def today_balance_change(self):
+        return self.cur_balance - self.yesterday_balance
+
 
     def RegenerateActivities(self):
         self.activities.all().delete()
@@ -847,6 +870,9 @@ class HoldingDetailQuerySet(models.query.QuerySet):
     def at_date(self, date):
         return self.filter(day=date)
 
+    def at_dates(self, startdate, enddate=datetime.date.today()):
+        return self.filter(day__range=(startdate, enddate))
+
     def today(self):
         return self.at_date(datetime.date.today())
 
@@ -855,10 +881,7 @@ class HoldingDetailQuerySet(models.query.QuerySet):
     
     def cash(self):
         return self.filter(type=Security.Type.Cash)
-
-    def ordered(self):
-        return self.order_by('day')
-
+    
     def month_end(self):
         return self.filter( day__in=utils.dates.month_ends(self.earliest().day) )
     
@@ -866,10 +889,18 @@ class HoldingDetailQuerySet(models.query.QuerySet):
         return self.filter( day__in=utils.dates.year_ends(self.earliest().day) )
 
     def account_values(self):
-        return self.values_list('account','day').annotate(Sum(F('value')))
+        return self.values_list('account','day').annotate(Sum('value'))
 
     def total_values(self):
         return self.values_list('day').annotate(Sum('value'))
+
+    def by_security(self, by_account=False):
+        columns = ['security','day']
+        if by_account:
+            columns.insert(1,'account')
+        return self.values(*columns, 'price','exch','cad','type'
+            ).annotate(total_qty=Sum('qty'), total_val=Sum('value')
+            ).order_by(*columns)
 
 
 class HoldingDetail(models.Model):
@@ -898,6 +929,8 @@ class HoldingDetail(models.Model):
         managed = False
         db_table = 'finance_holdingdetail'
         get_latest_by = 'day'
+        ordering = ['day']
+
 
     def __str__(self):
         return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
@@ -908,3 +941,44 @@ class HoldingDetail(models.Model):
         return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
             self.account_id, self.day, self.security_id, self.qty, 
             self.price, self.exch, self.cad, self.value, self.type)
+
+class HoldingView:
+    def __init__(self, yesterday, today):
+        assert yesterday.symbol == today.symbol
+        self.symbol = today.symbol
+        self.qty = today.qty
+        yesterday_price = yesterday.price
+        yesterday_price_CAD = yesterday.price * yesterday.exch
+        self.today_price = today.price
+        today_price_CAD = today.price * today.exch
+        if today.type == Security.Type.Cash:
+            yesterday_price = yesterday.exch
+            self.today_price = today.exch
+        self.price_delta = self.today_price - yesterday_price
+        self.percent_delta = self.price_delta / yesterday_price
+        self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
+        self.value_CAD = self.qty * today_price_CAD
+
+        if hasattr(today, 'acc'):
+            self.acc = today.acc
+
+
+class SecurityQuerySet(models.query.QuerySet):
+    def with_prices(self, user, start_date=None, by_account=False):
+        if not start_date:
+            start_date = datetime.date.today()
+
+        kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'),
+                     'exch': F('currency__rates__price')}
+        orderby = ['symbol', 'day']
+        if by_account:
+            kwcolumns['acc'] = F('holdings__account')
+            orderby = ['symbol', 'acc', 'day']
+
+        query = self.filter(holdings__account__client__user=user, holdings__enddate=None,
+                            rates__day__gte=start_date, currency__rates__day=F('rates__day')
+                            ).annotate(qty=Sum('holdings__qty'), **kwcolumns
+                            ).order_by(*orderby)
+        for s in query:
+            s.value = s.price * s.exch * s.qty
+        return query

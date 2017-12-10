@@ -18,44 +18,46 @@ import simplejson
 import numpy
 
 def GetHoldingsContext(user):
-    total_value = HoldingDetail.objects.for_user(user).today().total_values().first()[1]
-    total_yesterday = HoldingDetail.objects.for_user(user).yesterday().total_values().first()[1]
-    total_gain = total_value - total_yesterday
+    holdings_query = HoldingDetail.objects.for_user(user).at_dates(
+        datetime.date.today() - datetime.timedelta(days=1))
 
-    holding_data = Security.objects.get_todays_changes(user)
-    account_data = Security.objects.get_todays_changes(user, True)
-    for view in holding_data:
-        view.percent = view.value_CAD / total_value * 100
-        view.account_data = [d for d in account_data if d.symbol == view.symbol]
-        for account_view in view.account_data:
-            account_view.percent = account_view.value_CAD / total_value * 100
+    (_,yesterday_value), (_,today_value) = holdings_query.total_values()
+    total_gain = today_value - yesterday_value
 
-    holding_data.sort(key=lambda h: h.value_CAD, reverse=True)
+    holdings = holdings_query.by_security()
+    holdings_byacc = holdings_query.by_security(True)
 
-    total = [(total_gain, total_gain / total_value, total_value)]
-    context = {'security_data': holding_data, 'total': total}
+    def extract_today_with_deltas(holding_list):
+        todays = []
+        for yesterday, today in zip(holding_list[::2], holding_list[1::2]):
+            today['price_delta'] = today['price'] - yesterday['price']
+            today['percent_gain'] = today['price_delta'] / yesterday['price']
+            today['value_delta'] = today['total_val'] - yesterday['total_val']
+            today['percent'] = today['total_val'] / today_value * 100
+            todays.append(today)
+        return todays
+
+    holding_data = extract_today_with_deltas(holdings)
+    account_data = extract_today_with_deltas(holdings_byacc)
+    for h in holding_data:
+        h['account_data'] = [d for d in account_data if d['security'] == h['security']]
+
+    holding_data.sort(key=lambda r:r['total_val'], reverse=True)
+    
+    total = [(total_gain, total_gain / today_value, today_value)]
+    context = {'holding_data': holding_data, 'total': total}
     return context
 
 
 def GetBalanceContext(user):
-    accounts = BaseAccount.objects.filter(client__user=user)
+    accounts = BaseAccount.objects.for_user(user)
     if not accounts.exists():
         return {}
 
-    account_data = [(a.display_name, a.id, a.yesterday_balance, a.cur_balance,
-                     a.cur_cash_balance, a.cur_balance - a.yesterday_balance) for a in accounts]
+    total = accounts.get_balance_totals()
+    exchange_live, exchange_delta = Currency.objects.get(code='USD').GetTodaysChange()
 
-    names, ids, sod, cur, cur_cash, change = list(zip(*account_data))
-
-    total_data = [('Total', sum(sod), sum(cur), sum(cur_cash), sum(change))]
-
-    exchange_live = 1/Currency.objects.get(code='USD').live_price
-    exchange_yesterday = 1 / \
-        Currency.objects.get(code='USD').GetRateOnDay(
-            datetime.date.today() - datetime.timedelta(days=1))
-    exchange_delta = (exchange_live - exchange_yesterday) / exchange_yesterday
-
-    context = {'account_data': account_data, 'total_data': total_data,
+    context = {'accounts': accounts, 'account_total': total,
                'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
     return context
 

@@ -12,26 +12,24 @@
             </tr>
         </thead>
         <tfoot>
-        {% for name, sod, cur, cadcash, change in total_data %}
             <tr>
-                <td>{{name}}</td>
+                <td>Total</td>
                 <td></td>
-                <td>{{sod | currencyround}}</td>
-                <td>{{cur | currencyround}}</td>
-                <td>{{cadcash | currencyround}}</td>
-                <td>{{change | currency | colorize}}</td>
+                <td>{{account_total.yesterday_balance | currencyround}}</td>
+                <td>{{account_total.cur_balance | currencyround}}</td>
+                <td>{{account_total.cur_cash_balance | currencyround}}</td>
+                <td>{{account_total.today_balance_change | currency | colorize}}</td>
             </tr>
-        {% endfor %}
         </tfoot>
         <tbody>
-        {% for name, id, sod, cur, cadcash, change in account_data %}
+        {% for account in accounts %}
             <tr>
-                <td><a href="{% url 'finance:accountdetail' id %}">{{name}}</a></td>                
-                <td>{{id}}</td>
-                <td>{{sod | currencyround}}</td>
-                <td>{{cur | currencyround}}</td>
-                <td>{{cadcash | currencyround}}</td>
-                <td>{{change | currency | colorize}}</td>
+                <td><a href="{% url 'finance:accountdetail' account.id %}">{{account.display_name}}</a></td>                
+                <td>{{account.id}}</td>
+                <td>{{account.yesterday_balance | currencyround}}</td>
+                <td>{{account.cur_balance | currencyround}}</td>
+                <td>{{account.cur_cash_balance | currencyround}}</td>
+                <td>{{account.today_balance_change | currency | colorize}}</td>
             </tr>
         {% endfor %}
         </tbody>
