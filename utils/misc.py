@@ -16,3 +16,7 @@ def find_le_index(a,x, default=None):
         return default
     raise ValueError
 
+def plotly_iframe_from_url(url):
+    if not url: 
+        return None
+    return '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(url)

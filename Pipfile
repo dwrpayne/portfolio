@@ -7,7 +7,7 @@ name = "pypi"
 
 [packages]
 
-celery = "*"
+celery = "==4.0.2"
 django = "*"
 requests = "*"
 simplejson = "*"

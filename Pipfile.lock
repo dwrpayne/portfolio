@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "9ae4f3d418102b4e2b02d684f8ba9f2159affbf8b4caedcefe25404c4b23e205"
+            "sha256": "79e38683ca0df227ed680d0ce8c958de43ca285340e871cdc09487240a0cd61b"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -55,10 +55,10 @@
         },
         "celery": {
             "hashes": [
-                "sha256:81a67f0d53a688ec2bc8557bd5d6d7218f925a6f2e6df80e01560de9e28997ec",
-                "sha256:77ff3730198d6a17b3c1f05579ebe570b579efb35f6d7e13dba3b1368d068b35"
+                "sha256:0e5b7e0d7f03aa02061abfd27aa9da05b6740281ca1f5228a54fbf7fe74d8afa",
+                "sha256:e3d5a6c56a73ff8f2ddd4d06dc37f4c2afe4bb4da7928b884d0725ea865ef54d"
             ],
-            "version": "==4.1.0"
+            "version": "==4.0.2"
         },
         "certifi": {
             "hashes": [
@@ -337,9 +337,9 @@
         },
         "plotly": {
             "hashes": [
-                "sha256:69b3e9a16e5c4c20ca7d3a552ad6aa76b0164f5ee16e979c4e8086afb66fe0a4"
+                "sha256:dadd2263f1c0449b248fd3742a077d9594935921a9597529be76d6a841237ab0"
             ],
-            "version": "==2.2.2"
+            "version": "==2.2.3"
         },
         "prompt-toolkit": {
             "hashes": [
@@ -529,10 +529,10 @@
         },
         "werkzeug": {
             "hashes": [
-                "sha256:e8549c143af3ce6559699a01e26fa4174f4c591dbee0a499f3cd4c3781cdec3d",
-                "sha256:903a7b87b74635244548b30d30db4c8947fe64c5198f58899ddcd3a13c23bb26"
+                "sha256:f3000aa146ce8a9da8ca3e978e0e931c2a58eb56c323a5efb6b4307f7832b549",
+                "sha256:6246e5fc98a505824113fb6aca993d45ea284a2bcffdc2c65d0c538e53e4abd3"
             ],
-            "version": "==0.12.2"
+            "version": "==0.13"
         },
         "whitenoise": {
             "hashes": [

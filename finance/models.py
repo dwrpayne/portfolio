@@ -14,6 +14,7 @@ import datetime
 from model_utils import Choices
 import arrow
 import utils.dates
+from utils.misc import plotly_iframe_from_url
 import pandas
 from dateutil import parser
 import requests
@@ -152,27 +153,6 @@ class ExchangeRate(RateHistoryTableMixin):
     def __str__(self):
         return "{} {} {}".format(self.currency, self.day, self.price)
 
-    
-class HoldingView:
-    def __init__(self, yesterday, today):
-        assert yesterday.symbol == today.symbol
-        self.symbol = today.symbol
-        self.qty = today.qty
-        yesterday_price = yesterday.price
-        yesterday_price_CAD = yesterday.price * yesterday.exch
-        self.today_price = today.price
-        today_price_CAD = today.price * today.exch
-        if today.type == Security.Type.Cash:
-            yesterday_price = yesterday.exch
-            self.today_price = today.exch
-        self.price_delta = self.today_price - yesterday_price
-        self.percent_delta = self.price_delta / yesterday_price
-        self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
-        self.value_CAD = self.qty * today_price_CAD
-
-        if hasattr(today, 'acc'):
-            self.acc = today.acc
-
 
 class SecurityQuerySet(models.query.QuerySet):
     def with_prices(self, user, start_date=None, by_account=False):
@@ -252,18 +232,6 @@ class SecurityManager(models.Manager):
         return option
 
 
-    def get_todays_changes(self, user, by_account=False):
-        data = self.with_prices(user, datetime.date.today() - datetime.timedelta(days=1), by_account)
-        symbols = data.values_list('symbol', flat=True)
-
-        # Verify data
-        assert data.latest('day').day == datetime.date.today(), "Missing all of today's prices! Maybe exchange rates aren't synced?"
-        for s in set(symbols):
-            assert data.filter(symbol=s).last().day == datetime.date.today(), "Missing a price for {} - need to sync it!".format(s)
-
-        return list(map(HoldingView, data[::2], data[1::2]))
-
-
 class StockSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
@@ -282,6 +250,7 @@ class OptionSecurityManager(SecurityManager):
 class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
+
 
 class Security(RateLookupMixin):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
@@ -327,43 +296,27 @@ class Security(RateLookupMixin):
     @property
     def live_price_cad(self):
         return self.live_price * self.currency.live_price
-
-    def GetPrice(self, day):
-        return self.GetRateOnDay(day)
-
+    
     def GetPriceCAD(self, day):
-        return self.GetPrice(day) * self.currency.GetRateOnDay(day)
+        return self.GetRateOnDay(day) * self.currency.GetRateOnDay(day)
 
 
-class SecurityPriceManager(models.Manager):
-    def get_history(self, user, by_account=False, startdate=None):
-        query = SecurityPrice.objects.all()
-        if startdate:
-            query = query.filter(day__gte=startdate)
-
-        history = query.filter(
-            Q(security__holdings__enddate__gte=F('day')) | Q(security__holdings__enddate=None),
-            security__holdings__account__client__user=user,
-            security__holdings__startdate__lte=F('day'),
-            security__currency__rates__day=F('day'))
-
-        group_by = ['day']
-        if by_account:
-            group_by.append('security__holdings__account')
-
-        return history.values(*group_by).order_by(*group_by).annotate(
-                val=Sum(F('price') * F('security__holdings__qty') *
-                    F('security__currency__rates__price'))
-        ).values_list(*group_by, 'val')
+class SecurityPriceQuerySet(models.query.QuerySet):
+    def with_cad_prices(self):
+        return self.filter(security__currency__rates__day=F('day')).annotate(
+            exch=F('security__currency__rates__price'),
+            cadprice=F('security__currency__rates__price')*F('price')
+            )
 
 
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
-    objects = SecurityPriceManager()
+    objects = SecurityPriceQuerySet.as_manager()
 
     class Meta:
         unique_together = ('security', 'day')
         get_latest_by = 'day'
+        ordering = ['day']
         indexes = [
             models.Index(fields=['security']),
             models.Index(fields=['day'])
@@ -825,8 +778,7 @@ class Activity(models.Model):
             effect[self.security] = self.qty
 
         return effect
-
-
+    
 class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='allocations')
@@ -848,19 +800,21 @@ class UserProfile(models.Model):
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
 
     def GetHeldSecurities(self):
-        return Holding.objects.for_user(self.user).current().values_list('security_id', flat=True).distinct()
+        return Holding.objects.for_user(self.user
+               ).current().values_list('security_id', flat=True).distinct()
     
     def GetTaxableSecurities(self):
-        return Holding.objects.filter(account__taxable=True).for_user(self.user).current().values_list('security_id', flat=True).distinct()
+        return Holding.objects.filter(
+            account__taxable=True
+            ).exclude(security__type=Security.Type.Cash
+            ).for_user(self.user).current().values_list('security_id', flat=True).distinct()
 
     def GetAccounts(self):
         return BaseAccount.objects.filter(client__user=self.user)
 
     @property
     def portfolio_iframe(self):
-        if self.plotly_url: 
-            return '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(self.plotly_url)
-        return None
+        return plotly_iframe_from_url(self.plotly_url)
 
 
 class HoldingDetailQuerySet(models.query.QuerySet):    
@@ -881,6 +835,9 @@ class HoldingDetailQuerySet(models.query.QuerySet):
     
     def cash(self):
         return self.filter(type=Security.Type.Cash)
+    
+    def week_end(self):
+        return self.filter( day__in=utils.dates.week_ends(self.earliest().day) )
     
     def month_end(self):
         return self.filter( day__in=utils.dates.month_ends(self.earliest().day) )
@@ -941,44 +898,3 @@ class HoldingDetail(models.Model):
         return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
             self.account_id, self.day, self.security_id, self.qty, 
             self.price, self.exch, self.cad, self.value, self.type)
-
-class HoldingView:
-    def __init__(self, yesterday, today):
-        assert yesterday.symbol == today.symbol
-        self.symbol = today.symbol
-        self.qty = today.qty
-        yesterday_price = yesterday.price
-        yesterday_price_CAD = yesterday.price * yesterday.exch
-        self.today_price = today.price
-        today_price_CAD = today.price * today.exch
-        if today.type == Security.Type.Cash:
-            yesterday_price = yesterday.exch
-            self.today_price = today.exch
-        self.price_delta = self.today_price - yesterday_price
-        self.percent_delta = self.price_delta / yesterday_price
-        self.this_gain = self.qty * (today_price_CAD - yesterday_price_CAD)
-        self.value_CAD = self.qty * today_price_CAD
-
-        if hasattr(today, 'acc'):
-            self.acc = today.acc
-
-
-class SecurityQuerySet(models.query.QuerySet):
-    def with_prices(self, user, start_date=None, by_account=False):
-        if not start_date:
-            start_date = datetime.date.today()
-
-        kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'),
-                     'exch': F('currency__rates__price')}
-        orderby = ['symbol', 'day']
-        if by_account:
-            kwcolumns['acc'] = F('holdings__account')
-            orderby = ['symbol', 'acc', 'day']
-
-        query = self.filter(holdings__account__client__user=user, holdings__enddate=None,
-                            rates__day__gte=start_date, currency__rates__day=F('rates__day')
-                            ).annotate(qty=Sum('holdings__qty'), **kwcolumns
-                            ).order_by(*orderby)
-        for s in query:
-            s.value = s.price * s.exch * s.qty
-        return query

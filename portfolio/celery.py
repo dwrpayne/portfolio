@@ -18,27 +18,3 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
-
-@app.task(bind=True)
-def debug_task(self):
-    print('Request: {0!r}'.format(self.request))
-
-
-app.conf.beat_schedule = {
-    'sync-daily-client-prices': {
-        'task': 'finance.tasks.DailyUpdateTask',
-        'schedule': crontab(minute='0', hour='2'),
-    },
-    'refresh-questrade-tokens': {
-        'task': 'questrade.tasks.RefreshAccessTokens',
-        'schedule': crontab(minute='*/15')
-    },
-    'sync-live-exchanges': {
-        'task': 'finance.tasks.LiveExchangeUpdateTask',
-        'schedule': crontab(minute='0', hour='*')
-    },
-    'sync-live-prices': {
-        'task': 'finance.tasks.LiveSecurityUpdateTask',
-        'schedule': crontab(minute='*/5', hour='*')
-    },
-}

@@ -6,7 +6,8 @@ from django.db.models.expressions import RawSQL
 
 from .models import BaseAccount, DataProvider, Holding, HoldingDetail, Security, SecurityPrice, Currency, Allocation, Activity
 from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
-from .services import GetRebalanceInfo, GeneratePlot
+from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
+from utils.misc import plotly_iframe_from_url
 
 import datetime
 from collections import defaultdict
@@ -141,13 +142,14 @@ def accountdetail(request, account_id):
     return render(request, 'finance/account.html', context)
 
 
-
 @login_required
 def securitydetail(request, symbol):
     security = Security.objects.get(symbol=symbol)
+    filename = GenerateSecurityPlot(security)
+    iframe = plotly_iframe_from_url(filename)
     activities = reversed(list(security.activities.filter(account__client__user=request.user)))
 
-    context = {'activities': activities, 'symbol' : symbol}
+    context = {'activities': activities, 'symbol' : symbol, 'iframe': iframe}
     return render(request, 'finance/security.html', context)
 
 
