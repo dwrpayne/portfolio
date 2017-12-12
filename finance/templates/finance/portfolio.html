@@ -14,7 +14,7 @@
     </div>
     <div class="row">
         <div style="clear:both;width:800px" id="history-plot">
-            {{plotly_embed_html | safe}}
+            {{request.user.userprofile.portfolio_iframe | safe}}
         </div>
     </div>
 {% endblock content %}

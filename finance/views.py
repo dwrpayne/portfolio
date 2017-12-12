@@ -83,7 +83,6 @@ def Portfolio(request):
             DataProvider.SyncAllSecurities()
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
-    overall_context['plotly_embed_html'] = request.user.userprofile.portfolio_iframe
     return render(request, 'finance/portfolio.html', overall_context)
 
 

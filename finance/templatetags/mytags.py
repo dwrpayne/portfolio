@@ -18,9 +18,9 @@ def colorize(amount):
 
 
 @register.filter()
-def currency(dollars):
+def currency(dollars, decimals=2):
     prefix = "" if dollars > -0.004 else "-"
-    return "{}${:,.2f}".format(prefix, abs(dollars))
+    return "{}${:,.{}f}".format(prefix, abs(dollars), decimals)
 
 
 @register.filter()
@@ -31,7 +31,7 @@ def currencyround(dollars):
 
 @register.filter()
 def percentage(amount, decimals=2):
-    return ("{:,." + str(decimals) + "f}%").format(amount * 100)
+    return ("{:,.{}f}%").format(amount * 100, decimals)
 
 
 @register.filter()

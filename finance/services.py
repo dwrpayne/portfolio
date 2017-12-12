@@ -4,7 +4,7 @@ from django.db.models import F
 from .models import Security, Holding, Activity, HoldingDetail
 
 from itertools import accumulate
-from bisect import bisect_right
+from utils.misc import find_le, find_le_index
 import plotly
 import plotly.graph_objs as go
 
