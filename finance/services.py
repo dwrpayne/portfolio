@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Sum
 
 from .models import Security, Holding, Activity, HoldingDetail
 
@@ -9,20 +9,21 @@ import plotly
 import plotly.graph_objs as go
 
 def GetRebalanceInfo(user):
-    securities = Security.objects.with_prices(user)
-    total_value = sum(s.value for s in securities)
+    holdings = HoldingDetail.objects.for_user(user).today().by_security()
+    total_value = sum(h['total_val'] for h in holdings)
 
-    allocs = list(user.allocations.all().prefetch_related('securities'))
+    allocs = user.allocations.all()
     for alloc in allocs:
-        alloc.current_amt = sum(s.value for s in securities if s in alloc.securities.all())
+        alloc.current_amt = holdings.filter(
+            security__in=alloc.securities.all()).aggregate(
+            total=Sum('total_val'))['total']
         alloc.current_pct = alloc.current_amt / total_value
         alloc.desired_amt = alloc.desired_pct * total_value
         alloc.buysell = alloc.desired_amt - alloc.current_amt
-    allocs.sort(key=lambda a: a.desired_pct, reverse=True)
 
-    missing = [s for s in securities if not s.allocation_set.exists()]
-    for s in missing:
-        s.current_pct = s.value / total_value
+    missing = holdings.exclude(security__in=allocs.values_list('securities'))
+    for h in missing:
+        h['current_pct'] = h['total_val'] / total_value
 
     return allocs, missing
 

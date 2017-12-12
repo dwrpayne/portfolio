@@ -154,27 +154,6 @@ class ExchangeRate(RateHistoryTableMixin):
         return "{} {} {}".format(self.currency, self.day, self.price)
 
 
-class SecurityQuerySet(models.query.QuerySet):
-    def with_prices(self, user, start_date=None, by_account=False):
-        if not start_date:
-            start_date = datetime.date.today()
-
-        kwcolumns = {'day': F('rates__day'), 'price': F('rates__price'),
-                     'exch': F('currency__rates__price')}
-        orderby = ['symbol', 'day']
-        if by_account:
-            kwcolumns['acc'] = F('holdings__account')
-            orderby = ['symbol', 'acc', 'day']
-
-        query = self.filter(holdings__account__client__user=user, holdings__enddate=None,
-                            rates__day__gte=start_date, currency__rates__day=F('rates__day')
-                            ).annotate(qty=Sum('holdings__qty'), **kwcolumns
-                            ).order_by(*orderby)
-        for s in query:
-            s.value = s.price * s.exch * s.qty
-        return query
-
-
 class SecurityManager(models.Manager):
     def create(self, symbol, currency, **kwargs):
         if len(symbol) >= 20:
@@ -262,11 +241,11 @@ class Security(RateLookupMixin):
     listingExchange = models.CharField(max_length=20, null=True, blank=True, default='')
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
 
-    objects = SecurityManager.from_queryset(SecurityQuerySet)()
-    stocks = StockSecurityManager.from_queryset(SecurityQuerySet)()
-    cash = CashSecurityManager.from_queryset(SecurityQuerySet)()
-    options = OptionSecurityManager.from_queryset(SecurityQuerySet)()
-    mutualfunds = MutualFundSecurityManager.from_queryset(SecurityQuerySet)()
+    objects = SecurityManager()
+    stocks = StockSecurityManager()
+    cash = CashSecurityManager()
+    options = OptionSecurityManager()
+    mutualfunds = MutualFundSecurityManager()
 
     def __str__(self):
         return "{} {}".format(self.symbol, self.currency)
