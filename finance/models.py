@@ -41,6 +41,9 @@ class RateLookupMixin(models.Model):
     lookupSymbol = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupSource = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)
+    
+    class Meta:
+        abstract = True
 
     @property
     def earliest_price_needed(self):
@@ -116,15 +119,12 @@ class RateLookupMixin(models.Model):
 
     def GetRateOnDay(self, day):
         return self.rates.get(day=day).price
-
-    class Meta:
-        abstract = True
-
-        
+            
     @classmethod
     def _FakeData(cls, lookup, start, end):
         for day in pandas.date_range(start, end).date:
             yield day, 1.
+
 
 class CurrencyManager(models.Manager):
     def Sync(self):        
@@ -132,6 +132,12 @@ class CurrencyManager(models.Manager):
             currency.SyncExchangeRates()
             if currency.code == 'USD':
                 currency.SyncLive()
+
+    def create(self, code, **kwargs):
+        currency = super().create(code=code, **kwargs)
+        Security.objects.get_or_create(currency=currency, type=Security.Type.Cash,
+                                       defaults={'symbol' : code + ' Cash'} )
+
 
 class Currency(RateLookupMixin):
     code = models.CharField(max_length=3, primary_key=True)
@@ -142,6 +148,10 @@ class Currency(RateLookupMixin):
 
     class Meta:
         verbose_name_plural = 'Currencies'
+
+    @property
+    def cash_security(self):
+        return self.security_set.get(type=Security.Type.Cash)
         
     def GetTodaysChange(self):
         rates = self.rates.filter(
@@ -154,11 +164,6 @@ class Currency(RateLookupMixin):
     @classmethod
     def _RetrievePandasData(cls, lookup, start, end):
         """ Returns a list of tuples (day, price) """
-        FAKED_VALS = {'DLR.U.TO': 10.}
-        if lookup.lookupSymbol in FAKED_VALS:
-            index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
-
         print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
         for retry in range(5):
             try:
@@ -302,7 +307,7 @@ class Stock(Security):
 
     @classmethod
     def GetAlphaVantageData(cls, lookup, start, end):
-        fake = {'DLR.U.TO': 10., 'CAD': 1.}
+        fake = {'DLR.U.TO': 10.}
         if lookup.lookupSymbol in fake:
             index = pandas.date_range(start, end, freq='D').date
             return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
