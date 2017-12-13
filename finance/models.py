@@ -112,6 +112,8 @@ class RateLookupMixin(models.Model):
             print('Already synced data for {}, skipping.'.format(self.lookupSymbol))
             return []
 
+        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
+
         retrieved_data = retriever_fn(self, start, end)
         data = self._ProcessRateData(retrieved_data, end)
 
@@ -157,14 +159,7 @@ class Currency(RateLookupMixin):
         return (today, (today-yesterday)/yesterday)     
                 
     def _RetrievePandasData(self, start, end):
-        """ Returns a list of tuples (day, price) """
-        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
-        for retry in range(5):
-            try:
-                return pdr.DataReader(self.lookupSymbol, self.lookupSource, start, end)
-            except:
-                pass
-        return []
+        return pdr.DataReader(self.lookupSymbol, self.lookupSource, start, end)
 
     def SyncExchangeRates(self):
         self.SyncRates(self._FakeData if self.code == 'CAD' else self._RetrievePandasData)
@@ -298,12 +293,11 @@ class Stock(Security):
             self.live_price = price
 
     def GetAlphaVantageData(self, start, end):
-        fake = {'DLR.U.TO': 10.}
-        if self.lookupSymbol in fake:
+        # TODO: Monster hack for DLR - maybe have a fallback of some kind?
+        if self.lookupSymbol == 'DLR.U.TO':
             index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(fake[self.lookupSymbol], index))
+            return zip(index, pandas.Series(10.0, index))
 
-        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
         params = {'function': 'TIME_SERIES_DAILY',
                   'symbol': self.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
         if (end - start).days > 100:
@@ -417,7 +411,6 @@ class MutualFund(Security):
     def GetMorningstarData(self, start, end):
         RAW_URL = 'https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}'
         url = RAW_URL.format(self.lookupSymbol, str(start), str(end))
-        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
         r = requests.get(url)
         json = r.json()
         if 'data' in json and 'Prices' in json['data']:

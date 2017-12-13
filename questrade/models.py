@@ -120,7 +120,7 @@ class QuestradeRawActivity(BaseRawActivity):
             try:
                 json['security'] = Security.objects.get(symbol=json['symbol'])
             except:
-                json['security'] = Security.CreateStock(json['symbol'], json['currency'])
+                json['security'] = Security.objects.CreateStock(json['symbol'], json['currency'])
         else:
             json['security'] = None
 
