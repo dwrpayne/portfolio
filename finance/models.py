@@ -222,7 +222,7 @@ class StockSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
 
-def Stock(Security):
+class Stock(Security):
     objects = StockSecurityManager()
     class Meta:
         proxy = True        
@@ -231,7 +231,7 @@ class CashSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Cash)
     
-def Cash(Security):
+class Cash(Security):
     objects = CashSecurityManager()
     class Meta:
         proxy = True
@@ -259,7 +259,7 @@ class OptionSecurityManager(SecurityManager):
             })
         return option
 
-def Option(Security):
+class Option(Security):
     objects = OptionSecurityManager()
     class Meta:
         proxy = True
@@ -276,7 +276,7 @@ class MutualFundSecurityManager(SecurityManager):
             lookupSymbol=symbol
         )
 
-def MutualFund(Security):
+class MutualFund(Security):
     objects = MutualFundSecurityManager()
     class Meta:
         proxy = True
