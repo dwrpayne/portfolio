@@ -17,12 +17,11 @@ def LiveSecurityUpdateTask():
 @shared_task
 def LiveExchangeUpdateTask():
     from .models import Currency
-    Currency.objects.Sync()
+    Cash.objects.Sync()
 
 @shared_task
 def DailyUpdateTask():
     from .models import Currency, Stock, MutualFund, Cash, Option
-    Currency.objects.Sync()
     Stock.objects.Sync()
     Option.objects.Sync()        
     MutualFund.objects.Sync()

@@ -325,15 +325,20 @@ class CashSecurityManager(SecurityManager):
 
     def Sync(self):
         for security in self.get_queryset():
-            security.AddFakeEntries()
+            security.Sync()
     
 class Cash(Security):
     objects = CashSecurityManager()
     class Meta:
         proxy = True
 
-    def AddFakeEntries(self):
+    def Sync(self):
         self.SyncRates(self._FakeData)
+        self.currency.SyncExchangeRates()
+
+        # TODO: hack for live USD exchange rates from OpenExchangeRates
+        if 'USD' in self.symbol:
+            self.currency.SyncLive()
 
 
 class OptionSecurityManager(SecurityManager):
@@ -749,8 +754,7 @@ class Activity(models.Model):
     objects.use_for_related_fields = True
 
     class Meta:
-        unique_together = ('account', 'tradeDate', 'security', 'cash', 'qty',
-                           'price', 'netAmount', 'type', 'description')
+        unique_together = ('raw', 'type')
         verbose_name_plural = 'Activities'
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']

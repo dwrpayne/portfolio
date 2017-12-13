@@ -29,7 +29,6 @@ class GrsRawActivity(BaseRawActivity):
             security = MutualFund.Create(self.symbol, 'CAD')
 
         total_cost = self.qty*self.price
-
             
         Activity.objects.create(account=self.account, tradeDate=self.day, security=None, cash_id=security.currency.code + ' Cash',
                                        description='Generated Deposit', qty=0, raw=self,
