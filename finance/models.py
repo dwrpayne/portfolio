@@ -105,7 +105,7 @@ class RateLookupMixin(models.Model):
     def SyncRates(self, retriever_fn):
         """
         retriever_fn is the function that will retrieve the rates.
-        It gets passed (lookup, start, end) and is expected to return an iterator of (day, price) pairs or a pandas dataframe
+        It gets passed (self, start, end) and is expected to return an iterator of (day, price) pairs or a pandas dataframe
         """
         start, end = self.GetShouldSyncRange()
         if start is None:
@@ -122,8 +122,7 @@ class RateLookupMixin(models.Model):
     def GetRateOnDay(self, day):
         return self.rates.get(day=day).price
             
-    @classmethod
-    def _FakeData(cls, lookup, start, end, val=1.):
+    def _FakeData(self, start, end, val=1.):
         for day in pandas.date_range(start, end).date:
             yield day, val
 
@@ -156,21 +155,20 @@ class Currency(RateLookupMixin):
         yesterday = 1/rates[0]
         today = 1/rates[1]
         return (today, (today-yesterday)/yesterday)     
-    
-    @classmethod
-    def _RetrievePandasData(cls, lookup, start, end):
+                
+    def _RetrievePandasData(self, start, end):
         """ Returns a list of tuples (day, price) """
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
         for retry in range(5):
             try:
-                return pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
+                return pdr.DataReader(self.lookupSymbol, self.lookupSource, start, end)
             except:
                 pass
         return []
 
     def SyncExchangeRates(self):
         self.SyncRates(self._FakeData if self.code == 'CAD' else self._RetrievePandasData)
-
+        
     def SyncLive(self):     
         assert self.code=='USD'
         request = requests.get('https://openexchangerates.org/api/latest.json',
@@ -299,16 +297,15 @@ class Stock(Security):
         if price:
             self.live_price = price
 
-    @classmethod
-    def GetAlphaVantageData(cls, lookup, start, end):
+    def GetAlphaVantageData(self, start, end):
         fake = {'DLR.U.TO': 10.}
-        if lookup.lookupSymbol in fake:
+        if self.lookupSymbol in fake:
             index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
+            return zip(index, pandas.Series(fake[self.lookupSymbol], index))
 
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
         params = {'function': 'TIME_SERIES_DAILY',
-                  'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
+                  'symbol': self.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
         if (end - start).days > 100:
             params['outputsize'] = 'full'
         r = requests.get('https://www.alphavantage.co/query', params=params)
@@ -336,7 +333,7 @@ class Cash(Security):
         self.currency.SyncExchangeRates()
 
         # TODO: hack for live USD exchange rates from OpenExchangeRates
-        if 'USD' in self.symbol:
+        if self.currency.code=='USD':
             self.currency.SyncLive()
 
 
@@ -412,11 +409,10 @@ class MutualFund(Security):
         except:
             pass
                     
-    @classmethod
-    def GetMorningstarData(cls, lookup, start, end):
+    def GetMorningstarData(self, start, end):
         RAW_URL = 'https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}'
-        url = RAW_URL.format(lookup.lookupSymbol, str(start), str(end))
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        url = RAW_URL.format(self.lookupSymbol, str(start), str(end))
+        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
         r = requests.get(url)
         json = r.json()
         if 'data' in json and 'Prices' in json['data']:
