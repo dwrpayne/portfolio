@@ -19,6 +19,7 @@ import pandas
 from dateutil import parser
 import requests
 from pandas_datareader import data as pdr
+from functools import partial
 
 
 class RateHistoryTableMixin(models.Model):
@@ -111,7 +112,8 @@ class RateLookupMixin(models.Model):
             print('Already synced data for {}, skipping.'.format(self.lookupSymbol))
             return []
 
-        data = self._ProcessRateData(retriever_fn(self, start, end), end)
+        retrieved_data = retriever_fn(self, start, end)
+        data = self._ProcessRateData(retrieved_data, end)
 
         with transaction.atomic():
             for day, price in data:
@@ -121,18 +123,12 @@ class RateLookupMixin(models.Model):
         return self.rates.get(day=day).price
             
     @classmethod
-    def _FakeData(cls, lookup, start, end):
+    def _FakeData(cls, lookup, start, end, val=1.):
         for day in pandas.date_range(start, end).date:
-            yield day, 1.
+            yield day, val
 
 
 class CurrencyManager(models.Manager):
-    def Sync(self):        
-        for currency in self.get_queryset():
-            currency.SyncExchangeRates()
-            if currency.code == 'USD':
-                currency.SyncLive()
-
     def create(self, code, **kwargs):
         currency = super().create(code=code, **kwargs)
         Security.objects.get_or_create(currency=currency, type=Security.Type.Cash,
@@ -173,8 +169,6 @@ class Currency(RateLookupMixin):
         return []
 
     def SyncExchangeRates(self):
-        Security.objects.get_or_create(
-                symbol=self.code + ' Cash', currency=self, type=Security.Type.Cash)
         self.SyncRates(self._FakeData if self.code == 'CAD' else self._RetrievePandasData)
 
     def SyncLive(self):     
@@ -453,6 +447,7 @@ class SecurityPrice(RateHistoryTableMixin):
 
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
+
      
 class BaseClientManager(PolymorphicManager):
     def SyncAllBalances(self):        

@@ -13,7 +13,7 @@ def LiveSecurityUpdateTask():
             
 @shared_task
 def DailyUpdateTask():
-    from .models import Currency, Stock, MutualFund, Cash, Option
+    from .models import Stock, MutualFund, Cash, Option
     Stock.objects.Sync()
     Option.objects.Sync()        
     MutualFund.objects.Sync()
