@@ -31,11 +31,11 @@ class GrsRawActivity(BaseRawActivity):
         total_cost = self.qty*self.price
 
             
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=None, 
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=None, cash_id=security.currency.code + ' Cash',
                                        description='Generated Deposit', qty=0, raw=self,
                                        price=0, netAmount=total_cost, type=Activity.Type.Deposit)
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, 
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, cash_id=security.currency.code + ' Cash',
                                        description=self.description, qty=self.qty, raw=self,
                                        price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
 

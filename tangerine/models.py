@@ -23,7 +23,7 @@ class TangerineRawActivity(BaseRawActivity):
         return 'TangerineRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.symbol, self.qty, self.price)
 
     def CreateActivity(self):
-        if self.security == 'Tangerine Equity Growth Portfolio':
+        if self.symbol == 'Tangerine Equity Growth Portfolio':
             symbol = 'F00000NNHK'
             currency = 'CAD'
         else: assert False, 'Need a real lookup system here'
@@ -33,7 +33,7 @@ class TangerineRawActivity(BaseRawActivity):
         except:
             security = Security.CreateMutualFund(symbol, currency)
 
-        if self.type == 'PURCHASES':
+        if self.type == 'Purchase':
             activity_type = Activity.Type.Buy
         else:
             activity_type = Activity.Type.Dividend
@@ -41,11 +41,13 @@ class TangerineRawActivity(BaseRawActivity):
             
         total_cost = self.qty*self.price
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description='Generated Deposit', qty=self.qty,
-                        price=self.price, netAmount=-total_cost, type=Activity.Type.Deposit, raw=self)
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=None, cash_id=security.currency.code + ' Cash',
+                                description='Generated Deposit', qty=0,
+                        price=0, netAmount=total_cost, type=Activity.Type.Deposit, raw=self)
             
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, description=self.description, qty=self.qty,
-                        price=self.price, netAmount=total_cost, type=activity_type, raw=self)
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, cash_id=security.currency.code + ' Cash',
+                                description=self.description, qty=self.qty,
+                        price=self.price, netAmount=-total_cost, type=activity_type, raw=self)
 
 
 class TangerineAccount(BaseAccount):
@@ -111,7 +113,7 @@ class TangerineClient(BaseClient):
                     'day': parser.parse(trans['transaction_date']).date(),
                     'description': trans['description'],
                     'type': trans['mutual_fund']['transaction_type'],
-                    'security': trans['mutual_fund']['portfolio_name'],
+                    'symbol': trans['mutual_fund']['portfolio_name'],
                     'qty': trans['mutual_fund']['units'],
                     'price': trans['mutual_fund']['unit_price']
                     })

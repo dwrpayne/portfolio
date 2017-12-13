@@ -72,7 +72,7 @@ def GeneratePlot(user):
     #traces.append( go.Scatter(name='SP 500', x=sp_lists[0], y=sp_lists[1], mode='lines+markers') )
 
     
-    growth_vals = [val - sum(amounts[0:find_le_index(deposit_dates, date, 0)]) for date,val in pairs]
+    growth_vals = [val - sum(amounts[0:find_le_index(deposit_dates, date, 0)+1]) for date,val in pairs]
     traces.append( go.Scatter(name='Growth', x=dates, y=growth_vals, mode='lines+markers') )
 
     plotly_url = plotly.plotly.plot(
