@@ -897,6 +897,7 @@ WITH DATA;""")
             cursor.close()
 
     @classmethod
+    def Refresh(cls):
         cursor = connection.cursor()
         try:
             cursor.execute("REFRESH MATERIALIZED VIEW financeview_securitycadprices;")
