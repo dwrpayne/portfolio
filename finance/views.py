@@ -4,8 +4,8 @@ from django.db.models import F, Q, Sum
 from django.contrib.auth.decorators import login_required
 from django.db.models.expressions import RawSQL
 
-from .models import BaseAccount, DataProvider, Holding, HoldingDetail, Security, SecurityPrice, Currency, Allocation, Activity
-from .tasks import GetLiveUpdateTaskGroup, DailyUpdateTask
+from .models import BaseAccount, Holding, HoldingDetail, Security, SecurityPrice, Currency, Allocation, Activity
+from .tasks import LiveSecurityUpdateTask, DailyUpdateTask
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from utils.misc import plotly_iframe_from_url
 
@@ -70,8 +70,7 @@ def Portfolio(request):
 
     if request.is_ajax():
         if 'refresh-live' in request.GET:
-            result = GetLiveUpdateTaskGroup(request.user)()
-            result.get()
+            LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
             GeneratePlot(request.user)
@@ -80,7 +79,7 @@ def Portfolio(request):
             for client in request.user.clients.all():
                 with client:
                     client.Refresh()
-            DataProvider.SyncAllSecurities()
+            DailyUpdateTask()
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
     return render(request, 'finance/portfolio.html', overall_context)

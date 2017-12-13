@@ -120,9 +120,22 @@ class RateLookupMixin(models.Model):
     class Meta:
         abstract = True
 
+        
+    @classmethod
+    def _FakeData(cls, lookup, start, end):
+        for day in pandas.date_range(start, end).date:
+            yield day, 1.
+
+class CurrencyManager(models.Manager):
+    def Sync(self):        
+        for currency in self.get_queryset():
+            currency.SyncExchangeRates()
+            if currency.code == 'USD':
+                currency.SyncLive()
 
 class Currency(RateLookupMixin):
     code = models.CharField(max_length=3, primary_key=True)
+    objects = CurrencyManager()
 
     def __str__(self):
         return self.code
@@ -136,7 +149,34 @@ class Currency(RateLookupMixin):
             ).values_list('price', flat=True)
         yesterday = 1/rates[0]
         today = 1/rates[1]
-        return (today, (today-yesterday)/yesterday)        
+        return (today, (today-yesterday)/yesterday)     
+    
+    @classmethod
+    def _RetrievePandasData(cls, lookup, start, end):
+        """ Returns a list of tuples (day, price) """
+        FAKED_VALS = {'DLR.U.TO': 10.}
+        if lookup.lookupSymbol in FAKED_VALS:
+            index = pandas.date_range(start, end, freq='D').date
+            return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
+
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        for retry in range(5):
+            try:
+                return pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
+            except:
+                pass
+        return []
+
+    def SyncExchangeRates(self):
+        Security.objects.get_or_create(
+                symbol=self.code + ' Cash', currency=self, type=Security.Type.Cash)
+        self.SyncRates(self._FakeData if self.code == 'CAD' else self._RetrievePandasData)
+
+    def SyncLive(self):     
+        assert self.code=='USD'
+        request = requests.get('https://openexchangerates.org/api/latest.json',
+                         params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
+        self.live_price = Decimal(str(request.json()['rates']['CAD']))
                 
 
 class ExchangeRate(RateHistoryTableMixin):
@@ -221,20 +261,80 @@ class Security(RateLookupMixin):
 class StockSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Stock)
+    
+    def SyncLive(self):
+        for security in self.get_queryset().filter(holdings__enddate=None).distinct():
+            security.SyncLiveAlphaVantagePrice()
+
+    def Sync(self):
+        for security in self.get_queryset():
+            security.SyncDailyAlphaVantagePrice()
+
 
 class Stock(Security):
     objects = StockSecurityManager()
     class Meta:
-        proxy = True        
+        proxy = True  
+
+    @property
+    def base_symbol(self):
+        return self.symbol.split('.')[0]
+
+    def SyncDailyAlphaVantagePrice(self):
+        self.SyncRates(self.GetAlphaVantageData)
+        
+    def SyncLiveAlphaVantagePrice(self):
+        params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': self.base_symbol,
+                  'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
+        r = requests.get('https://www.alphavantage.co/query', params=params)
+        json = r.json()
+        price = Decimal(0)
+        if 'Time Series (1min)' in json:
+            newest = json["Meta Data"]["3. Last Refreshed"]
+            price = Decimal(json['Time Series (1min)'][newest]['4. close'])
+        else:
+            print(self.base_symbol, json)
+            print(r, r.content)
+        print('Getting live price for {}... {}'.format(self.base_symbol, price))
+
+        if price:
+            self.live_price = price
+
+    @classmethod
+    def GetAlphaVantageData(cls, lookup, start, end):
+        fake = {'DLR.U.TO': 10., 'CAD': 1.}
+        if lookup.lookupSymbol in fake:
+            index = pandas.date_range(start, end, freq='D').date
+            return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
+
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        params = {'function': 'TIME_SERIES_DAILY',
+                  'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
+        if (end - start).days > 100:
+            params['outputsize'] = 'full'
+        r = requests.get('https://www.alphavantage.co/query', params=params)
+        json = r.json()
+        if 'Time Series (Daily)' in json:
+            return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
+        return []
+
 
 class CashSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.Cash)
+
+    def Sync(self):
+        for security in self.get_queryset():
+            security.AddFakeEntries()
     
 class Cash(Security):
     objects = CashSecurityManager()
     class Meta:
         proxy = True
+
+    def AddFakeEntries(self):
+        self.SyncRates(self._FakeData)
+
 
 class OptionSecurityManager(SecurityManager):
     def get_queryset(self):
@@ -258,11 +358,19 @@ class OptionSecurityManager(SecurityManager):
                 'currency_id': currency_str
             })
         return option
+    
+    def Sync(self):
+        for security in self.get_queryset():
+            security.FakePriceData()
 
 class Option(Security):
     objects = OptionSecurityManager()
     class Meta:
         proxy = True
+
+    def FakePriceData(self):
+        self.SyncRates(lambda l, s, e: self.activities.values_list(
+                'tradeDate', 'price').distinct('tradeDate'))
 
 class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
@@ -275,11 +383,41 @@ class MutualFundSecurityManager(SecurityManager):
             currency_id=currency_str,
             lookupSymbol=symbol
         )
+    
+    def Sync(self):
+        for security in self.get_queryset():
+            security.SyncPricesFromClient()
+            security.SyncFromMorningStar()
+
 
 class MutualFund(Security):
     objects = MutualFundSecurityManager()
     class Meta:
         proxy = True
+
+    def SyncPricesFromClient(self):
+        # TODO: Hacky mutual fund syncing, find a better way.
+        if self.GetShouldSyncRange()[1]:
+            for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
+                with c:
+                    c.SyncPrices()
+
+    def SyncFromMorningStar(self):
+        try:
+            self.SyncRates(self.GetMorningstarData)
+        except:
+            pass
+                    
+    @classmethod
+    def GetMorningstarData(cls, lookup, start, end):
+        RAW_URL = 'https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}'
+        url = RAW_URL.format(lookup.lookupSymbol, str(start), str(end))
+        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
+        r = requests.get(url)
+        json = r.json()
+        if 'data' in json and 'Prices' in json['data']:
+            return [(parser.parse(item['d']).date(), Decimal(item['v'])) for item in json['data']['Prices']]
+        return []
 
 
 class SecurityPriceQuerySet(models.query.QuerySet):
@@ -305,127 +443,7 @@ class SecurityPrice(RateHistoryTableMixin):
 
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
-    
-
-class DataProvider:
-    @classmethod
-    def _FakeData(cls, lookup, start, end):
-        for day in pandas.date_range(start, end).date:
-            yield day, 1.
-
-    @classmethod
-    def _RetrievePandasData(cls, lookup, start, end):
-        """ Returns a list of tuples (day, price) """
-        FAKED_VALS = {'DLR.U.TO': 10.}
-        if lookup.lookupSymbol in FAKED_VALS:
-            index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(cls.FAKED_VALS[lookup.lookupSymbol], index))
-
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        for retry in range(5):
-            try:
-                return pdr.DataReader(lookup.lookupSymbol, lookup.lookupSource, start, end)
-            except:
-                pass
-        return []
-
-    @classmethod
-    def GetAlphaVantageData(cls, lookup, start, end):
-        fake = {'DLR.U.TO': 10., 'CAD': 1.}
-        if lookup.lookupSymbol in fake:
-            index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(fake[lookup.lookupSymbol], index))
-
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        params = {'function': 'TIME_SERIES_DAILY',
-                  'symbol': lookup.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
-        if (end - start).days > 100:
-            params['outputsize'] = 'full'
-        r = requests.get('https://www.alphavantage.co/query', params=params)
-        json = r.json()
-        if 'Time Series (Daily)' in json:
-            return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
-        return []
-
-    @classmethod
-    def GetMorningstarData(cls, lookup, start, end):
-        RAW_URL = 'https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}'
-        url = RAW_URL.format(lookup.lookupSymbol, str(start), str(end))
-        print('Syncing prices for {} from {} to {}...'.format(lookup.lookupSymbol, start, end))
-        r = requests.get(url)
-        json = r.json()
-        if 'data' in json and 'Prices' in json['data']:
-            return [(parser.parse(item['d']).date(), Decimal(item['v'])) for item in json['data']['Prices']]
-        return []
-
-    @classmethod
-    def GetLiveStockPrice(cls, symbol):
-        symbol = symbol.split('.')[0]
-        params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': symbol,
-                  'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
-        r = requests.get('https://www.alphavantage.co/query', params=params)
-        json = r.json()
-        price = Decimal(0)
-        if 'Time Series (1min)' in json:
-            newest = json["Meta Data"]["3. Last Refreshed"]
-            price = Decimal(json['Time Series (1min)'][newest]['4. close'])
-        else:
-            print(symbol, json)
-            print(r, r.content)
-        print('Getting live price for {}... {}'.format(symbol, price))
-        return price
-
-    @classmethod
-    def SyncLiveSecurities(cls):
-        for security in Stock.objects.filter(holdings__isnull=False, holdings__enddate=None).distinct():
-            price = cls.GetLiveStockPrice(security.symbol)
-            if price:
-                security.live_price = price
-
-        for fund in MutualFund.objects.all():
-            if fund.GetShouldSyncRange()[1]:
-                for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
-                    with c:
-                        c.SyncPrices()
-
-        # Just generate fake 1 entries so we can join these tables later.
-        for cash in Cash.objects.all():
-            cash.SyncRates(cls._FakeData)
-
-    @classmethod
-    def SyncAllSecurities(cls):
-        for stock in Stock.objects.all():
-            stock.SyncRates(cls.GetAlphaVantageData)
-
-        for option in Option.objects.all():
-            option.SyncRates(lambda l, s, e: option.activities.values_list(
-                'tradeDate', 'price').distinct('tradeDate'))
-
-        for fund in MutualFund.objects.all():
-            try:
-                fund.SyncRates(cls.GetMorningstarData)
-            except:
-                pass
-            if fund.GetShouldSyncRange()[1]:
-                for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
-                    with c:
-                        c.SyncPrices()
-
-        # Just generate fake 1 entries so we can join these tables later.
-        for cash in Cash.objects.all():
-            cash.SyncRates(cls._FakeData)
-
-    @classmethod
-    def SyncAllExchangeRates(cls):
-        for currency in Currency.objects.all():
-            Security.objects.get_or_create(
-                symbol=currency.code + ' Cash', currency=currency, type=Security.Type.Cash)
-            currency.SyncRates(cls._FakeData if currency.code == 'CAD' else cls._RetrievePandasData)
-
-        r = requests.get('https://openexchangerates.org/api/latest.json',
-                         params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
-        Currency.objects.get(code='USD').live_price = Decimal(str(r.json()['rates']['CAD']))
-
+     
 
 class BaseClient(PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,

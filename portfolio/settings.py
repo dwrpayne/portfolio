@@ -83,7 +83,6 @@ TEMPLATES = [
 ]
 
 SHELL_PLUS_PRE_IMPORTS = [
-    ('finance.models', 'DataProvider'),
     'datetime',
     'arrow',
     'simplejson',
