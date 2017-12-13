@@ -834,7 +834,7 @@ class HoldingDetailQuerySet(models.query.QuerySet):
         columns = ['security','day']
         if by_account:
             columns.insert(1,'account')
-        return self.values(*columns, 'price','exch','cad','type'
+        return self.values(*columns, 'price','exch','cad',
             ).annotate(total_qty=Sum('qty'), total_val=Sum('value')
             ).order_by(*columns)
 
@@ -848,32 +848,75 @@ class HoldingDetail(models.Model):
     exch = models.DecimalField(max_digits=16, decimal_places=6)
     cad = models.DecimalField(max_digits=16, decimal_places=6)
     value = models.DecimalField(max_digits=16, decimal_places=6)
-    type = models.CharField(max_length=30)
 
-    objects = HoldingDetailQuerySet.as_manager()
+    objects = HoldingDetailQuerySet.as_manager()            
+
+    @classmethod
+    def CreateView(cls):
+        cursor = connection.cursor()
+        try:
+            cursor.execute("""DROP MATERIALIZED VIEW financeview_securitycadprices CASCADE;""")
+            cursor.execute("""
+CREATE MATERIALIZED VIEW public.financeview_securitycadprices
+AS
+ SELECT sec.day,
+    sec.symbol,
+    sec.price,
+    er.price AS exch,
+    sec.price * er.price AS cadprice
+   FROM ( SELECT s.symbol,
+            s.currency_id,
+            sp.day,
+            sp.price
+           FROM finance_security s
+             JOIN finance_securityprice sp ON s.symbol::text = sp.security_id::text) sec
+     JOIN finance_exchangerate er ON sec.day = er.day AND sec.currency_id::text = er.currency_id::text
+WITH DATA;""")
+            cursor.execute("""
+CREATE MATERIALIZED VIEW financeview_holdingdetail
+TABLESPACE pg_default
+AS
+ SELECT h.account_id,
+    h.security_id,
+    p.day,
+    h.qty,
+    p.price,
+    p.exch,
+    p.cadprice AS cad,
+    p.cadprice * h.qty AS value,
+    row_number() OVER () AS id
+   FROM finance_holding h
+     JOIN financeview_securitycadprices p ON h.security_id::text = p.symbol::text AND h.startdate <= p.day AND (p.day <= h.enddate OR h.enddate IS NULL)
+WITH DATA;""")
+            cursor.execute("ALTER TABLE financeview_securitycadprices OWNER TO financeuser;")
+            cursor.execute("ALTER TABLE financeview_holdingdetail OWNER TO financeuser;")
+            connection.commit()
+        finally:
+            cursor.close()
 
     @classmethod
     def Refresh(cls):
         cursor = connection.cursor()
         try:
-            cursor.execute("REFRESH MATERIALIZED VIEW finance_holdingdetail;")
+            cursor.execute("REFRESH MATERIALIZED VIEW financeview_securitycadprices;")
+            cursor.execute("REFRESH MATERIALIZED VIEW financeview_holdingdetail;")
             connection.commit()
         finally:
             cursor.close()
 
     class Meta:
         managed = False
-        db_table = 'finance_holdingdetail'
+        db_table = 'financeview_holdingdetail'
         get_latest_by = 'day'
         ordering = ['day']
 
 
     def __str__(self):
-        return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
+        return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f}'.format(
             self.account_id, self.day, self.security_id, self.qty, 
-            self.price, self.exch, self.cad, self.value, self.type)
+            self.price, self.exch, self.cad, self.value)
 
     def __repr__(self):
-        return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f} {}'.format(
+        return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f}'.format(
             self.account_id, self.day, self.security_id, self.qty, 
-            self.price, self.exch, self.cad, self.value, self.type)
+            self.price, self.exch, self.cad, self.value)
