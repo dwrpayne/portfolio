@@ -10,7 +10,7 @@ import simplejson
 import threading
 from utils.api import api_response
 
-from finance.models import Activity, Security
+from finance.models import Activity, Security, Option
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
 
 
@@ -76,11 +76,11 @@ class QuestradeRawActivity(BaseRawActivity):
 
             callput, symbol, expiry, strike = json['description'].split()[:4]
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
-            security = Security.objects.CreateOption(callput, symbol, expiry, strike, json['currency'])
+            security = Option.objects.Create(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
 
         # Hack to fix invalid Questrade data just for me
-        if not json['symbolId'] and not json['symbol']:
+        if not json['symbol']:
             if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol'] = 'XIU.TO'
             elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol'] = 'VUG'
             elif 'SMALLCAP GROWTH ETF' in json['description']:             json['symbol'] = 'VBK'

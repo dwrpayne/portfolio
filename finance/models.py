@@ -169,89 +169,28 @@ class SecurityManager(models.Manager):
             lookupSymbol=symbol
         )
 
-    def CreateMutualFund(self, symbol, currency_str):
-        return super().create(
-            symbol=symbol,
-            type=self.model.Type.MutualFund,
-            currency_id=currency_str,
-            lookupSymbol=symbol
-        )
-
     def CreateOptionRaw(self, optsymbol, currency_str):
-        """
-        callput is either 'call' or 'put'.
-        symbol is the base symbol of the underlying
-        expiry is a datetime.date
-        strike is a Decimal
-        currency_str is the 3 digit currency code
-        """
         return super().create(
             symbol=optsymbol,
             type=self.model.Type.Option,
             currency_id=currency_str
         )
 
-    def CreateOption(self, callput, symbol, expiry, strike, currency_str):
-        """
-        callput is either 'call' or 'put'.
-        symbol is the base symbol of the underlying
-        expiry is a datetime.date
-        strike is a Decimal
-        currency_str is the 3 digit currency code
-        """
-        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
-            '%y%m%d'), callput[0], Decimal(strike) * 1000)
-        option, created = super().get_or_create(
-            symbol=optsymbol,
-            defaults={
-                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
-                'type': self.model.Type.Option,
-                'currency_id': currency_str
-            })
-        return option
-
-
-class StockSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Stock)
-
-
-class CashSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Cash)
-
-
-class OptionSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Option)
-
-
-class MutualFundSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.MutualFund)
-
 
 class Security(RateLookupMixin):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
-
     symbol = models.CharField(max_length=32, primary_key=True)
-    symbolid = models.BigIntegerField(default=0)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
-    listingExchange = models.CharField(max_length=20, null=True, blank=True, default='')
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
 
     objects = SecurityManager()
-    stocks = StockSecurityManager()
-    cash = CashSecurityManager()
-    options = OptionSecurityManager()
-    mutualfunds = MutualFundSecurityManager()
 
     def __str__(self):
         return "{} {}".format(self.symbol, self.currency)
 
     def __repr(self):
-        return "Security({} {} ({}) {} {})".format(self.symbol, self.symbolid, self.currency, self.listingExchange, self.description)
+        return "Security({} ({}) {})".format(self.symbol, self.currency, self.description)
 
     class Meta:
         verbose_name_plural = 'Securities'
@@ -278,6 +217,69 @@ class Security(RateLookupMixin):
     
     def GetPriceCAD(self, day):
         return self.GetRateOnDay(day) * self.currency.GetRateOnDay(day)
+    
+class StockSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.Stock)
+
+def Stock(Security):
+    objects = StockSecurityManager()
+    class Meta:
+        proxy = True        
+
+class CashSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.Cash)
+    
+def Cash(Security):
+    objects = CashSecurityManager()
+    class Meta:
+        proxy = True
+
+class OptionSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.Option)
+    
+    def Create(self, callput, symbol, expiry, strike, currency_str):
+        """
+        callput is either 'call' or 'put'.
+        symbol is the base symbol of the underlying
+        expiry is a datetime.date
+        strike is a Decimal
+        currency_str is the 3 digit currency code
+        """
+        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
+            '%y%m%d'), callput[0], Decimal(strike) * 1000)
+        option, created = super().get_or_create(
+            symbol=optsymbol,
+            defaults={
+                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike, expiry),
+                'type': self.model.Type.Option,
+                'currency_id': currency_str
+            })
+        return option
+
+def Option(Security):
+    objects = OptionSecurityManager()
+    class Meta:
+        proxy = True
+
+class MutualFundSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.MutualFund)
+    
+    def Create(self, symbol, currency_str):
+        return super().create(
+            symbol=symbol,
+            type=self.model.Type.MutualFund,
+            currency_id=currency_str,
+            lookupSymbol=symbol
+        )
+
+def MutualFund(Security):
+    objects = MutualFundSecurityManager()
+    class Meta:
+        proxy = True
 
 
 class SecurityPriceQuerySet(models.query.QuerySet):
@@ -375,31 +377,31 @@ class DataProvider:
 
     @classmethod
     def SyncLiveSecurities(cls):
-        for security in Security.stocks.filter(holdings__isnull=False, holdings__enddate=None).distinct():
+        for security in Stock.objects.filter(holdings__isnull=False, holdings__enddate=None).distinct():
             price = cls.GetLiveStockPrice(security.symbol)
             if price:
                 security.live_price = price
 
-        for fund in Security.mutualfunds.all():
+        for fund in MutualFund.objects.all():
             if fund.GetShouldSyncRange()[1]:
                 for c in BaseClient.objects.filter(accounts__activities__security=fund).distinct():
                     with c:
                         c.SyncPrices()
 
         # Just generate fake 1 entries so we can join these tables later.
-        for cash in Security.cash.all():
+        for cash in Cash.objects.all():
             cash.SyncRates(cls._FakeData)
 
     @classmethod
     def SyncAllSecurities(cls):
-        for stock in Security.stocks.all():
+        for stock in Stock.objects.all():
             stock.SyncRates(cls.GetAlphaVantageData)
 
-        for option in Security.options.all():
+        for option in Option.objects.all():
             option.SyncRates(lambda l, s, e: option.activities.values_list(
                 'tradeDate', 'price').distinct('tradeDate'))
 
-        for fund in Security.mutualfunds.all():
+        for fund in MutualFund.objects.all():
             try:
                 fund.SyncRates(cls.GetMorningstarData)
             except:
@@ -410,7 +412,7 @@ class DataProvider:
                         c.SyncPrices()
 
         # Just generate fake 1 entries so we can join these tables later.
-        for cash in Security.cash.all():
+        for cash in Cash.objects.all():
             cash.SyncRates(cls._FakeData)
 
     @classmethod
@@ -856,14 +858,23 @@ class HoldingDetail(models.Model):
     def Refresh(cls):
         cursor = connection.cursor()
         try:
-            cursor.execute("REFRESH MATERIALIZED VIEW finance_holdingdetail;")
+            cursor.execute(";")
+            connection.commit()
+        finally:
+            cursor.close()
+
+    @classmethod
+    def CreateView(cls):
+        cursor = connection.cursor()
+        try:
+            cursor.execute("REFRESH MATERIALIZED VIEW financeview_holdingdetail;")
             connection.commit()
         finally:
             cursor.close()
 
     class Meta:
         managed = False
-        db_table = 'finance_holdingdetail'
+        db_table = 'financeview_holdingdetail'
         get_latest_by = 'day'
         ordering = ['day']
 

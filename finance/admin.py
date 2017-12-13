@@ -61,7 +61,7 @@ class SecurityAdmin(admin.ModelAdmin):
         return obj.rates.earliest().day
     latest_update_day.short_description = "Latest Price"
     list_filter = ['currency', 'type']
-    list_display = ['symbol', 'symbolid', 'type', 'currency', 'live_price',
+    list_display = ['symbol', 'type', 'currency', 'live_price',
                     'first_update_day', 'latest_update_day', 'lookupSymbol', 'description']
 
 

@@ -6,7 +6,7 @@ from dateutil import parser
 from decimal import Decimal
 import arrow
 
-from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, Security
+from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, MutualFund
 
 
 class GrsRawActivity(BaseRawActivity):
@@ -24,9 +24,9 @@ class GrsRawActivity(BaseRawActivity):
 
     def CreateActivity(self):        
         try:
-            security = Security.objects.get(symbol=self.symbol)
+            security = MutualFund.objects.get(symbol=self.symbol)
         except:
-            security = Security.CreateMutualFund(self.symbol, 'CAD')
+            security = MutualFund.Create(self.symbol, 'CAD')
 
         total_cost = self.qty*self.price
 
