@@ -265,7 +265,7 @@ class StockSecurityManager(SecurityManager):
 
     def Sync(self):
         for security in self.get_queryset():
-            security.SyncDailyAlphaVantagePrice()
+            security.Sync()
 
 
 class Stock(Security):
@@ -277,7 +277,7 @@ class Stock(Security):
     def base_symbol(self):
         return self.symbol.split('.')[0]
 
-    def SyncDailyAlphaVantagePrice(self):
+    def Sync(self):
         self.SyncRates(self.GetAlphaVantageData)
         
     def SyncLiveAlphaVantagePrice(self):
@@ -362,16 +362,18 @@ class OptionSecurityManager(SecurityManager):
     
     def Sync(self):
         for security in self.get_queryset():
-            security.FakePriceData()
+            security.Sync()
 
 class Option(Security):
     objects = OptionSecurityManager()
     class Meta:
         proxy = True
 
-    def FakePriceData(self):
-        self.SyncRates(lambda l, s, e: self.activities.values_list(
-                'tradeDate', 'price').distinct('tradeDate'))
+    def GetOptionPrices(self, start, end):
+        return self.activities.values_list('tradeDate', 'price').distinct('tradeDate')
+
+    def Sync(self):
+        self.SyncRates(self.GetOptionPrices)
 
 class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
@@ -387,14 +389,17 @@ class MutualFundSecurityManager(SecurityManager):
     
     def Sync(self):
         for security in self.get_queryset():
-            security.SyncPricesFromClient()
-            security.SyncFromMorningStar()
+            security.Sync()
 
 
 class MutualFund(Security):
     objects = MutualFundSecurityManager()
     class Meta:
         proxy = True
+
+    def Sync(self):
+        security.SyncPricesFromClient()
+        security.SyncFromMorningStar()
 
     def SyncPricesFromClient(self):
         # TODO: Hacky mutual fund syncing, find a better way.
