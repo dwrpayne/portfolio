@@ -11,14 +11,8 @@ def LiveSecurityUpdateTask():
     HoldingDetail.Refresh()
     for client in BaseClient.objects.all():
         with client:
-            client.SyncPrices()
             client.SyncCurrentAccountBalances()
             
-@shared_task
-def LiveExchangeUpdateTask():
-    from .models import Currency
-    Cash.objects.Sync()
-
 @shared_task
 def DailyUpdateTask():
     from .models import Currency, Stock, MutualFund, Cash, Option
