@@ -8,10 +8,8 @@ def LiveSecurityUpdateTask():
     Stock.objects.SyncLive()
     MutualFund.objects.Sync()
     Cash.objects.Sync()
+    BaseClient.objects.SyncAllBalances()
     HoldingDetail.Refresh()
-    for client in BaseClient.objects.all():
-        with client:
-            client.SyncCurrentAccountBalances()
             
 @shared_task
 def DailyUpdateTask():

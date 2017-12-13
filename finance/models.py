@@ -449,11 +449,18 @@ class SecurityPrice(RateHistoryTableMixin):
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
      
+class BaseClientManager(PolymorphicManager):
+    def SyncAllBalances(self):        
+        for client in BaseClient.objects.all():
+            with client:
+                client.SyncCurrentAccountBalances()
 
 class BaseClient(PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='clients')
     display_name = models.CharField(max_length=100, null=True)
+    
+    objects = BaseClientManager()
 
     @property
     def activitySyncDateRange(self):
