@@ -186,7 +186,7 @@ class ExchangeRate(RateHistoryTableMixin):
 
 
 class SecurityManager(models.Manager):
-    def create(self, symbol, currency, **kwargs):
+    def Create(self, symbol, currency):
         if len(symbol) >= 20:
             return self.CreateOptionRaw(symbol, currency)
         else:
@@ -630,7 +630,7 @@ class HoldingManager(models.Manager):
                 previous_qty = current_holding.qty
 
         except Holding.MultipleObjectsReturned as e:
-            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(security))
+            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, security, date))
         except Holding.DoesNotExist:
             pass
 

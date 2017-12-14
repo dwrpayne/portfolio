@@ -95,7 +95,7 @@ class ActivityModelTests(TestCase):
     def test_dep_effect_cash(self):
         self.assertEqual(self.dep.GetHoldingEffect()['CashCAD'], 1000)
 
-    def test_dep_effect_cash_2(self):
+    def test_dep_effect_cash_3(self):
         self.assertNotIn('CAD', self.dep.GetHoldingEffect())
 
     def test_dep_security(self):
