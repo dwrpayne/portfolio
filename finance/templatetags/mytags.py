@@ -31,7 +31,7 @@ def currencyround(dollars):
 
 @register.filter()
 def percentage(amount, decimals=2):
-    return ("{:,.{}f}%").format(amount * 100, decimals)
+    return "{:,.{}f}%".format(amount * 100, decimals)
 
 
 @register.filter()

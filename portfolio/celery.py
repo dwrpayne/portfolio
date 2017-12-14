@@ -1,6 +1,5 @@
 import os
 from celery import Celery
-from celery.schedules import crontab
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'portfolio.settings')
 
@@ -8,7 +7,7 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'portfolio.settings')
 
 app = Celery('portfolio')
 
-CELERY_IMPORTS = ("")
+CELERY_IMPORTS = ""
 
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.

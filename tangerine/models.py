@@ -26,28 +26,30 @@ class TangerineRawActivity(BaseRawActivity):
         if self.symbol == 'Tangerine Equity Growth Portfolio':
             symbol = 'F00000NNHK'
             currency = 'CAD'
-        else: assert False, 'Need a real lookup system here'
+        else:
+            assert False, 'Need a real lookup system here'
 
         try:
             security = MutualFund.objects.get(symbol=symbol)
         except:
-            security = MutualFund.Create(symbol, currency)
+            security = MutualFund.objects.Create(symbol, currency)
 
         if self.type == 'Purchase':
             activity_type = Activity.Type.Buy
         else:
             activity_type = Activity.Type.Dividend
 
-            
-        total_cost = self.qty*self.price
+        total_cost = self.qty * self.price
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=None, cash_id=security.currency.code + ' Cash',
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=None,
+                                cash_id=security.currency.code + ' Cash',
                                 description='Generated Deposit', qty=0,
-                        price=0, netAmount=total_cost, type=Activity.Type.Deposit, raw=self)
-            
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, cash_id=security.currency.code + ' Cash',
+                                price=0, netAmount=total_cost, type=Activity.Type.Deposit, raw=self)
+
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
+                                cash_id=security.currency.code + ' Cash',
                                 description=self.description, qty=self.qty,
-                        price=self.price, netAmount=-total_cost, type=activity_type, raw=self)
+                                price=self.price, netAmount=-total_cost, type=activity_type, raw=self)
 
 
 class TangerineAccount(BaseAccount):
@@ -82,7 +84,10 @@ class TangerineClient(BaseClient):
     def activitySyncDateRange(self):
         return 2000
 
-    def _GetRequest(self, url, params={}):
+    @staticmethod
+    def _GetRequest(url, params=None):
+        if params is None:
+            params = []
         r = requests.get(url, params=params)
         r.raise_for_status()
         return r.json()
@@ -102,20 +107,26 @@ class TangerineClient(BaseClient):
             accounts = self.client.list_accounts()
             for a in accounts:
                 TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={
-                                                       'type': a['description'], 'internal_display_name': a['display_name'], 'account_balance': a['account_balance']})
+                    'type': a['description'], 'internal_display_name': a['display_name'],
+                    'account_balance': a['account_balance']})
 
     def _CreateRawActivities(self, account, start, end):
         with self.client.login():
             transactions = self.client.list_transactions([account.id], start.date(), end.date())
             count = 0
             for trans in transactions:
-                obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'], account=account, defaults={
-                    'day': parser.parse(trans['transaction_date']).date(),
-                    'description': trans['description'],
-                    'type': trans['mutual_fund']['transaction_type'],
-                    'symbol': trans['mutual_fund']['portfolio_name'],
-                    'qty': trans['mutual_fund']['units'],
-                    'price': trans['mutual_fund']['unit_price']
-                    })
+                obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'], account=account,
+                                                                          defaults={
+                                                                              'day': parser.parse(
+                                                                                  trans['transaction_date']).date(),
+                                                                              'description': trans['description'],
+                                                                              'type': trans['mutual_fund'][
+                                                                                  'transaction_type'],
+                                                                              'symbol': trans['mutual_fund'][
+                                                                                  'portfolio_name'],
+                                                                              'qty': trans['mutual_fund']['units'],
+                                                                              'price': trans['mutual_fund'][
+                                                                                  'unit_price']
+                                                                          })
                 if created: count += 1
             return count

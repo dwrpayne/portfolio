@@ -209,7 +209,9 @@ class QuestradeClient(BaseClient):
     def CloseSession(self):
         self.session.close()
 
-    def _GetRequest(self, url, params={}):
+    def _GetRequest(self, url, params=None):
+        if params is None:
+            params = {}
         r = self.session.get(self.api_server + url, params=params)
         r.raise_for_status()
         return r.json()
@@ -241,7 +243,7 @@ class QuestradeClient(BaseClient):
 
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
-            json = self._GetRequest('accounts/%s/balances' % (a.id))
+            json = self._GetRequest('accounts/{}/balances'.format(a.id))
             current = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
             sod = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
             a.UpdateSyncedBalances(current, sod)

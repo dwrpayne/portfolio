@@ -22,21 +22,23 @@ class GrsRawActivity(BaseRawActivity):
     def __repr__(self):
         return 'GrsRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.symbol, self.qty, self.price)
 
-    def CreateActivity(self):        
+    def CreateActivity(self):
         try:
             security = MutualFund.objects.get(symbol=self.symbol)
         except:
-            security = MutualFund.Create(self.symbol, 'CAD')
+            security = MutualFund.objects.Create(self.symbol, 'CAD')
 
-        total_cost = self.qty*self.price
-            
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=None, cash_id=security.currency.code + ' Cash',
-                                       description='Generated Deposit', qty=0, raw=self,
-                                       price=0, netAmount=total_cost, type=Activity.Type.Deposit)
+        total_cost = self.qty * self.price
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security, cash_id=security.currency.code + ' Cash',
-                                       description=self.description, qty=self.qty, raw=self,
-                                       price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=None,
+                                cash_id=security.currency.code + ' Cash',
+                                description='Generated Deposit', qty=0, raw=self,
+                                price=0, netAmount=total_cost, type=Activity.Type.Deposit)
+
+        Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
+                                cash_id=security.currency.code + ' Cash',
+                                description=self.description, qty=self.qty, raw=self,
+                                price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
 
 
 class GrsAccount(BaseAccount):
@@ -70,12 +72,13 @@ class GrsClient(BaseClient):
 
     def _CreateRawActivities(self, account, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={
-                                     'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'), 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'})
+            'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
+            'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'})
         soup = BeautifulSoup(response.text, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date()
                        for tag in soup.find_all('td', class_='activities-d-lit1')]
         descriptions = [tag.contents[0]
-                       for tag in soup.find_all('td', class_='activities-d-lit2')]
+                        for tag in soup.find_all('td', class_='activities-d-lit2')]
         units = [Decimal(tag.contents[0])
                  for tag in soup.find_all('td', class_='activities-d-unitnum')]
         prices = [Decimal(tag.contents[0])
@@ -93,7 +96,8 @@ class GrsClient(BaseClient):
         for start, end in arrow.Arrow.interval('day', arrow.get(start_date), arrow.get(end_date), 15):
             response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
                                          data={'PlanFund': lookup.lookupSymbol, 'PlanDetail': '', 'BodyTitle': '',
-                                               'StartDate': start.format('MM/DD/YYYY'), 'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
+                                               'StartDate': start.format('MM/DD/YYYY'),
+                                               'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
                                          headers={
                                              'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
                                          )

@@ -1,28 +1,24 @@
-from django.shortcuts import redirect, render
-from django.http import HttpResponse
-from django.db.models import F, Q, Sum
-from django.contrib.auth.decorators import login_required
-from django.db.models.expressions import RawSQL
-
-from .models import BaseAccount, Holding, HoldingDetail, Security, SecurityPrice, Currency, Allocation, Activity
-from .tasks import LiveSecurityUpdateTask, DailyUpdateTask
-from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
-from utils.misc import plotly_iframe_from_url
-
 import datetime
-from collections import defaultdict
 from decimal import Decimal
-import plotly
-import plotly.graph_objs as go
-import pandas
-import simplejson
+
 import numpy
+import pandas
+from django.contrib.auth.decorators import login_required
+from django.db.models import F, Sum
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
+
+from utils.misc import plotly_iframe_from_url
+from .models import BaseAccount, HoldingDetail, Security, SecurityPrice, Currency, Activity
+from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
+from .tasks import LiveSecurityUpdateTask, DailyUpdateTask
+
 
 def GetHoldingsContext(user):
     holdings_query = HoldingDetail.objects.for_user(user).at_dates(
         datetime.date.today() - datetime.timedelta(days=1))
 
-    (_,yesterday_value), (_,today_value) = holdings_query.total_values()
+    (_, yesterday_value), (_, today_value) = holdings_query.total_values()
     total_gain = today_value - yesterday_value
 
     holdings = holdings_query.by_security()
@@ -43,8 +39,8 @@ def GetHoldingsContext(user):
     for h in holding_data:
         h['account_data'] = [d for d in account_data if d['security'] == h['security']]
 
-    holding_data.sort(key=lambda r:r['total_val'], reverse=True)
-    
+    holding_data.sort(key=lambda r: r['total_val'], reverse=True)
+
     total = [(total_gain, total_gain / today_value, today_value)]
     context = {'holding_data': holding_data, 'total': total}
     return context
@@ -95,7 +91,7 @@ def History(request, period):
 
     vals = holdings.account_values()
 
-    array = numpy.rec.array(list(vals), dtype=[('account','S20'),('day','S10'),('val','f4')])
+    array = numpy.rec.array(list(vals), dtype=[('account', 'S20'), ('day', 'S10'), ('val', 'f4')])
     df = pandas.DataFrame(array)
     table = df.pivot_table(index='day', columns='account', values='val', fill_value=0)
     rows = table.iloc[::-1].iterrows()
@@ -147,7 +143,7 @@ def securitydetail(request, symbol):
     iframe = plotly_iframe_from_url(filename)
     activities = reversed(list(security.activities.filter(account__client__user=request.user)))
 
-    context = {'activities': activities, 'symbol' : symbol, 'iframe': iframe}
+    context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}
     return render(request, 'finance/security.html', context)
 
 
@@ -156,7 +152,8 @@ def capgains(request, symbol):
     security = Security.objects.get(symbol=symbol)
     activities = security.activities.filter(
         account__client__user=request.user, account__taxable=True, security__currency__rates__day=F('tradeDate')
-        ).exclude(type=Activity.Type.Dividend).order_by('tradeDate').annotate(exch=Sum(F('security__currency__rates__price')))
+    ).exclude(type=Activity.Type.Dividend).order_by('tradeDate').annotate(
+        exch=Sum(F('security__currency__rates__price')))
 
     totalqty = Decimal('0')
     totalacb = Decimal('0')
@@ -166,18 +163,18 @@ def capgains(request, symbol):
         act.cadprice = act.exch * act.price
         if not act.cadprice:
             act.cadprice = act.security.GetPriceCAD(act.tradeDate)
-        act.commission = 0#abs(act.exch * Decimal(simplejson.loads(act.raw.jsonstr)['commission']))
+        act.commission = 0  # abs(act.exch * Decimal(simplejson.loads(act.raw.jsonstr)['commission']))
 
         prevacbpershare = totalacb / totalqty if totalqty else 0
 
         act.capgain = 0
         if act.qty < 0:
-            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - ((prevacbpershare) * abs(act.qty))
+            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - (prevacbpershare * abs(act.qty))
 
         if act.qty > 0:
             act.acbchange = act.cadprice * act.qty + act.commission
         else:
-            act.acbchange = -(prevacbpershare) * abs(act.qty)
+            act.acbchange = -prevacbpershare * abs(act.qty)
 
         for s, amt in act.GetHoldingEffect().items():
             if s.symbol == symbol:
@@ -200,10 +197,10 @@ def capgains(request, symbol):
 def index(request):
     context = {}
     last_update_days = SecurityPrice.objects.filter(
-            day__gt=datetime.date.today() - datetime.timedelta(days=30)
-        ).order_by('security', '-day').distinct('security').filter(
-            security__holdings__enddate=None, security__holdings__account__client__user=request.user
-        ).values_list('day', flat=True)
+        day__gt=datetime.date.today() - datetime.timedelta(days=30)
+    ).order_by('security', '-day').distinct('security').filter(
+        security__holdings__enddate=None, security__holdings__account__client__user=request.user
+    ).values_list('day', flat=True)
     if any(day < datetime.date.today() for day in last_update_days):
         context['updating'] = True
         DailyUpdateTask.delay()

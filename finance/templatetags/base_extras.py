@@ -1,5 +1,5 @@
 from django import template
-from django.core.urlresolvers import reverse, resolve, Resolver404
+from django.core.urlresolvers import resolve, Resolver404
 
 register = template.Library()
 
