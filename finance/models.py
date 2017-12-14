@@ -392,8 +392,8 @@ class MutualFund(Security):
         proxy = True
 
     def Sync(self):
-        security.SyncPricesFromClient()
-        security.SyncFromMorningStar()
+        self.SyncPricesFromClient()
+        self.SyncFromMorningStar()
 
     def SyncPricesFromClient(self):
         # TODO: Hacky mutual fund syncing, find a better way.
