@@ -156,7 +156,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     def RegenerateActivities(self):
         self.activities.all().delete()
-        Activity.objects.GenerateFromRaw(self.rawactivities.all())
+        Activity.objects.GenerateFromRawActivities(self.rawactivities.all())
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
@@ -293,11 +293,18 @@ class ActivityManager(models.Manager):
             kwargs['cash_id'] = None
         super().create(*args, **kwargs)
 
-    def GenerateFromRaw(self, rawactivities):
+    def GenerateFromRawActivities(self, rawactivities):
         with transaction.atomic():
             for raw in rawactivities:
                 raw.CreateActivity()
 
+    def create_with_deposit(self, *args, **kwargs):
+        super().create(*args, **kwargs)
+
+        kwargs.update({'security' : None, 'description' : 'Generated Deposit', 'qty' : 0,
+                      'price' : 0, 'type' : Activity.Type.Deposit})
+        kwargs['netAmount'] *= -1
+        super().create(*args, **kwargs)
 
 class ActivityQuerySet(models.query.QuerySet):
     def in_year(self, year):

@@ -42,12 +42,7 @@ class TangerineRawActivity(BaseRawActivity):
 
         total_cost = self.qty * self.price
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=None,
-                                cash_id=security.currency.code + ' Cash',
-                                description='Generated Deposit', qty=0,
-                                price=0, netAmount=total_cost, type=Activity.Type.Deposit, raw=self)
-
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
+        Activity.objects.create_with_deposit(account=self.account, tradeDate=self.day, security=security,
                                 cash_id=security.currency.code + ' Cash',
                                 description=self.description, qty=self.qty,
                                 price=self.price, netAmount=-total_cost, type=activity_type, raw=self)

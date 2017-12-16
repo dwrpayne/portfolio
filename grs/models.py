@@ -32,12 +32,7 @@ class GrsRawActivity(BaseRawActivity):
 
         total_cost = self.qty * self.price
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=None,
-                                cash_id=security.currency.code + ' Cash',
-                                description='Generated Deposit', qty=0, raw=self,
-                                price=0, netAmount=total_cost, type=Activity.Type.Deposit)
-
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
+        Activity.objects.create_with_deposit(account=self.account, tradeDate=self.day, security=security,
                                 cash_id=security.currency.code + ' Cash',
                                 description=self.description, qty=self.qty, raw=self,
                                 price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
@@ -51,6 +46,24 @@ class GrsAccount(BaseAccount):
 
     def __repr__(self):
         return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
+
+    def CreateActivitiesFromHtml(self, response):
+        soup = BeautifulSoup(response.text, 'html.parser')
+        trans_dates = [parser.parse(tag.contents[0]).date()
+                       for tag in soup.find_all('td', class_='activities-d-lit1')]
+        descriptions = [tag.contents[0]
+                        for tag in soup.find_all('td', class_='activities-d-lit2')]
+        units = [Decimal(tag.contents[0])
+                 for tag in soup.find_all('td', class_='activities-d-unitnum')]
+        prices = [Decimal(tag.contents[0])
+                  for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
+        count = 0
+        with transaction.atomic():
+            for day, qty, price, desc in zip(trans_dates, units, prices, descriptions):
+                GrsRawActivity.objects.create(
+                    account=self, day=day, qty=qty, price=price, symbol='ETP', description=desc)
+                count += 1
+        return count
 
 
 class GrsClient(BaseClient):
@@ -76,22 +89,7 @@ class GrsClient(BaseClient):
         response = self.session.post('https://ssl.grsaccess.com/english/member/activity_reports_details.aspx', data={
             'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
             'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'})
-        soup = BeautifulSoup(response.text, 'html.parser')
-        trans_dates = [parser.parse(tag.contents[0]).date()
-                       for tag in soup.find_all('td', class_='activities-d-lit1')]
-        descriptions = [tag.contents[0]
-                        for tag in soup.find_all('td', class_='activities-d-lit2')]
-        units = [Decimal(tag.contents[0])
-                 for tag in soup.find_all('td', class_='activities-d-unitnum')]
-        prices = [Decimal(tag.contents[0])
-                  for tag in soup.find_all('td', class_='activities-d-netunitvalamt')]
-        count = 0
-        with transaction.atomic():
-            for day, qty, price, desc in zip(trans_dates, units, prices, descriptions):
-                GrsRawActivity.objects.create(
-                    account=account, day=day, qty=qty, price=price, symbol='ETP', description=desc)
-                count += 1
-        return count
+        return account.CreateActivitiesFromHtml(response.text)
 
 
 class GrsDataSource(DataSourceMixin):
