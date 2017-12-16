@@ -75,9 +75,7 @@ class RateLookupMixin(models.Model):
     def SyncRates(self):
         start, end = self.GetShouldSyncRange()
         if start is None:
-            print('Already synced data, skipping.')
             return []
-        print('Syncing prices from {} to {}...'.format(start, end))
 
         data = self.datasource.GetData(start, end)
 
@@ -257,8 +255,9 @@ class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
 
-    def Create(self, symbol, currency_str):
-        datasource = MorningstarDataSource.objects.get_or_create(symbol=symbol)
+    def Create(self, symbol, currency_str, datasource=None):
+        if not datasource:
+            datasource, _ = MorningstarDataSource.objects.get_or_create(symbol=symbol)
         return super().create(
             symbol=symbol,
             type=self.model.Type.MutualFund,

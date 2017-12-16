@@ -8,7 +8,7 @@ from django.db import models, transaction
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
 from securities.models import Security
-
+from datasource.models import DataSourceMixin
 
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
@@ -26,8 +26,9 @@ class GrsRawActivity(BaseRawActivity):
     def CreateActivity(self):
         try:
             security = Security.mutualfunds.get(symbol=self.symbol)
-        except:
-            security = Security.mutualfunds.Create(self.symbol, 'CAD')
+        except Security.DoesNotExist:
+            datasource = GrsDataSource.objects.get_or_create(symbol=self.symbol)
+            security = Security.mutualfunds.Create(self.symbol, 'CAD', datasource=datasource)
 
         total_cost = self.qty * self.price
 
@@ -92,29 +93,31 @@ class GrsClient(BaseClient):
                 count += 1
         return count
 
-    def _GetRawPrices(self, lookup, start_date, end_date):
-        print("_GetRawPrices... {} {} {}".format(lookup.lookupSymbol, start_date, end_date))
-        for start, end in arrow.Arrow.interval('day', arrow.get(start_date), arrow.get(end_date), 15):
-            response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
-                                         data={'PlanFund': lookup.lookupSymbol, 'PlanDetail': '', 'BodyTitle': '',
-                                               'StartDate': start.format('MM/DD/YYYY'),
-                                               'EndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'},
-                                         headers={
-                                             'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
-                                         )
-            soup = BeautifulSoup(response.text, 'html.parser')
-            table_header = soup.find('tr', class_='table-header')
-            if table_header:
-                dates = [tag.contents[0] for tag in table_header.find_all('td')[1:]]
-                values = [tag.contents[0]
-                          for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
-                for date, value in zip(dates, values):
-                    if 'Unknown' not in value:
-                        yield parser.parse(date).date(), Decimal(value[1:])
-        return
 
-    def SyncPrices(self):
-        self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx',
-                         params={'Selected_Info': self.accounts.first().plan_data})
-        for security in self.currentSecurities:
-            security.SyncRates()
+class GrsDataSource(DataSourceMixin):
+    symbol = models.CharField(max_length=32)
+    client = models.ForeignKey(GrsClient, null=True, default=None)
+
+    def _Retrieve(self, start, end):
+        with self.client as client:
+            client.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx',
+                             params={'Selected_Info': client.accounts.first().plan_data})
+            print("_GetRawPrices... {} {} {}".format(self.symbol, start, end))
+            for s, e in arrow.Arrow.interval('day', arrow.get(start), arrow.get(end), client.activitySyncDateRange):
+                response = client.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
+                                             data={'PlanFund': self.symbol, 'PlanDetail': '', 'BodyTitle': '',
+                                                   'StartDate': s.format('MM/DD/YYYY'),
+                                                   'EndDate': e.format('MM/DD/YYYY'), 'Submit': 'Submit'},
+                                             headers={
+                                                 'User-Agent': 'Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0'}
+                                             )
+                soup = BeautifulSoup(response.text, 'html.parser')
+                table_header = soup.find('tr', class_='table-header')
+                if table_header:
+                    dates = [tag.contents[0] for tag in table_header.find_all('td')[1:]]
+                    values = [tag.contents[0]
+                              for tag in soup.find('tr', class_='body-text').find_all('td')[1:]]
+                    for date, value in zip(dates, values):
+                        if 'Unknown' not in value:
+                            yield parser.parse(date).date(), Decimal(value[1:])
+        return

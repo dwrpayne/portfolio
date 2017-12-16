@@ -6,8 +6,9 @@ from decimal import Decimal
 from dateutil import parser
 from pandas_datareader import data as pdr
 from polymorphic.models import PolymorphicModel
+from polymorphic.showfields import ShowFieldTypeAndContent
 
-class DataSourceMixin(PolymorphicModel):
+class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
     """
     A mixin class for retrieving data in a well-defined format.
     Just need to override a function that grabs the data.
@@ -29,6 +30,7 @@ class DataSourceMixin(PolymorphicModel):
         return data.iteritems()
 
     def GetData(self, start, end):
+        print("Getting data from {} for {} to {}".format(self, start, end))
         return self.ProcessRateData(self._Retrieve(start, end), end)
 
     def _Retrieve(self, start, end):
@@ -43,6 +45,12 @@ class DataSourceMixin(PolymorphicModel):
 class FakeDataSource(DataSourceMixin):
     value = models.DecimalField(max_digits=19, decimal_places=6, default=1)
 
+    def __str__(self):
+        return "Constant value of {}".format(self.value)
+
+    def __repr__(self):
+        return "FakeDataSource<{}>".format(self.value)
+
     def _Retrieve(self, start, end):
         for day in pandas.date_range(start, end).date:
             yield day, self.value
@@ -52,23 +60,32 @@ class PandasDataSource(DataSourceMixin):
     source = models.CharField(max_length=32, default=None)
     column = models.CharField(max_length=32, default=None)
 
+    def __str__(self):
+        return "Pandas {} for {}".format(self.source, self.symbol)
+
+    def __repr__(self):
+        return "PandasDataSource<{},{},{}>".format(self.symbol, self.source, self.column)
+
     def _Retrieve(self, start, end):
         df = pdr.DataReader(self.symbol, self.source, start, end)
         if df.empty:
             return []
-        return pandas.Series(df[self.column], df.index)
+        if self.source == 'bankofcanada':
+            df = 1/df
+        return pandas.Series(df[self.column], df.index).iteritems()
 
 class AlphaVantageDataSource(DataSourceMixin):
     api_key = models.CharField(max_length=32, default='P38D2XH1GFHST85V')
     function = models.CharField(max_length=32, default='TIME_SERIES_DAILY')
     symbol = models.CharField(max_length=32)
 
-    def _Retrieve(self, start, end):
-        # TODO: Monster hack for DLR - should be a fakedatasource
-        if self.symbol == 'DLR.U.TO':
-            index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(10.0, index))
+    def __str__(self):
+        return "AlphaVantage {} for {}".format(self.function, self.symbol)
 
+    def __repr__(self):
+        return "AlphaVantageDataSource<{},{},{}>".format(self.symbol)
+
+    def _Retrieve(self, start, end):
         params = {'function': self.function,
                   'symbol': self.symbol, 'apikey': self.api_key}
         if (datetime.date.today() - start).days >= 100:
@@ -88,6 +105,12 @@ class MorningstarDataSource(DataSourceMixin):
     raw_url = models.CharField(max_length=1000, default='https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}')
     symbol = models.CharField(max_length=32, default=None)
 
+    def __str__(self):
+        return "Morningstar {}".format(self.symbol)
+
+    def __repr__(self):
+        return "MorningstarDataSource<{}>".format(self.symbol)
+
     def _Retrieve(self, start, end):
         url = self.raw_url.format(self.symbol, str(start), str(end))
         r = requests.get(url)
@@ -102,6 +125,14 @@ class StartEndDataSource(DataSourceMixin):
     start_val = models.DecimalField(max_digits=19, decimal_places=6)
     end_day = models.DateField()
     end_val = models.DecimalField(max_digits=19, decimal_places=6)
+
+    def __str__(self):
+        return "interpolated data from {} {} to {} {}".format(
+            self.start_day, self.start_val, self.end_day, self.end_val)
+
+    def __repr__(self):
+        return "StartEndDataSource<{},{},{},{}>".format(
+            self.start_day, self.start_val, self.end_day, self.end_val)
 
     def _Retrieve(self, start, end):
         return (self.start_day, self.start_val), (self.end_day, self.end_val),

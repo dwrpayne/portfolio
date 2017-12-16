@@ -196,13 +196,17 @@ class QuestradeClient(BaseClient):
                 _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
                 r = requests.get(_URL_LOGIN + self.refresh_token)
                 r.raise_for_status()
-                json = r.json()
-                self.api_server = json['api_server'] + 'v1/'
-                self.refresh_token = json['refresh_token']
-                self.access_token = json['access_token']
-                self.token_expiry = timezone.now() + datetime.timedelta(seconds=json['expires_in'])
-                # Make sure to save out to DB
-                self.save()
+                try:
+                    json = r.json()
+                    self.api_server = json['api_server'] + 'v1/'
+                    self.refresh_token = json['refresh_token']
+                    self.access_token = json['access_token']
+                    self.token_expiry = timezone.now() + datetime.timedelta(seconds=json['expires_in'])
+                    # Make sure to save out to DB
+                    self.save()
+                except simplejson.errors.JSONDecodeError:
+                    print("Failed to get a valid Questrade access token for {}.".format(self))
+                    raise ConnectionError()
 
         self.session = requests.Session()
         self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})

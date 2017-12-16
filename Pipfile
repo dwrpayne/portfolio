@@ -13,7 +13,6 @@ requests = "*"
 simplejson = "*"
 dj-database-url = "*"
 plotly = "*"
-pandas-datareader = "*"
 pandas = "*"
 django-polymorphic = "*"
 django-extensions = "*"
@@ -29,6 +28,7 @@ django-debug-toolbar = "*"
 eventlet = "*"
 ipython = "*"
 pendulum = "*"
+pandas-datareader = {git = "https://github.com/dwrpayne/pandas-datareader.git", ref = "bankofcanada"}
 
 
 [dev-packages]

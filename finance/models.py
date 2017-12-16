@@ -10,6 +10,7 @@ from model_utils import Choices
 from polymorphic.manager import PolymorphicManager
 from polymorphic.models import PolymorphicModel
 from polymorphic.query import PolymorphicQuerySet
+from polymorphic.showfields import ShowFieldTypeAndContent
 
 import utils.dates
 from utils.misc import plotly_iframe_from_url
@@ -19,11 +20,14 @@ from securities.models import Security, SecurityPriceDetail
 class BaseClientManager(PolymorphicManager):
     def SyncAllBalances(self):
         for client in self.get_queryset().all():
-            with client:
-                client.SyncCurrentAccountBalances()
+            try:
+                with client:
+                    client.SyncCurrentAccountBalances()
+            except ConnectionError:
+                pass
 
 
-class BaseClient(PolymorphicModel):
+class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='clients')
     display_name = models.CharField(max_length=100, null=True)
@@ -109,7 +113,7 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
         return {p: sum(getattr(a, p) for a in self) for p in properties}
 
 
-class BaseAccount(PolymorphicModel):
+class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
     id = models.CharField(max_length=100, primary_key=True)
@@ -250,7 +254,7 @@ class Holding(models.Model):
         self.save(update_fields=['enddate'])
 
 
-class BaseRawActivity(PolymorphicModel):
+class BaseRawActivity(ShowFieldTypeAndContent, PolymorphicModel):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
 
     def CreateActivity(self):
