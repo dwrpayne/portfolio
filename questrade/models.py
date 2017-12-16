@@ -14,6 +14,19 @@ from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawAc
 from securities.models import Security
 from utils.api import api_response
 
+class QuestradeActivityTypeManager(models.Manager):
+    def GetActivityType(self, type, action):
+        try:
+            return QuestradeActivityType.objects.get(q_type=type, q_action=action).activity_type
+        except QuestradeActivityType.DoesNotExist:
+            print('No action type mapping for "{}" "{}"'.format(type, action))
+            return Activity.Type.NotImplemented
+
+class QuestradeActivityType(models.Model):
+    q_type = models.CharField(max_length=32)
+    q_action = models.CharField(max_length=32)
+    activity_type = models.CharField(max_length=32)
+    objects = QuestradeActivityTypeManager()
 
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
@@ -42,39 +55,11 @@ class QuestradeRawActivity(BaseRawActivity):
 
         return created
 
-    @classmethod
-    def GetActivityType(cls, type, action):
-        mapping = {('Deposits', 'CON'): Activity.Type.Deposit,
-                   ('Deposits', 'CSP'): Activity.Type.Deposit,
-                   ('Deposits', 'DEP'): Activity.Type.Deposit,
-                   ('Fees and rebates', 'FCH'): Activity.Type.Fee,
-                   ('FX conversion', 'FXT'): Activity.Type.FX,
-                   ('Other', 'EXP'): Activity.Type.Expiry,
-                   ('Other', 'BRW'): Activity.Type.Journal,
-                   ('Trades', 'Buy'): Activity.Type.Buy,
-                   ('Trades', 'Sell'): Activity.Type.Sell,
-                   ('Withdrawals', 'CON'): Activity.Type.Withdrawal,
-                   ('Transfers', 'TF6'): Activity.Type.Transfer,
-                   ('Dividends', 'DIV'): Activity.Type.Dividend,
-                   ('Dividends', ''): Activity.Type.Dividend,
-                   ('Dividends', '   '): Activity.Type.Dividend,
-                   ('Dividends', 'NRT'): Activity.Type.Dividend,
-                   ('Interest', '   '): Activity.Type.Interest
-                   }
-        if (type, action) in mapping:
-            return mapping[(type, action)]
-        print('No action type mapping for "{}" "{}"'.format(type, action))
-        return Activity.Type.NotImplemented
-
     def GetCleanedJson(self):
         json = simplejson.loads(self.jsonstr)
 
-        if json['grossAmount'] is None:
-            json['grossAmount'] = 0
-
         # Handle Options cleanup
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
-
             callput, symbol, expiry, strike = json['description'].split()[:4]
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
             security = Security.options.Create(callput, symbol, expiry, strike, json['currency'])
@@ -110,12 +95,9 @@ class QuestradeRawActivity(BaseRawActivity):
                     year=asof.year, month=asof.month, day=asof.day).isoformat()
 
         json['tradeDate'] = str(parser.parse(json['tradeDate']).date())
-        json['type'] = self.GetActivityType(json['type'], json['action'])
+        json['type'] = QuestradeActivityType.objects.GetActivityType(json['type'], json['action'])
         json['qty'] = json['quantity']
         del json['quantity']
-
-        if json['currency'] == json['symbol']:
-            json['symbol'] = None
 
         if json['symbol']:
             try:
@@ -263,8 +245,7 @@ tfsa_activity_data = [
     ('6/15/2009', 'Buy', 'GE', 'USD', '13.73', '150', '-2299.38', 'CONV TO CAD @ 1.1138 %US PREM'),
     ('6/15/2009', 'Buy', 'IGR', 'USD', '5.25', '200', '-1175', 'CONV TO CAD @ 1.1138 %US PREM'),
     ('6/15/2009', 'Buy', 'VUG', 'USD', '44.58', '30', '-1495.11', 'CONV TO CAD @ 1.1138 %US PREM'),
-    ('6/15/2009', 'Sell', 'GE    090718C00014000', 'USD',
-     '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
+    ('6/15/2009', 'Sell', 'GE    090718C00014000', 'USD', '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
     ('6/30/2009', 'Dividend', 'IGR', 'USD', '', '', '8.82', 'CONVERT TO CAD @ 1.15350'),
     ('6/30/2009', 'Dividend', 'VUG', 'USD', '', '', '4.27', 'CONVERT TO CAD @ 1.15350'),
     ('7/7/2009', 'Buy', 'EA    090721C00021000', 'USD', '', '1', '-94.33', 'CONV TO CAD @1.1653 %US PREM'),
