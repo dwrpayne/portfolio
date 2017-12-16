@@ -90,18 +90,18 @@ class SecurityManager(models.Manager):
         else:
             return self.CreateStock(symbol, currency)
 
-    def CreateStock(self, symbol, currency_str):
+    def CreateStock(self, symbol, currency):
         return self.create(
             symbol=symbol,
             type=self.model.Type.Stock,
-            currency_id=currency_str
+            currency=currency
         )
 
-    def CreateOptionRaw(self, optsymbol, currency_str):
+    def CreateOptionRaw(self, optsymbol, currency):
         return self.create(
             symbol=optsymbol,
             type=self.model.Type.Option,
-            currency_id=currency_str
+            currency=currency
         )
 
     def Sync(self):
@@ -166,7 +166,7 @@ class OptionSecurityManager(SecurityManager):
                 'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike,
                                                                                     expiry),
                 'type': self.model.Type.Option,
-                'currency_id': currency_str
+                'currency': currency_str
             })
 
         return option
@@ -182,7 +182,7 @@ class MutualFundSecurityManager(SecurityManager):
         return super().create(
             symbol=symbol,
             type=self.model.Type.MutualFund,
-            currency_id=currency_str,
+            currency=currency_str,
             datasource=datasource
         )
 
@@ -191,7 +191,7 @@ class Security(RateLookupMixin):
     symbol = models.CharField(max_length=32, primary_key=True)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
-    currency_id = models.CharField(max_length=3, default='XXX')
+    currency = models.CharField(max_length=3, default='XXX')
 
     objects = SecurityManager()
     stocks = StockSecurityManager()
@@ -200,16 +200,16 @@ class Security(RateLookupMixin):
     mutualfunds = MutualFundSecurityManager()
 
     def __str__(self):
-        return "{} {}".format(self.symbol, self.currency_id)
+        return "{} {}".format(self.symbol, self.currency)
 
     def __repr(self):
-        return "Security({} ({}) {})".format(self.symbol, self.currency_id, self.description)
+        return "Security({} ({}) {})".format(self.symbol, self.currency, self.description)
 
     class Meta:
         verbose_name_plural = 'Securities'
         indexes = [
             models.Index(fields=['symbol']),
-            models.Index(fields=['currency_id'])
+            models.Index(fields=['currency'])
         ]
 
     @cached_property
@@ -277,13 +277,13 @@ SELECT prices.symbol as security_id,
     prices.type,    
     row_number() OVER () AS id
     FROM (SELECT s.symbol, 
-     s.currency_id, 
+     s.currency, 
      p.day, 
      p.price,
      s.type 
      FROM securities_security s 
         JOIN securities_securityprice p ON s.symbol=p.security_id) prices
-        LEFT JOIN securities_securityprice currencies on prices.day=currencies.day and currencies.security_id=prices.currency_id
+        LEFT JOIN securities_securityprice currencies on prices.day=currencies.day and currencies.security_id=prices.currency
 WITH DATA;
 ALTER TABLE securities_cadview OWNER TO financeuser;
 """)
