@@ -316,12 +316,6 @@ class SecurityPriceQuerySet(models.query.QuerySet):
     def today(self):
         return self.filter(day=datetime.date.today())
 
-    def with_cad_prices(self):
-        return self.filter(security__currency__rates__day=F('day')).annotate(
-            exch=F('security__currency__rates__price'),
-            cadprice=F('security__currency__rates__price') * F('price')
-        )
-
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
     objects = SecurityPriceQuerySet.as_manager()
