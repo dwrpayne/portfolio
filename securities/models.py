@@ -14,7 +14,7 @@ from pandas_datareader import data as pdr
 
 class RateHistoryTableMixin(models.Model):
     """
-    A mixin class for rate history.
+    A mixin class for storing rate history.
     Classes that use this must define a foreign key back to the related RateLookupMixin with related_name="rates"
     """
     day = models.DateField(default=datetime.date.today)
@@ -159,7 +159,10 @@ class Currency(RateLookupMixin):
         return today, (today - yesterday) / yesterday
 
     def _RetrievePandasData(self, start, end):
-        return pdr.DataReader(self.lookupSymbol, self.lookupSource, start, end)
+        df = pdr.DataReader(self.lookupSymbol, self.lookupSource, start, end)
+        if df.empty:
+            return []
+        return pandas.Series(df[self.lookupColumn], df.index)
 
     def SyncExchangeRates(self):
         self.SyncRates(self._FakeData if self.code == 'CAD' else self._RetrievePandasData)
@@ -278,22 +281,12 @@ class Stock(Security):
         self.SyncRates(self.GetAlphaVantageData)
 
     def SyncLiveAlphaVantagePrice(self):
-        params = {'function': 'TIME_SERIES_INTRADAY', 'symbol': self.base_symbol,
-                  'apikey': 'P38D2XH1GFHST85V', 'interval': '1min'}
-        r = requests.get('https://www.alphavantage.co/query', params=params)
-        if r.ok:
-            json = r.json()
-            price = Decimal(0)
-            if 'Time Series (1min)' in json:
-                newest = json["Meta Data"]["3. Last Refreshed"]
-                price = Decimal(json['Time Series (1min)'][newest]['4. close'])
-            else:
-                print(self.base_symbol, json)
-                print(r, r.content)
-            print('Getting live price for {}... {}'.format(self.base_symbol, price))
-
-            if price:
-                self.live_price = price
+        vals = self.GetAlphaVantageData(datetime.date.today(), datetime.date.today())
+        try:
+            if vals[0][1]:
+                self.live_price = vals[0][1]
+        except IndexError:
+            pass
 
     def GetAlphaVantageData(self, start, end):
         # TODO: Monster hack for DLR - maybe have a fallback of some kind?
