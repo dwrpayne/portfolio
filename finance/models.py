@@ -3,6 +3,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 import arrow
+import requests
 from django.conf import settings
 from django.db import models, transaction, connection
 from django.db.models import Sum
@@ -17,6 +18,7 @@ from utils.misc import plotly_iframe_from_url
 from securities.models import Security, SecurityPriceDetail
 
 
+
 class BaseClientManager(PolymorphicManager):
     def SyncAllBalances(self):
         for client in self.get_queryset().all():
@@ -24,7 +26,7 @@ class BaseClientManager(PolymorphicManager):
                 with client:
                     client.SyncCurrentAccountBalances()
             except ConnectionError:
-                pass
+                print("Perhaps the server is down.")
 
 
 class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
@@ -283,7 +285,7 @@ class ManualRawActivity(BaseRawActivity):
                 security = Security.objects.Create(self.symbol, self.currency)
 
         Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
-                                description=self.description, cash_id=self.currency + ' Cash', qty=self.qty,
+                                description=self.description, cash_id=self.currency, qty=self.qty,
                                 price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
 
 
@@ -468,7 +470,7 @@ class HoldingDetail(models.Model):
 
     @classmethod
     def CreateView(cls):
-        SecurityPriceDetail.CreateView()
+        SecurityPriceDetail.CreateView(drop_cascading=True)
         cursor = connection.cursor()
         try:
             cursor.execute("""

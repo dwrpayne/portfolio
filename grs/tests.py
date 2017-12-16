@@ -5,5 +5,3 @@ when you run "manage.py test".
 Replace this with more appropriate tests for your application.
 """
 
-import django
-from django.test import TestCase

@@ -2,10 +2,9 @@ from celery import shared_task
 
 @shared_task
 def LiveSecurityUpdateTask():
-    from securities.models import Security, Currency
+    from securities.models import Security
     from .models import BaseClient, HoldingDetail
     Security.objects.Sync()
-    Currency.objects.Sync()
     BaseClient.objects.SyncAllBalances()
     HoldingDetail.Refresh()
 

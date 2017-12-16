@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 
 from utils.misc import plotly_iframe_from_url
 from .models import BaseAccount, HoldingDetail, Activity
-from securities.models import Security, SecurityPrice, Currency
+from securities.models import Security, SecurityPrice
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, RefreshClientTask
 
@@ -19,7 +19,8 @@ def GetHoldingsContext(user):
     holdings_query = HoldingDetail.objects.for_user(user).at_dates(
         datetime.date.today() - datetime.timedelta(days=1))
 
-    (_, yesterday_value), (_, today_value) = holdings_query.total_values()
+    total_vals = holdings_query.total_values()
+    (_, yesterday_value), (_, today_value) = total_vals
     total_gain = today_value - yesterday_value
 
     holdings = holdings_query.by_security()
@@ -53,7 +54,7 @@ def GetBalanceContext(user):
         return {}
 
     total = accounts.get_balance_totals()
-    exchange_live, exchange_delta = Currency.objects.get(code='USD').GetTodaysChange()
+    exchange_live, exchange_delta = Security.objects.get(symbol='USD Cash').GetTodaysChange()
 
     context = {'accounts': accounts, 'account_total': total,
                'exchange_live': exchange_live, 'exchange_delta': exchange_delta}

@@ -33,7 +33,7 @@ class GrsRawActivity(BaseRawActivity):
         total_cost = self.qty * self.price
 
         Activity.objects.create_with_deposit(account=self.account, tradeDate=self.day, security=security,
-                                cash_id=security.currency.code + ' Cash',
+                                cash_id=security.currency,
                                 description=self.description, qty=self.qty, raw=self,
                                 price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
 
@@ -47,8 +47,8 @@ class GrsAccount(BaseAccount):
     def __repr__(self):
         return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
 
-    def CreateActivitiesFromHtml(self, response):
-        soup = BeautifulSoup(response.text, 'html.parser')
+    def CreateActivitiesFromHtml(self, html):
+        soup = BeautifulSoup(html, 'html.parser')
         trans_dates = [parser.parse(tag.contents[0]).date()
                        for tag in soup.find_all('td', class_='activities-d-lit1')]
         descriptions = [tag.contents[0]
@@ -100,7 +100,6 @@ class GrsDataSource(DataSourceMixin):
         with self.client as client:
             client.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx',
                              params={'Selected_Info': client.accounts.first().plan_data})
-            print("_GetRawPrices... {} {} {}".format(self.symbol, start, end))
             for s, e in arrow.Arrow.interval('day', arrow.get(start), arrow.get(end), client.activitySyncDateRange):
                 response = client.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
                                              data={'PlanFund': self.symbol, 'PlanDetail': '', 'BodyTitle': '',

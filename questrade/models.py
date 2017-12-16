@@ -136,7 +136,7 @@ class QuestradeRawActivity(BaseRawActivity):
         for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item]))
 
-        create_args['cash_id'] = json['currency'] + ' Cash'
+        create_args['cash_id'] = json['currency']
 
         Activity.objects.create(**create_args)
 
@@ -248,11 +248,13 @@ class QuestradeClient(BaseClient):
 
     def SyncCurrentAccountBalances(self):
         for a in self.accounts.all():
-            json = self._GetRequest('accounts/{}/balances'.format(a.id))
-            current = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-            sod = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-            a.UpdateSyncedBalances(current, sod)
-
+            try:
+                json = self._GetRequest('accounts/{}/balances'.format(a.id))
+                current = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
+                sod = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
+                a.UpdateSyncedBalances(current, sod)
+            except requests.exceptions.HTTPError as ex:
+                print("Failed to connect to Questrade server: {}".format(ex))
 
 
 tfsa_activity_data = [

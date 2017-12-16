@@ -1,12 +1,5 @@
 from django.contrib import admin
-from .models import Currency, ExchangeRate, Security, SecurityPrice
-
-class CurrencyAdmin(admin.ModelAdmin):
-    list_display = ['code', 'live_price']
-
-
-admin.site.register(Currency, CurrencyAdmin)
-
+from .models import Security, SecurityPrice
 
 class SecurityAdmin(admin.ModelAdmin):
     def latest_update_day(self, obj):
@@ -15,8 +8,8 @@ class SecurityAdmin(admin.ModelAdmin):
     def first_update_day(self, obj):
         return obj.rates.earliest().day
     latest_update_day.short_description = "Latest Price"
-    list_filter = ['currency', 'type']
-    list_display = ['symbol', 'type', 'currency', 'live_price',
+    list_filter = ['currency_id', 'type']
+    list_display = ['symbol', 'type', 'currency_id', 'live_price',
                     'first_update_day', 'latest_update_day', 'description']
 
 
@@ -30,10 +23,3 @@ class SecurityPriceAdmin(admin.ModelAdmin):
 
 admin.site.register(SecurityPrice, SecurityPriceAdmin)
 
-
-class ExchangeRateAdmin(admin.ModelAdmin):
-    list_display = ['currency', 'day', 'price']
-    list_filter = ['day', 'currency']
-
-
-admin.site.register(ExchangeRate, ExchangeRateAdmin)

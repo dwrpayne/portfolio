@@ -82,92 +82,6 @@ class RateLookupMixin(models.Model):
             for day, price in data:
                 self.rates.update_or_create(day=day, defaults={'price': price})
 
-    def GetRateOnDay(self, day):
-        return self.rates.get(day=day).price
-
-class CurrencyManager(models.Manager):
-    def DefaultInit(self):
-        self.create(code='CAD')
-        usd = self.create(code='USD')
-        usd.SyncRates()
-        usd.save()
-
-    def create(self, code, **kwargs):
-        if not 'datasource' in kwargs:
-            if code == 'CAD':
-                datasource, _ = ConstantDataSource.objects.get_or_create()
-            else:
-                datasource, _ = PandasDataSource.objects.get_or_create(
-                    symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
-            kwargs['datasource'] = datasource
-
-        currency = super().create(code=code, **kwargs)
-        Security.objects.get_or_create(currency=currency, type=Security.Type.Cash,
-                                       defaults={'symbol': code + ' Cash'})
-        return currency
-
-    def Sync(self):
-        for security in self.get_queryset():
-            security.SyncRates()
-            # TODO: live rate hack
-            if security.code == 'USD':
-                security.SyncLive()
-
-
-class Currency(RateLookupMixin):
-    code = models.CharField(max_length=3, primary_key=True)
-    objects = CurrencyManager()
-
-    def __str__(self):
-        return self.code
-
-    class Meta:
-        verbose_name_plural = 'Currencies'
-
-    @property
-    def cash_security(self):
-        return self.security_set.get(type=Security.Type.Cash)
-
-    def GetTodaysChange(self):
-        rates = self.rates.filter(
-            day__gte=datetime.date.today() - datetime.timedelta(days=1)
-        ).values_list('price', flat=True)
-        yesterday = 1 / rates[0]
-        today = 1 / rates[1]
-        return today, (today - yesterday) / yesterday
-
-    def GetDefaultDataSource(self):
-        if not self.datasource:
-            if self.code == 'CAD':
-                self.datasource, _ = ConstantDataSource.objects.get_or_create()
-                self.save()
-            else:
-                self.datasource, _ = PandasDataSource.objects.get_or_create(
-                    symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
-            self.save()
-        return self.datasource
-
-    def SyncLive(self):
-        assert self.code == 'USD'
-        request = requests.get('https://openexchangerates.org/api/latest.json',
-                               params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
-        self.live_price = Decimal(str(request.json()['rates']['CAD']))
-
-
-class ExchangeRate(RateHistoryTableMixin):
-    currency = models.ForeignKey(Currency, on_delete=models.CASCADE, related_name='rates')
-
-    class Meta:
-        unique_together = ('currency', 'day')
-        get_latest_by = 'day'
-        indexes = [
-            models.Index(fields=['currency']),
-            models.Index(fields=['day'])
-        ]
-
-    def __str__(self):
-        return "{} {} {}".format(self.currency, self.day, self.price)
-
 
 class SecurityManager(models.Manager):
     def Create(self, symbol, currency):
@@ -195,6 +109,12 @@ class SecurityManager(models.Manager):
         for security in self.get_queryset():
             security.SyncRates()
 
+            #TODO USD live sync hack
+            if security.symbol == 'USD':
+                request = requests.get('https://openexchangerates.org/api/latest.json',
+                                       params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
+                security.live_price = Decimal(str(request.json()['rates']['CAD']))
+
 
 class StockSecurityManager(SecurityManager):
     def get_queryset(self):
@@ -205,6 +125,10 @@ class StockSecurityManager(SecurityManager):
             kwargs['datasource'], _ = AlphaVantageDataSource.objects.get_or_create(symbol=kwargs['symbol'])
         super().create(*args, **kwargs)
 
+        def DefaultInit(self):
+            self.create(symbol='CAD')
+            self.create(symbol='USD')
+
 
 class CashSecurityManager(SecurityManager):
     def get_queryset(self):
@@ -212,8 +136,15 @@ class CashSecurityManager(SecurityManager):
 
     def create(self, *args, **kwargs):
         if not 'datasource' in kwargs:
-            kwargs['datasource'], _ = ConstantDataSource.objects.get_or_create()
-        super().create(*args, **kwargs)
+            if kwargs['symbol'] == 'CAD':
+                datasource, _ = ConstantDataSource.objects.get_or_create()
+            else:
+                datasource, _ = PandasDataSource.objects.get_or_create(
+                    symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
+            kwargs['datasource'] = datasource
+
+        cash = super().create(*args, **kwargs)
+        return cash
 
 
 class OptionSecurityManager(SecurityManager):
@@ -269,7 +200,7 @@ class Security(RateLookupMixin):
     symbol = models.CharField(max_length=32, primary_key=True)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
-    currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
+    currency_id = models.CharField(max_length=3, default='XXX')
 
     objects = SecurityManager()
     stocks = StockSecurityManager()
@@ -278,10 +209,10 @@ class Security(RateLookupMixin):
     mutualfunds = MutualFundSecurityManager()
 
     def __str__(self):
-        return "{} {}".format(self.symbol, self.currency)
+        return "{} {}".format(self.symbol, self.currency_id)
 
     def __repr(self):
-        return "Security({} ({}) {})".format(self.symbol, self.currency, self.description)
+        return "Security({} ({}) {})".format(self.symbol, self.currency_id, self.description)
 
     class Meta:
         verbose_name_plural = 'Securities'
@@ -302,12 +233,13 @@ class Security(RateLookupMixin):
             return super().latest_price_needed
         return self.activities.latest().tradeDate
 
-    @property
-    def live_price_cad(self):
-        return self.live_price * self.currency.live_price
-
-    def GetPriceCAD(self, day):
-        return self.GetRateOnDay(day) * self.currency.GetRateOnDay(day)
+    def GetTodaysChange(self):
+        rates = self.rates.filter(
+            day__gte=datetime.date.today() - datetime.timedelta(days=1)
+        ).values_list('price', flat=True)
+        yesterday = 1 / rates[0]
+        today = 1 / rates[1]
+        return today, (today - yesterday) / yesterday
 
 
 class SecurityPriceQuerySet(models.query.QuerySet):
@@ -340,26 +272,27 @@ class SecurityPriceDetail(models.Model):
     type = models.CharField(max_length=100)
 
     @classmethod
-    def CreateView(cls):
+    def CreateView(cls, drop_cascading=False):
         cursor = connection.cursor()
         try:
-            cursor.execute("""DROP MATERIALIZED VIEW IF EXISTS securities_cadview;
+            cursor.execute("DROP MATERIALIZED VIEW IF EXISTS securities_cadview {};".format("CASCADE" if drop_cascading else ""))
+            cursor.execute("""
 CREATE MATERIALIZED VIEW public.securities_cadview
 AS
- SELECT sec.day,
-    sec.symbol as security_id,
-    sec.price,
-    er.price AS exch,
-    sec.price * er.price AS cadprice,
-    sec.type
-   FROM ( SELECT s.symbol,
-            s.currency_id,
-            sp.day,
-            sp.price,
-            s.type
-           FROM securities_security s
-             JOIN securities_securityprice sp ON s.symbol::text = sp.security_id::text) sec
-     JOIN securities_exchangerate er ON sec.day = er.day AND sec.currency_id::text = er.currency_id::text
+SELECT p.symbol as security_id, 
+    p.day, 
+    p.price, 
+    c.price as exch,
+    p.price * c.price as cadprice,
+    p.type    
+    FROM (SELECT sec.symbol, 
+     sec.currency_id||' Cash' as cashhack, 
+     pr.day, 
+     pr.price,
+     sec.type 
+     FROM securities_security sec 
+        JOIN securities_securityprice pr ON sec.symbol=pr.security_id) p 
+        LEFT JOIN securities_securityprice c on p.day=c.day and c.security_id=p.cashhack
 WITH DATA;
 ALTER TABLE securities_cadview OWNER TO financeuser;
 """)
