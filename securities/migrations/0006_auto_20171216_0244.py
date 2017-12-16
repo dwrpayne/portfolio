@@ -12,6 +12,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RemoveIndex(
+            model_name='security',
+            name='securities__currenc_d30ae6_idx',
+        ),
         migrations.RenameField(
             model_name='security',
             old_name='currency_id',
