@@ -30,6 +30,7 @@ INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14', '70.71.233.189']
 # Application definition
 
 INSTALLED_APPS = [
+    'datasource.apps.DatasourceConfig',
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',

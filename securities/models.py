@@ -1,15 +1,19 @@
 import datetime
 from decimal import Decimal
 
-import pandas
-import requests
-from dateutil import parser
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, transaction, connection
 from django.db.models import F
 from django.utils.functional import cached_property
+
+from datasource.models import DataSourceMixin
+
+import pandas
+import requests
+from dateutil import parser
 from model_utils import Choices
 from pandas_datareader import data as pdr
+
 
 
 class RateHistoryTableMixin(models.Model):
@@ -33,6 +37,8 @@ class RateLookupMixin(models.Model):
     lookupSymbol = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupSource = models.CharField(max_length=32, null=True, blank=True, default=None)
     lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)
+    datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
+                                   default=None, on_delete=models.DO_NOTHING)
 
     class Meta:
         abstract = True
