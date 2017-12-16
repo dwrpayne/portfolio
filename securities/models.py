@@ -262,7 +262,6 @@ class SecurityPrice(RateHistoryTableMixin):
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
 
-
 class SecurityPriceDetail(models.Model):
     security = models.ForeignKey(Security, on_delete=models.DO_NOTHING)
     day = models.DateField()
