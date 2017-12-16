@@ -29,7 +29,7 @@ def GetRebalanceInfo(user):
 
 
 def GenerateSecurityPlot(security):
-    pairs = security.securitypricedetail_set.objects.values('day', 'cad')
+    pairs = security.securitypricedetail_set.values_list('day', 'cadprice')
     dates, vals = list(zip(*pairs))
 
     filename = 'security-values-{}'.format(security.symbol)

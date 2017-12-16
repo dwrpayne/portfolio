@@ -42,7 +42,7 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
         return []
 
 
-class FakeDataSource(DataSourceMixin):
+class ConstantDataSource(DataSourceMixin):
     value = models.DecimalField(max_digits=19, decimal_places=6, default=1)
 
     def __str__(self):

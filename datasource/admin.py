@@ -1,11 +1,11 @@
 from django.contrib import admin
 
-from .models import DataSourceMixin, FakeDataSource, PandasDataSource, AlphaVantageDataSource, \
+from .models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
 
-class FakeDataSourceAdmin(admin.ModelAdmin):
+class ConstantDataSourceAdmin(admin.ModelAdmin):
     list_display = ['value']
-admin.site.register(FakeDataSource, FakeDataSourceAdmin)
+admin.site.register(ConstantDataSource, ConstantDataSourceAdmin)
 
 class PandasDataSourceAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'source', 'column']

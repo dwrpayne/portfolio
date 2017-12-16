@@ -6,7 +6,7 @@ from django.db import models, transaction, connection
 from django.db.models import F
 from django.utils.functional import cached_property
 
-from datasource.models import DataSourceMixin, FakeDataSource, PandasDataSource, AlphaVantageDataSource, \
+from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
 
 import requests
@@ -96,7 +96,7 @@ class CurrencyManager(models.Manager):
     def create(self, code, **kwargs):
         if not 'datasource' in kwargs:
             if code == 'CAD':
-                datasource, _ = FakeDataSource.objects.get_or_create()
+                datasource, _ = ConstantDataSource.objects.get_or_create()
             else:
                 datasource, _ = PandasDataSource.objects.get_or_create(
                     symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
@@ -140,7 +140,7 @@ class Currency(RateLookupMixin):
     def GetDefaultDataSource(self):
         if not self.datasource:
             if self.code == 'CAD':
-                self.datasource, _ = FakeDataSource.objects.get_or_create()
+                self.datasource, _ = ConstantDataSource.objects.get_or_create()
                 self.save()
             else:
                 self.datasource, _ = PandasDataSource.objects.get_or_create(
@@ -213,7 +213,7 @@ class CashSecurityManager(SecurityManager):
 
     def create(self, *args, **kwargs):
         if not 'datasource' in kwargs:
-            kwargs['datasource'], _ = FakeDataSource.objects.get_or_create()
+            kwargs['datasource'], _ = ConstantDataSource.objects.get_or_create()
         super().create(*args, **kwargs)
 
 
@@ -337,7 +337,7 @@ class SecurityPriceDetail(models.Model):
     day = models.DateField()
     price = models.DecimalField(max_digits=16, decimal_places=6)
     exch = models.DecimalField(max_digits=16, decimal_places=6)
-    cad = models.DecimalField(max_digits=16, decimal_places=6)
+    cadprice = models.DecimalField(max_digits=16, decimal_places=6)
     type = models.CharField(max_length=100)
 
     @classmethod
@@ -386,9 +386,9 @@ ALTER TABLE securities_cadview OWNER TO financeuser;
     def __str__(self):
         return '{} {} {:.2f} {:.2f} {:.4f} {}'.format(
             self.security_id, self.day,
-            self.price, self.exch, self.cad, self.type)
+            self.price, self.exch, self.cadprice, self.type)
 
     def __repr__(self):
         return '{} {} {:.2f} {:.2f} {:.4f} {}'.format(
             self.security_id, self.day,
-            self.price, self.exch, self.cad, self.type)
+            self.price, self.exch, self.cadprice, self.type)
