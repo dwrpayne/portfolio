@@ -99,9 +99,6 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
                 account.RegenerateActivities()
                 account.RegenerateHoldings()
 
-    def SyncPrices(self):
-        pass
-
     def SyncCurrentAccountBalances(self):
         pass
 
@@ -162,14 +159,10 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
-        self.HackInit()
         for activity in self.activities.all():
             for security, qty_delta in activity.GetHoldingEffect().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
-
-    def HackInit(self):
-        pass
 
     def GetMostRecentActivityDate(self):
         try:
@@ -182,9 +175,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     def GetValueToday(self):
         return self.holdingdetail_set.today().total_values().first()[1]
-
-    def GetDividendsInYear(self, year):
-        sum(self.activities.dividends().in_year(year).values_list('netAmount', flat=True))
 
 
 class HoldingManager(models.Manager):
