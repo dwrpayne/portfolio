@@ -38,13 +38,13 @@
                     <td>{{alloc.buysell | currencyround | colorize}}</td>
                 </tr>
                 {% endfor %}
-                {% for security in missing %}
+                {% for holding in missing %}
                 <tr>
-                    <td>{{security.symbol}}</td>
+                    <td>{{holding.security}}</td>
                     <td>**MISSING**</td>
-                    <td>{{security.current_pct | percentage}}</td>
+                    <td>{{holding.current_pct | percentage}}</td>
                     <td>**MISSING**</td>
-                    <td>{{security.total_val | currencyround}}</td>
+                    <td>{{holding.total_val | currencyround}}</td>
                     <td>DEFINE ME</td>
                 </tr>
                 {% endfor %}
