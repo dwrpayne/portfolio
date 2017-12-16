@@ -12,7 +12,7 @@ from utils.misc import plotly_iframe_from_url
 from .models import BaseAccount, HoldingDetail, Activity
 from securities.models import Security, SecurityPrice, Currency
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
-from .tasks import LiveSecurityUpdateTask, DailyUpdateTask, RefreshClientTask
+from .tasks import LiveSecurityUpdateTask, RefreshClientTask
 
 
 def GetHoldingsContext(user):
@@ -74,7 +74,7 @@ def Portfolio(request):
 
         elif 'refresh-account' in request.GET:
             RefreshClientTask(request.user)
-            DailyUpdateTask()
+            LiveSecurityUpdateTask()
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
     return render(request, 'finance/portfolio.html', overall_context)
@@ -202,7 +202,7 @@ def index(request):
     ).values_list('day', flat=True)
     if any(day < datetime.date.today() for day in last_update_days):
         context['updating'] = True
-        DailyUpdateTask.delay()
+        LiveSecurityUpdateTask.delay()
 
     if request.user.is_authenticated:
         return render(request, 'finance/index.html', context)

@@ -29,7 +29,7 @@ class DataSourceMixin(PolymorphicModel):
         return data.iteritems()
 
     def GetData(self, start, end):
-        return self.ProcessRateData(self._Retrieve(start, end))
+        return self.ProcessRateData(self._Retrieve(start, end), end)
 
     def _Retrieve(self, start, end):
         """
@@ -41,7 +41,7 @@ class DataSourceMixin(PolymorphicModel):
 
 
 class FakeDataSource(DataSourceMixin):
-    value = models.DecimalField(max_digits=19, decimal_places=6)
+    value = models.DecimalField(max_digits=19, decimal_places=6, default=1)
 
     def _Retrieve(self, start, end):
         for day in pandas.date_range(start, end).date:
@@ -96,3 +96,12 @@ class MorningstarDataSource(DataSourceMixin):
             return [(parser.parse(item['d']).date(), Decimal(item['v'])) for item in json['data']['Prices']]
         return []
 
+
+class StartEndDataSource(DataSourceMixin):
+    start_day = models.DateField()
+    start_val = models.DecimalField(max_digits=19, decimal_places=6)
+    end_day = models.DateField()
+    end_val = models.DecimalField(max_digits=19, decimal_places=6)
+
+    def _Retrieve(self, start, end):
+        return (self.start_day, self.start_val), (self.end_day, self.end_val),

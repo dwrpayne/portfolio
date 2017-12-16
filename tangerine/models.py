@@ -5,7 +5,7 @@ import tangerine.tangerinelib
 from dateutil import parser
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
-from securities.models import MutualFund
+from securities.models import Security
 
 
 class TangerineRawActivity(BaseRawActivity):
@@ -31,9 +31,9 @@ class TangerineRawActivity(BaseRawActivity):
             assert False, 'Need a real lookup system here'
 
         try:
-            security = MutualFund.objects.get(symbol=symbol)
+            security = Security.mutualfunds.get(symbol=symbol)
         except:
-            security = MutualFund.objects.Create(symbol, currency)
+            security = Security.mutualfunds.Create(symbol, currency)
 
         if self.type == 'Purchase':
             activity_type = Activity.Type.Buy

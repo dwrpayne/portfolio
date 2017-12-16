@@ -5,8 +5,6 @@ from django.contrib.auth.models import User
 from .models import BaseAccount, BaseClient, ManualRawActivity
 from .models import Activity, Holding, Allocation
 from .models import UserProfile
-from securities.models import SecurityPrice, Security, ExchangeRate, Currency
-
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):
@@ -45,45 +43,6 @@ class HoldingAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Holding, HoldingAdmin)
-
-
-class CurrencyAdmin(admin.ModelAdmin):
-    list_display = ['code', 'lookupSymbol', 'lookupSource', 'lookupColumn', 'live_price']
-
-
-admin.site.register(Currency, CurrencyAdmin)
-
-
-class SecurityAdmin(admin.ModelAdmin):
-    def latest_update_day(self, obj):
-        return obj.rates.latest().day
-
-    def first_update_day(self, obj):
-        return obj.rates.earliest().day
-    latest_update_day.short_description = "Latest Price"
-    list_filter = ['currency', 'type']
-    list_display = ['symbol', 'type', 'currency', 'live_price',
-                    'first_update_day', 'latest_update_day', 'lookupSymbol', 'description']
-
-
-admin.site.register(Security, SecurityAdmin)
-
-
-class SecurityPriceAdmin(admin.ModelAdmin):
-    list_display = ['security', 'day', 'price']
-    list_filter = ['day', 'security']
-
-
-admin.site.register(SecurityPrice, SecurityPriceAdmin)
-
-
-class ExchangeRateAdmin(admin.ModelAdmin):
-    list_display = ['currency', 'day', 'price']
-    list_filter = ['day', 'currency']
-
-
-admin.site.register(ExchangeRate, ExchangeRateAdmin)
-
 
 admin.site.register(BaseAccount)
 admin.site.register(BaseClient)

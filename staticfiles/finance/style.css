@@ -1,0 +1,12 @@
+/* Override Bootstrap 4 styling on Django Debug Toolbar */
+#djDebug[hidden], #djDebug [hidden] {
+    display: block !important;
+}
+
+#djDebug [hidden][style='display: none;'] {
+    display: none !important;
+}
+
+.table>tfoot>tr>td {
+    font-weight: bold;
+}

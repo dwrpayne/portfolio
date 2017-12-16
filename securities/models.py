@@ -6,14 +6,11 @@ from django.db import models, transaction, connection
 from django.db.models import F
 from django.utils.functional import cached_property
 
-from datasource.models import DataSourceMixin
+from datasource.models import DataSourceMixin, FakeDataSource, PandasDataSource, AlphaVantageDataSource, \
+    MorningstarDataSource, StartEndDataSource
 
-import pandas
 import requests
-from dateutil import parser
 from model_utils import Choices
-from pandas_datareader import data as pdr
-
 
 
 class RateHistoryTableMixin(models.Model):
@@ -34,9 +31,6 @@ class RateLookupMixin(models.Model):
     A mixin class that adds the necessary fields to support looking up historical rates from pandas-datareader
     Classes that use this must define a subclass of RateHistoryTableMixin and create a foreign key back to this class with related_name="rates"
     """
-    lookupSymbol = models.CharField(max_length=32, null=True, blank=True, default=None)
-    lookupSource = models.CharField(max_length=32, null=True, blank=True, default=None)
-    lookupColumn = models.CharField(max_length=32, null=True, blank=True, default=None)
     datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
                                    default=None, on_delete=models.DO_NOTHING)
 
@@ -78,39 +72,14 @@ class RateLookupMixin(models.Model):
     def live_price(self, value):
         self.rates.update_or_create(day=datetime.date.today(), defaults={'price': value})
 
-    def _ProcessRateData(self, data, end_date):
-        if isinstance(data, pandas.DataFrame):
-            if data.empty:
-                return []
-            data = pandas.Series(data[self.lookupColumn], data.index)
-        else:
-            # Expect iterator of day, price pairs
-            dates_and_prices = list(zip(*data))
-            if len(dates_and_prices) == 0:
-                return []
-
-            dates, prices = dates_and_prices
-            data = pandas.Series(prices, index=dates, dtype='float64')
-
-        data = data.sort_index()
-        index = pandas.DatetimeIndex(start=min(data.index), end=end_date, freq='D').date
-        data = data.reindex(index).ffill()
-        return data.iteritems()
-
-    def SyncRates(self, retriever_fn):
-        """
-        retriever_fn is the function that will retrieve the rates.
-        It gets passed (self, start, end) and is expected to return an iterator of (day, price) pairs or a pandas dataframe
-        """
+    def SyncRates(self):
         start, end = self.GetShouldSyncRange()
         if start is None:
-            print('Already synced data for {}, skipping.'.format(self.lookupSymbol))
+            print('Already synced data, skipping.')
             return []
+        print('Syncing prices from {} to {}...'.format(start, end))
 
-        print('Syncing prices for {} from {} to {}...'.format(self.lookupSymbol, start, end))
-
-        retrieved_data = retriever_fn(start, end)
-        data = self._ProcessRateData(retrieved_data, end)
+        data = self.datasource.GetData(start, end)
 
         with transaction.atomic():
             for day, price in data:
@@ -119,27 +88,33 @@ class RateLookupMixin(models.Model):
     def GetRateOnDay(self, day):
         return self.rates.get(day=day).price
 
-    @staticmethod
-    def _FakeData(start, end, val=1.):
-        for day in pandas.date_range(start, end).date:
-            yield day, val
-
-
 class CurrencyManager(models.Manager):
     def DefaultInit(self):
         self.create(code='CAD')
-        usd = self.create(code='USD', lookupSymbol='DEXCAUS', lookupSource='fred', lookupColumn='DEXCAUS')
-        usd.SyncExchangeRates()
-        usd.lookupSource = 'bankofcanada'
-        usd.lookupSymbol = 'FXCADUSD'
-        usd.lookupColumn = 'FXCADUSD'
+        usd = self.create(code='USD')
+        usd.SyncRates()
         usd.save()
 
     def create(self, code, **kwargs):
+        if not 'datasource' in kwargs:
+            if code == 'CAD':
+                datasource, _ = FakeDataSource.objects.get_or_create()
+            else:
+                datasource, _ = PandasDataSource.objects.get_or_create(
+                    symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
+            kwargs['datasource'] = datasource
+
         currency = super().create(code=code, **kwargs)
         Security.objects.get_or_create(currency=currency, type=Security.Type.Cash,
                                        defaults={'symbol': code + ' Cash'})
         return currency
+
+    def Sync(self):
+        for security in self.get_queryset():
+            security.SyncRates()
+            # TODO: live rate hack
+            if security.code == 'USD':
+                security.SyncLive()
 
 
 class Currency(RateLookupMixin):
@@ -164,14 +139,16 @@ class Currency(RateLookupMixin):
         today = 1 / rates[1]
         return today, (today - yesterday) / yesterday
 
-    def _RetrievePandasData(self, start, end):
-        df = pdr.DataReader(self.lookupSymbol, self.lookupSource, start, end)
-        if df.empty:
-            return []
-        return pandas.Series(df[self.lookupColumn], df.index)
-
-    def SyncExchangeRates(self):
-        self.SyncRates(self._FakeData if self.code == 'CAD' else self._RetrievePandasData)
+    def GetDefaultDataSource(self):
+        if not self.datasource:
+            if self.code == 'CAD':
+                self.datasource, _ = FakeDataSource.objects.get_or_create()
+                self.save()
+            else:
+                self.datasource, _ = PandasDataSource.objects.get_or_create(
+                    symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
+            self.save()
+        return self.datasource
 
     def SyncLive(self):
         assert self.code == 'USD'
@@ -217,6 +194,77 @@ class SecurityManager(models.Manager):
             currency_id=currency_str
         )
 
+    def Sync(self):
+        for security in self.get_queryset():
+            security.SyncRates()
+
+
+class StockSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.Stock)
+
+    def create(self, *args, **kwargs):
+        if not 'datasource' in kwargs:
+            kwargs['datasource'], _ = AlphaVantageDataSource.objects.get_or_create(symbol=kwargs['symbol'])
+        super().create(*args, **kwargs)
+
+
+class CashSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.Cash)
+
+    def create(self, *args, **kwargs):
+        if not 'datasource' in kwargs:
+            kwargs['datasource'], _ = FakeDataSource.objects.get_or_create()
+        super().create(*args, **kwargs)
+
+
+class OptionSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.Option)
+
+    def Create(self, callput, symbol, expiry, strike, currency_str):
+        """
+        callput is either 'call' or 'put'.
+        symbol is the base symbol of the underlying
+        expiry is a datetime.date
+        strike is a Decimal
+        currency_str is the 3 digit currency code
+        """
+        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
+            '%y%m%d'), callput[0], Decimal(strike) * 1000)
+        option, created = super().get_or_create(
+            symbol=optsymbol,
+            defaults={
+                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike,
+                                                                                    expiry),
+                'type': self.model.Type.Option,
+                'currency_id': currency_str
+            })
+
+        ((start_day, start_val), (end_day, end_val),) = option.activities.values_list(
+            'tradeDate', 'price').distinct('tradeDate')
+        datasource, _ = StartEndDataSource.objects.get_or_create(
+            start_day=start_day,
+            start_val=start_val,
+            end_day=end_day,
+            end_val=end_val)
+        option.update(datasource=datasource)
+        return option
+
+
+class MutualFundSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=Security.Type.MutualFund)
+
+    def Create(self, symbol, currency_str):
+        datasource = MorningstarDataSource.objects.get_or_create(symbol=symbol)
+        return super().create(
+            symbol=symbol,
+            type=self.model.Type.MutualFund,
+            currency_id=currency_str,
+            datasource=datasource
+        )
 
 class Security(RateLookupMixin):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
@@ -226,6 +274,10 @@ class Security(RateLookupMixin):
     currency = models.ForeignKey(Currency, on_delete=models.CASCADE)
 
     objects = SecurityManager()
+    stocks = StockSecurityManager()
+    options = OptionSecurityManager()
+    cash = CashSecurityManager()
+    mutualfunds = MutualFundSecurityManager()
 
     def __str__(self):
         return "{} {}".format(self.symbol, self.currency)
@@ -260,186 +312,15 @@ class Security(RateLookupMixin):
         return self.GetRateOnDay(day) * self.currency.GetRateOnDay(day)
 
 
-class StockSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Stock)
-
-    def SyncLive(self):
-        for security in self.get_queryset().filter(holdings__enddate=None).distinct():
-            security.SyncLiveAlphaVantagePrice()
-
-    def Sync(self):
-        for security in self.get_queryset():
-            security.Sync()
-
-
-class Stock(Security):
-    objects = StockSecurityManager()
-
-    class Meta:
-        proxy = True
-
-    @property
-    def base_symbol(self):
-        return self.symbol.split('.')[0]
-
-    def Sync(self):
-        self.SyncRates(self.GetAlphaVantageData)
-
-    def SyncLiveAlphaVantagePrice(self):
-        vals = self.GetAlphaVantageData(datetime.date.today(), datetime.date.today())
-        try:
-            if vals[0][1]:
-                self.live_price = vals[0][1]
-        except IndexError:
-            pass
-
-    def GetAlphaVantageData(self, start, end):
-        # TODO: Monster hack for DLR - maybe have a fallback of some kind?
-        if self.lookupSymbol == 'DLR.U.TO':
-            index = pandas.date_range(start, end, freq='D').date
-            return zip(index, pandas.Series(10.0, index))
-
-        params = {'function': 'TIME_SERIES_DAILY',
-                  'symbol': self.lookupSymbol, 'apikey': 'P38D2XH1GFHST85V'}
-        if (datetime.date.today() - start).days >= 100:
-            params['outputsize'] = 'full'
-        r = requests.get('https://www.alphavantage.co/query', params=params)
-        if r.ok:
-            json = r.json()
-            if 'Time Series (Daily)' in json:
-                return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in
-                        json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
-        else:
-            print('Failed to get data, response: {}'.format(r.content))
-        return []
-
-
-class CashSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Cash)
-
-    def Sync(self):
-        for security in self.get_queryset():
-            security.Sync()
-
-
-class Cash(Security):
-    objects = CashSecurityManager()
-
-    class Meta:
-        proxy = True
-
-    def Sync(self):
-        self.SyncRates(self._FakeData)
-        self.currency.SyncExchangeRates()
-
-        # TODO: hack for live USD exchange rates from OpenExchangeRates
-        if self.currency.code == 'USD':
-            self.currency.SyncLive()
-
-
-class OptionSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Option)
-
-    def Create(self, callput, symbol, expiry, strike, currency_str):
-        """
-        callput is either 'call' or 'put'.
-        symbol is the base symbol of the underlying
-        expiry is a datetime.date
-        strike is a Decimal
-        currency_str is the 3 digit currency code
-        """
-        optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
-            '%y%m%d'), callput[0], Decimal(strike) * 1000)
-        option, created = super().get_or_create(
-            symbol=optsymbol,
-            defaults={
-                'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike,
-                                                                                    expiry),
-                'type': self.model.Type.Option,
-                'currency_id': currency_str
-            })
-        return option
-
-    def Sync(self):
-        for security in self.get_queryset():
-            security.Sync()
-
-
-class Option(Security):
-    objects = OptionSecurityManager()
-
-    class Meta:
-        proxy = True
-
-    def GetOptionPrices(self, start, end):
-        return self.activities.values_list('tradeDate', 'price').distinct('tradeDate')
-
-    def Sync(self):
-        self.SyncRates(self.GetOptionPrices)
-
-
-class MutualFundSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.MutualFund)
-
-    def Create(self, symbol, currency_str):
-        return super().create(
-            symbol=symbol,
-            type=self.model.Type.MutualFund,
-            currency_id=currency_str,
-            lookupSymbol=symbol
-        )
-
-    def Sync(self):
-        for security in self.get_queryset():
-            security.Sync()
-
-
-class MutualFund(Security):
-    objects = MutualFundSecurityManager()
-
-    class Meta:
-        proxy = True
-
-    def Sync(self):
-        self.SyncPricesFromClient()
-        self.SyncFromMorningStar()
-
-    def SyncPricesFromClient(self):
-        pass
-        # TODO: Hacky mutual fund syncing, find a better way.
-        # TODO: Dependency inject the syncer into the MutualFund
-        # if self.GetShouldSyncRange()[1]:
-        #     for c in BaseClient.objects.filter(accounts__activities__security=self).distinct():
-        #         with c:
-        #             c.SyncPrices()
-
-    def SyncFromMorningStar(self):
-        try:
-            self.SyncRates(self.GetMorningstarData)
-        except:
-            pass
-
-    def GetMorningstarData(self, start, end):
-        RAW_URL = 'https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}'
-        url = RAW_URL.format(self.lookupSymbol, str(start), str(end))
-        r = requests.get(url)
-        json = r.json()
-        if 'data' in json and 'Prices' in json['data']:
-            return [(parser.parse(item['d']).date(), Decimal(item['v'])) for item in json['data']['Prices']]
-        return []
-
-
 class SecurityPriceQuerySet(models.query.QuerySet):
+    def today(self):
+        return self.filter(day=datetime.date.today())
+
     def with_cad_prices(self):
         return self.filter(security__currency__rates__day=F('day')).annotate(
             exch=F('security__currency__rates__price'),
             cadprice=F('security__currency__rates__price') * F('price')
         )
-
 
 class SecurityPrice(RateHistoryTableMixin):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')

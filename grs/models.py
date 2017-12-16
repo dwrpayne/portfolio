@@ -7,7 +7,7 @@ from dateutil import parser
 from django.db import models, transaction
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
-from securities.models import MutualFund
+from securities.models import Security
 
 
 class GrsRawActivity(BaseRawActivity):
@@ -25,9 +25,9 @@ class GrsRawActivity(BaseRawActivity):
 
     def CreateActivity(self):
         try:
-            security = MutualFund.objects.get(symbol=self.symbol)
+            security = Security.mutualfunds.get(symbol=self.symbol)
         except:
-            security = MutualFund.objects.Create(self.symbol, 'CAD')
+            security = Security.mutualfunds.Create(self.symbol, 'CAD')
 
         total_cost = self.qty * self.price
 
@@ -117,4 +117,4 @@ class GrsClient(BaseClient):
         self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx',
                          params={'Selected_Info': self.accounts.first().plan_data})
         for security in self.currentSecurities:
-            security.SyncRates(self._GetRawPrices)
+            security.SyncRates()

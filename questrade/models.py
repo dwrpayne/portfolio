@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
-from securities.models import Security, Option
+from securities.models import Security
 from utils.api import api_response
 
 
@@ -77,7 +77,7 @@ class QuestradeRawActivity(BaseRawActivity):
 
             callput, symbol, expiry, strike = json['description'].split()[:4]
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
-            security = Option.objects.Create(callput, symbol, expiry, strike, json['currency'])
+            security = Security.options.Create(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
 
         # Hack to fix invalid Questrade data just for me
