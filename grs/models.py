@@ -33,7 +33,7 @@ class GrsRawActivity(BaseRawActivity):
         total_cost = self.qty * self.price
 
         Activity.objects.create_with_deposit(account=self.account, tradeDate=self.day, security=security,
-                                cash_id=security.currency,
+                                cash_id=security.currency_id,
                                 description=self.description, qty=self.qty, raw=self,
                                 price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
 

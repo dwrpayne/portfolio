@@ -91,15 +91,14 @@ class SecurityManager(models.Manager):
             return self.CreateStock(symbol, currency)
 
     def CreateStock(self, symbol, currency_str):
-        return super().create(
+        return self.create(
             symbol=symbol,
             type=self.model.Type.Stock,
-            currency_id=currency_str,
-            lookupSymbol=symbol
+            currency_id=currency_str
         )
 
     def CreateOptionRaw(self, optsymbol, currency_str):
-        return super().create(
+        return self.create(
             symbol=optsymbol,
             type=self.model.Type.Option,
             currency_id=currency_str
@@ -170,14 +169,6 @@ class OptionSecurityManager(SecurityManager):
                 'currency_id': currency_str
             })
 
-        ((start_day, start_val), (end_day, end_val),) = option.activities.values_list(
-            'tradeDate', 'price').distinct('tradeDate')
-        datasource, _ = StartEndDataSource.objects.get_or_create(
-            start_day=start_day,
-            start_val=start_val,
-            end_day=end_day,
-            end_val=end_val)
-        option.update(datasource=datasource)
         return option
 
 
@@ -280,10 +271,11 @@ CREATE MATERIALIZED VIEW public.securities_cadview
 AS
 SELECT prices.symbol as security_id, 
     prices.day, 
-    prices.price, 
-    currencies.price as exch,
-    prices.price * currencies.price as cadprice,
-    prices.type    
+    prices.price,
+    COALESCE(currencies.price, 1) as exch,
+    prices.price * COALESCE(currencies.price, 1) as cadprice,
+    prices.type,    
+    row_number() OVER () AS id
     FROM (SELECT s.symbol, 
      s.currency_id, 
      p.day, 

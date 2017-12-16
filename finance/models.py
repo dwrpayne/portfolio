@@ -282,7 +282,7 @@ class ManualRawActivity(BaseRawActivity):
             try:
                 security = Security.objects.get(symbol=self.symbol)
             except Security.DoesNotExist:
-                security = Security.objects.Create(self.symbol, self.currency)
+                  security = Security.objects.Create(self.symbol, self.currency)
 
         Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
                                 description=self.description, cash_id=self.currency, qty=self.qty,
@@ -312,6 +312,9 @@ class ActivityQuerySet(models.query.QuerySet):
     def in_year(self, year):
         return self.filter(tradeDate__year=year)
 
+    def taxable(self):
+        return self.filter(account__taxable=True)
+
     def for_user(self, user):
         return self.filter(account__client__user=user)
 
@@ -320,6 +323,9 @@ class ActivityQuerySet(models.query.QuerySet):
 
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)
+
+    def without_dividends(self):
+        return self.exclude(type=Activity.Type.Dividend)
 
 
 class Activity(models.Model):

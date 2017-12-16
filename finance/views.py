@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 
 from utils.misc import plotly_iframe_from_url
 from .models import BaseAccount, HoldingDetail, Activity
-from securities.models import Security, SecurityPrice
+from securities.models import Security, SecurityPrice, SecurityPriceDetail
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, RefreshClientTask
 
@@ -150,9 +150,7 @@ def securitydetail(request, symbol):
 @login_required
 def capgains(request, symbol):
     security = Security.objects.get(symbol=symbol)
-    activities = security.activities.filter(
-        account__client__user=request.user, account__taxable=True, security__currency__rates__day=F('tradeDate')
-    ).exclude(type=Activity.Type.Dividend).order_by('tradeDate').annotate(
+    activities = security.activities.for_user(request.user).taxable().without_dividends().annotate(
         exch=Sum(F('security__currency__rates__price')))
 
     totalqty = Decimal('0')
