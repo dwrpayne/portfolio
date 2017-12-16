@@ -15,8 +15,8 @@ def MakeNormalizedFloat(field, desc):
 
 
 class ManualRawActivityAdmin(admin.ModelAdmin):
-    list_display = ['account', 'day', 'type', 'security', 'qty', 'price', 'cash', 'netAmount']
-    list_filter = ['account', 'day', 'security', 'type']
+    list_display = ['account', 'day', 'type', 'symbol', 'qty', 'price', 'currency', 'netAmount']
+    list_filter = ['account', 'day', 'symbol', 'type']
 
 
 admin.site.register(ManualRawActivity, ManualRawActivityAdmin)

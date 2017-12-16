@@ -263,9 +263,9 @@ class BaseRawActivity(ShowFieldTypeAndContent, PolymorphicModel):
 
 class ManualRawActivity(BaseRawActivity):
     day = models.DateField()
-    security = models.CharField(max_length=100)
+    symbol = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
-    cash = models.CharField(max_length=100)
+    currency = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
@@ -276,14 +276,14 @@ class ManualRawActivity(BaseRawActivity):
 
     def CreateActivity(self):
         security = None
-        if self.security:
+        if self.symbol:
             try:
-                security = Security.objects.get(symbol=self.security)
+                security = Security.objects.get(symbol=self.symbol)
             except Security.DoesNotExist:
-                security = Security.objects.Create(self.security, self.cash)
+                security = Security.objects.Create(self.symbol, self.currency)
 
         Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
-                                description=self.description, cash_id=self.cash + ' Cash', qty=self.qty,
+                                description=self.description, cash_id=self.currency + ' Cash', qty=self.qty,
                                 price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
 
 

@@ -369,11 +369,11 @@ def AddManualRawActivity():
                              (51424829, rrsp_activity_data)
                              ]:
         account = BaseAccount.objects.get(id=account_id)
-        for date, type, security, cash, price, qty, netAmount, description in data:
+        for date, type, symbol, currency, price, qty, netAmount, description in data:
             act = ManualRawActivity.objects.create(day=parser.parse(date),
-                                    security=security,
+                                    symbol=symbol,
                                     type=type,
-                                    cash=cash,
+                                    currency=currency,
                                     qty=qty if qty else '0',
                                     price=price if price else '0',
                                     netAmount=netAmount if netAmount else '0',
