@@ -12,77 +12,6 @@ import requests
 from model_utils import Choices
 
 
-class RateHistoryTableMixin(models.Model):
-    """
-    A mixin class for storing rate history.
-    Classes that use this must define a foreign key back to the related RateLookupMixin with related_name="rates"
-    """
-    day = models.DateField(default=datetime.date.today)
-    price = models.DecimalField(max_digits=19, decimal_places=6)
-
-    class Meta:
-        abstract = True
-
-
-# noinspection PyUnresolvedReferences,PyUnresolvedReferences,PyUnresolvedReferences
-class RateLookupMixin(models.Model):
-    """
-    A mixin class that adds the necessary fields to support looking up historical rates from pandas-datareader
-    Classes that use this must define a subclass of RateHistoryTableMixin and create a foreign key back to this class with related_name="rates"
-    """
-    datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
-                                   default=None, on_delete=models.DO_NOTHING)
-
-    class Meta:
-        abstract = True
-
-    @property
-    def earliest_price_needed(self):
-        return datetime.date(2009, 1, 1)
-
-    @property
-    def latest_price_needed(self):
-        return datetime.date.today()
-
-    def GetShouldSyncRange(self):
-        """ Returns a pair (start,end) of datetime.dates that need to be synced."""
-        try:
-            earliest = self.rates.earliest().day
-            latest = self.rates.latest().day
-        except ObjectDoesNotExist:
-            return self.earliest_price_needed, self.latest_price_needed
-
-        if earliest > self.earliest_price_needed:
-            return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed
-
-        if latest < self.latest_price_needed:
-            return latest - datetime.timedelta(days=7), self.latest_price_needed
-
-        return None, None
-
-    @property
-    def live_price(self):
-        try:
-            return self.rates.get(day=datetime.date.today()).price
-        except RateHistoryTableMixin.DoesNotExist:
-            return self.rates.latest().price
-
-    @live_price.setter
-    def live_price(self, value):
-        self.rates.update_or_create(day=datetime.date.today(), defaults={'price': value})
-
-    def SyncRates(self):
-        start, end = self.GetShouldSyncRange()
-        if start is None:
-            return []
-
-        data = self.datasource.GetData(start, end)
-
-        with transaction.atomic():
-            for day, price in data:
-                self.rates.update_or_create(day=day, defaults={'price': price})
-
-
 class SecurityManager(models.Manager):
     def Create(self, symbol, currency):
         if len(symbol) >= 20:
@@ -186,12 +115,14 @@ class MutualFundSecurityManager(SecurityManager):
             datasource=datasource
         )
 
-class Security(RateLookupMixin):
+class Security(models.Model):
     Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
     symbol = models.CharField(max_length=32, primary_key=True)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
     currency = models.CharField(max_length=3, default='XXX')
+    datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
+                                   default=None, on_delete=models.DO_NOTHING)
 
     objects = SecurityManager()
     stocks = StockSecurityManager()
@@ -215,17 +146,55 @@ class Security(RateLookupMixin):
     @cached_property
     def earliest_price_needed(self):
         if not self.activities.exists():
-            return super().earliest_price_needed
+            return datetime.date(2009, 1, 1)
         return self.activities.earliest().tradeDate
 
     @cached_property
     def latest_price_needed(self):
         if not self.activities.exists() or self.holdings.current().exists():
-            return super().latest_price_needed
+            return datetime.date.today()
         return self.activities.latest().tradeDate
 
+    def GetShouldSyncRange(self):
+        """ Returns a pair (start,end) of datetime.dates that need to be synced."""
+        try:
+            earliest = self.prices.earliest().day
+            latest = self.prices.latest().day
+        except ObjectDoesNotExist:
+            return self.earliest_price_needed, self.latest_price_needed
+
+        if earliest > self.earliest_price_needed:
+            return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed
+
+        if latest < self.latest_price_needed:
+            return latest - datetime.timedelta(days=7), self.latest_price_needed
+
+        return None, None
+
+    @property
+    def live_price(self):
+        try:
+            return self.prices.get(day=datetime.date.today()).price
+        except Security.DoesNotExist:
+            return self.prices.latest().price
+
+    @live_price.setter
+    def live_price(self, value):
+        self.prices.update_or_create(day=datetime.date.today(), defaults={'price': value})
+
+    def SyncRates(self):
+        start, end = self.GetShouldSyncRange()
+        if start is None:
+            return []
+
+        data = self.datasource.GetData(start, end)
+
+        with transaction.atomic():
+            for day, price in data:
+                self.prices.update_or_create(day=day, defaults={'price': price})
+
     def GetTodaysChange(self):
-        rates = self.rates.filter(
+        rates = self.prices.filter(
             day__gte=datetime.date.today() - datetime.timedelta(days=1)
         ).values_list('price', flat=True)
         yesterday = 1 / rates[0]
@@ -237,8 +206,12 @@ class SecurityPriceQuerySet(models.query.QuerySet):
     def today(self):
         return self.filter(day=datetime.date.today())
 
-class SecurityPrice(RateHistoryTableMixin):
-    security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='rates')
+
+class SecurityPrice(models.Model):
+    security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='prices')
+    day = models.DateField(default=datetime.date.today)
+    price = models.DecimalField(max_digits=19, decimal_places=6)
+
     objects = SecurityPriceQuerySet.as_manager()
 
     class Meta:

@@ -308,6 +308,7 @@ class ActivityManager(models.Manager):
         kwargs['netAmount'] *= -1
         super().create(*args, **kwargs)
 
+
 class ActivityQuerySet(models.query.QuerySet):
     def in_year(self, year):
         return self.filter(tradeDate__year=year)

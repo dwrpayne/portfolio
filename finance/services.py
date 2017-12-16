@@ -55,7 +55,7 @@ def GeneratePlot(user):
 
     # dep_dict = dict(deposits)
     # sp = Security.objects.get(symbol='SPXTR')
-    # sp_prices_byday = dict(sp.rates.filter(
+    # sp_prices_byday = dict(sp.prices.filter(
     #    day=F('security__currency__rates__day')
     #    ).values_list(
     #        'day', F('price') * F('security__currency__rates__price')
