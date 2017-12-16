@@ -9,9 +9,10 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from utils.misc import plotly_iframe_from_url
-from .models import BaseAccount, HoldingDetail, Security, SecurityPrice, Currency, Activity
+from .models import BaseAccount, HoldingDetail, Activity
+from securities.models import Security, SecurityPrice, Currency
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
-from .tasks import LiveSecurityUpdateTask, DailyUpdateTask
+from .tasks import LiveSecurityUpdateTask, DailyUpdateTask, RefreshClientTask
 
 
 def GetHoldingsContext(user):
@@ -72,9 +73,7 @@ def Portfolio(request):
             GeneratePlot(request.user)
 
         elif 'refresh-account' in request.GET:
-            for client in request.user.clients.all():
-                with client:
-                    client.Refresh()
+            RefreshClientTask(request.user)
             DailyUpdateTask()
 
     overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}

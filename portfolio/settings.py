@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
     'questrade.apps.QuestradeConfig',
+    'securities.apps.SecuritiesConfig',
     'tangerine.apps.tangerineConfig',
     'utils',
     'debug_toolbar',

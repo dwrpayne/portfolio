@@ -3,8 +3,9 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
 from .models import BaseAccount, BaseClient, ManualRawActivity
-from .models import Activity, Holding, SecurityPrice, Security, ExchangeRate, Currency, Allocation
+from .models import Activity, Holding, Allocation
 from .models import UserProfile
+from securities.models import SecurityPrice, Security, ExchangeRate, Currency
 
 
 def MakeNormalizedFloat(field, desc):

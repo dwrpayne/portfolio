@@ -4,7 +4,8 @@ import requests
 import tangerine.tangerinelib
 from dateutil import parser
 
-from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, MutualFund
+from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
+from securities.models import MutualFund
 
 
 class TangerineRawActivity(BaseRawActivity):

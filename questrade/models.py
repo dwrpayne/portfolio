@@ -1,17 +1,18 @@
+import datetime
+import threading
+from decimal import Decimal
+
+import arrow
+import requests
+import simplejson
+from dateutil import parser
 from django.db import models
 from django.utils import timezone
 
-import requests
-from dateutil import parser
-import arrow
-import datetime
-from decimal import Decimal
-import simplejson
-import threading
-from utils.api import api_response
-
-from finance.models import Activity, Security, Option
+from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
+from securities.models import Security, Option
+from utils.api import api_response
 
 
 class QuestradeRawActivity(BaseRawActivity):
@@ -339,7 +340,7 @@ rrsp_activity_data = [
     ('1/31/2011', 'Buy', 'XSB.TO', 'CAD', '28.81', '260', '-7496.51', ''),
     ('1/12/2011', 'Sell', 'EA  110219C00017000', 'USD', '40', '-3', '107.04', ''),
     ('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
-    ('2/3/2011', 'Buy', 'EA  110219C00017000', 'USD', '120', '3', '-372.95', ''),
+    ('2/3/2011', 'Buy', 'EA    110219C00017000', 'USD', '120', '3', '-372.95', ''),
     ('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', '')
 ]
 

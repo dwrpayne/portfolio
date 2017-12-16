@@ -1,12 +1,13 @@
-from django.db import models, transaction
+from decimal import Decimal
 
+import arrow
 import requests
 from bs4 import BeautifulSoup
 from dateutil import parser
-from decimal import Decimal
-import arrow
+from django.db import models, transaction
 
-from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity, MutualFund
+from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
+from securities.models import MutualFund
 
 
 class GrsRawActivity(BaseRawActivity):
