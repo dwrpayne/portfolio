@@ -3,7 +3,6 @@ from decimal import Decimal
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, transaction, connection
-from django.db.models import F
 from django.utils.functional import cached_property
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
@@ -65,7 +64,7 @@ class RateLookupMixin(models.Model):
     def live_price(self):
         try:
             return self.rates.get(day=datetime.date.today()).price
-        except:
+        except RateHistoryTableMixin.DoesNotExist:
             return self.rates.latest().price
 
     @live_price.setter

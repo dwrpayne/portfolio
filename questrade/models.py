@@ -120,7 +120,7 @@ class QuestradeRawActivity(BaseRawActivity):
         if json['symbol']:
             try:
                 json['security'] = Security.objects.get(symbol=json['symbol'])
-            except:
+            except Security.DoesNotExist:
                 json['security'] = Security.objects.CreateStock(json['symbol'], json['currency'])
         else:
             json['security'] = None

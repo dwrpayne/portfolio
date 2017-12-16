@@ -32,7 +32,7 @@ class TangerineRawActivity(BaseRawActivity):
 
         try:
             security = Security.mutualfunds.get(symbol=symbol)
-        except:
+        except Security.DoesNotExist:
             security = Security.mutualfunds.Create(symbol, currency)
 
         if self.type == 'Purchase':

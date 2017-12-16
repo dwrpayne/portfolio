@@ -83,7 +83,7 @@ class AlphaVantageDataSource(DataSourceMixin):
         return "AlphaVantage {} for {}".format(self.function, self.symbol)
 
     def __repr__(self):
-        return "AlphaVantageDataSource<{},{},{}>".format(self.symbol)
+        return "AlphaVantageDataSource<{}>".format(self.symbol)
 
     def _Retrieve(self, start, end):
         params = {'function': self.function,

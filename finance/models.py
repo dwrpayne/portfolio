@@ -172,7 +172,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def GetMostRecentActivityDate(self):
         try:
             return self.activities.latest().tradeDate
-        except:
+        except Activity.DoesNotExist:
             return None
 
     def GetValueAtDate(self, date):
@@ -197,7 +197,7 @@ class HoldingManager(models.Manager):
                 current_holding.SetEndsOn(date - datetime.timedelta(days=1))
                 previous_qty = current_holding.qty
 
-        except Holding.MultipleObjectsReturned as e:
+        except Holding.MultipleObjectsReturned:
             print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, security, date))
         except Holding.DoesNotExist:
             pass

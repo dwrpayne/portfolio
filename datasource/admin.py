@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
+from .models import ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
 
 class ConstantDataSourceAdmin(admin.ModelAdmin):
