@@ -278,20 +278,20 @@ class SecurityPriceDetail(models.Model):
             cursor.execute("""
 CREATE MATERIALIZED VIEW public.securities_cadview
 AS
-SELECT p.symbol as security_id, 
-    p.day, 
-    p.price, 
-    c.price as exch,
-    p.price * c.price as cadprice,
-    p.type    
-    FROM (SELECT sec.symbol, 
-     sec.currency_id||' Cash' as cashhack, 
-     pr.day, 
-     pr.price,
-     sec.type 
-     FROM securities_security sec 
-        JOIN securities_securityprice pr ON sec.symbol=pr.security_id) p 
-        LEFT JOIN securities_securityprice c on p.day=c.day and c.security_id=p.cashhack
+SELECT prices.symbol as security_id, 
+    prices.day, 
+    prices.price, 
+    currencies.price as exch,
+    prices.price * currencies.price as cadprice,
+    prices.type    
+    FROM (SELECT s.symbol, 
+     s.currency_id, 
+     p.day, 
+     p.price,
+     s.type 
+     FROM securities_security s 
+        JOIN securities_securityprice p ON s.symbol=p.security_id) prices
+        LEFT JOIN securities_securityprice currencies on prices.day=currencies.day and currencies.security_id=prices.currency_id
 WITH DATA;
 ALTER TABLE securities_cadview OWNER TO financeuser;
 """)

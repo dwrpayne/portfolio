@@ -54,7 +54,7 @@ def GetBalanceContext(user):
         return {}
 
     total = accounts.get_balance_totals()
-    exchange_live, exchange_delta = Security.objects.get(symbol='USD Cash').GetTodaysChange()
+    exchange_live, exchange_delta = Security.objects.get(symbol='USD').GetTodaysChange()
 
     context = {'accounts': accounts, 'account_total': total,
                'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
