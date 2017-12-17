@@ -65,6 +65,9 @@ class QuestradeRawActivity(BaseRawActivity):
             security = Security.options.Create(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
 
+            # Questrade options have price per share not per option.
+            json['price'] *= security.price_multiplier
+
         # Hack to fix invalid Questrade data just for me
         if not json['symbol']:
             if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol'] = 'XIU.TO'
@@ -113,7 +116,7 @@ class QuestradeRawActivity(BaseRawActivity):
         json = self.GetCleanedJson()
 
         create_args = {'account': self.account, 'raw': self}
-        for item in ['description', 'tradeDate', 'type', 'security']:
+        for item in ['description', 'tradeDate', 'type', 'security', 'commission']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item]))
@@ -141,7 +144,15 @@ class QuestradeAccount(BaseAccount):
     def yesterday_balance(self):
         return self.sodBalanceSynced
 
-    def UpdateSyncedBalances(self, current, sod):
+    def UpdateSyncedBalances(self, json):
+        current = sum([
+            Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
+            for entry in json['perCurrencyBalances']
+        ])
+        sod = sum([
+            Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
+            for entry in json['sodPerCurrencyBalances']
+        ])
         self.curBalanceSynced = current
         self.sodBalanceSynced = sod
         self.save()
@@ -232,9 +243,7 @@ class QuestradeClient(BaseClient):
         for a in self.accounts.all():
             try:
                 json = self._GetRequest('accounts/{}/balances'.format(a.id))
-                current = next(currency['totalEquity'] for currency in json['combinedBalances'] if currency['currency'] == 'CAD')
-                sod = next(currency['totalEquity'] for currency in json['sodCombinedBalances'] if currency['currency'] == 'CAD')
-                a.UpdateSyncedBalances(current, sod)
+                a.UpdateSyncedBalances(json)
             except requests.exceptions.HTTPError as ex:
                 print("Failed to connect to Questrade server: {}".format(ex))
 
@@ -242,106 +251,177 @@ class QuestradeClient(BaseClient):
 tfsa_activity_data = [
     ('6/3/2009', 'Deposit', '', 'CAD', '', '', '1000', ''),
     ('6/8/2009', 'Deposit', '', 'CAD', '', '', '4000', ''),
-    ('6/15/2009', 'Buy', 'GE', 'USD', '13.73', '150', '-2299.38', 'CONV TO CAD @ 1.1138 %US PREM'),
-    ('6/15/2009', 'Buy', 'IGR', 'USD', '5.25', '200', '-1175', 'CONV TO CAD @ 1.1138 %US PREM'),
-    ('6/15/2009', 'Buy', 'VUG', 'USD', '44.58', '30', '-1495.11', 'CONV TO CAD @ 1.1138 %US PREM'),
-    ('6/15/2009', 'Sell', 'GE    090718C00014000', 'USD', '', '-1', '47.96', 'CONV TO CAD @ 1.1142 %US PREM'),
-    ('6/30/2009', 'Dividend', 'IGR', 'USD', '', '', '8.82', 'CONVERT TO CAD @ 1.15350'),
-    ('6/30/2009', 'Dividend', 'VUG', 'USD', '', '', '4.27', 'CONVERT TO CAD @ 1.15350'),
-    ('7/7/2009', 'Buy', 'EA    090721C00021000', 'USD', '', '1', '-94.33', 'CONV TO CAD @1.1653 %US PREM'),
+
+    ('6/15/2009', 'Buy', 'GE', 'USD', '13.73', '150', '-2064.45', ''),
+    ('6/15/2009', 'Buy', 'IGR', 'USD', '5.25', '200', '-1054.95', ''),
+    ('6/15/2009', 'Buy', 'VUG', 'USD', '44.58', '30', '-1342.35', ''),
+    ('6/15/2009', 'FX', '', 'CAD', '', '', '-4969.50', 'AUTO CONV @ 1.1138 %US PREM'),
+    ('6/15/2009', 'FX', '', 'USD', '', '', '4461.75', 'AUTO CONV @ 1.1138 %US PREM'),
+
+    ('6/15/2009', 'Sell', 'GE    090718C00014000', 'USD', '54', '-1', '43.05', ''),
+    ('6/15/2009', 'FX', '', 'CAD', '', '', '47.97', 'AUTO CONV @ 1.1142 %US PREM'),
+    ('6/15/2009', 'FX', '', 'USD', '', '', '-43.05', 'AUTO CONV @ 1.1142 %US PREM'),
+
+    ('6/30/2009', 'Dividend', 'IGR', 'USD', '', '', '7.65', ''),
+    ('6/30/2009', 'Dividend', 'VUG', 'USD', '', '', '3.70', ''),
+    ('6/30/2009', 'FX', '', 'CAD', '', '', '13.09', 'AUTO CONV @ 1.15350 %US PREM'),
+    ('6/30/2009', 'FX', '', 'USD', '', '', '-11.35', 'AUTO CONV @ 1.15350 %US PREM'),
+
+    ('7/7/2009', 'Buy', 'EA    090721C00021000', 'USD', '70', '1', '-80.95', ''),
+    ('7/7/2009', 'FX', '', 'CAD', '', '', '-94.33', 'AUTO CONV @ 1.1653 %US PREM'),
+    ('7/7/2009', 'FX', '', 'USD', '', '', '80.95', 'AUTO CONV @ 1.1653 %US PREM'),
+
     ('7/17/2009', 'Expiry', 'GE    090718C00014000', 'USD', '', '1', '', ''),
     ('7/17/2009', 'Expiry', 'EA    090721C00021000', 'USD', '', '-1', '', ''),
-    ('7/27/2009', 'Dividend', 'GE', 'USD', '', '', '13.69', 'CONVERT TO CAD @ 1.07400'),
-    ('7/31/2009', 'Dividend', 'IGR', 'USD', '', '', '8.2', 'CONVERT TO CAD @ 1.07250'),
-    ('8/10/2009', 'Sell', 'GE', 'USD', '14', '-50', '740.48', 'CONV TO CAD @1.0654 %US PREM'),
-    ('8/10/2009', 'Sell', 'IGR', 'USD', '6.08', '-200', '1290.21', 'CONV TO CAD @1.0654 %US PREM'),
-    ('8/10/2009', 'Buy', 'IGR', 'USD', '6.07', '100', '-651.97', 'CONV TO CAD @1.0654 %US PREM'),
+
+    ('7/27/2009', 'Dividend', 'GE', 'USD', '', '', '12.75', ''),
+    ('7/27/2009', 'FX', '', 'CAD', '', '', '13.69', 'AUTO CONV @ 1.074 %US PREM'),
+    ('7/27/2009', 'FX', '', 'USD', '', '', '-12.75', 'AUTO CONV @ 1.074 %US PREM'),
+
+    ('7/31/2009', 'Dividend', 'IGR', 'USD', '', '', '7.65', ''),
+    ('7/31/2009', 'FX', '', 'CAD', '', '', '8.2', 'AUTO CONV @ 1.07250 %US PREM'),
+    ('7/31/2009', 'FX', '', 'USD', '', '', '-7.65', 'AUTO CONV @ 1.07250 %US PREM'),
+
+    ('8/10/2009', 'Sell', 'GE', 'USD', '14', '-50', '695.02', ''),
+    ('8/10/2009', 'Sell', 'IGR', 'USD', '6.08', '-200', '1211.01', ''),
+    ('8/10/2009', 'Buy', 'IGR', 'USD', '6.07', '100', '-611.95', ''),
+    ('8/10/2009', 'FX', '', 'CAD', '', '', '1378.72', 'AUTO CONV @ 1.0654 %US PREM'),
+    ('8/10/2009', 'FX', '', 'USD', '', '', '-1294.08', 'AUTO CONV @ 1.0654 %US PREM'),
     ('8/10/2009', 'Buy', 'WJA.TO', 'CAD', '10.69', '100', '-1073.95', ''),
-    ('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.5', ''),
-    ('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.03', ''),
+
+    ('8/21/2009', 'Fee', '', 'CAD', '', '', '-0.53', ''),
     ('8/25/2009', 'Buy', 'HXU.TO', 'CAD', '15.36', '20', '-312.22', ''),
-    ('8/31/2009', 'Dividend', 'IGR', 'USD', '', '100', '4.15', 'CONVERT TO CAD @ 1.08750'),
+
+    ('8/31/2009', 'Dividend', 'IGR', 'USD', '', '100', '3.82', ''),
+    ('8/31/2009', 'FX', '', 'CAD', '', '', '4.15', 'AUTO CONV @ 1.08750 %US PREM'),
+    ('8/31/2009', 'FX', '', 'USD', '', '', '-3.82', 'AUTO CONV @ 1.08750 %US PREM'),
+
     ('9/10/2009', 'Sell', 'HXU.TO', 'CAD', '16.12', '-20', '317.38', ''),
-    ('9/18/2009', 'Fee', '', 'CAD', '', '', '-2.5', ''),
-    ('9/18/2009', 'Fee', '', 'CAD', '', '', '-0.13', ''),
-    ('9/21/2009', 'Sell', 'GE', 'USD', '16.722', '-100', '1785.64', 'CONV TO CAD @1.071 %US PREM'),
-    ('9/21/2009', 'Buy', 'VBK', 'USD', '57.75', '34', '-2108.21', 'CONV TO CAD @1.071 %US PREM'),
-    ('9/30/2009', 'Dividend', 'IGR', 'USD', '', '100', '4.06', 'CONVERT TO CAD @ 1.06250'),
-    ('9/30/2009', 'Dividend', 'VUG', 'USD', '', '30', '3.85', 'CONVERT TO CAD @ 1.06250'),
-    ('10/14/2009', 'Fee', '', 'CAD', '', '', '-1.5', ''),
-    ('10/14/2009', 'Fee', '', 'CAD', '', '', '-0.08', ''),
-    ('10/30/2009', 'Dividend', 'IGR', 'USD', '', '100', '4.09', 'CONVERT TO CAD @ 1.07100'),
-    ('11/30/2009', 'Dividend', 'IGR', 'USD', '', '100', '4.01', 'CONVERT TO CAD @ 1.04850'),
+    ('9/18/2009', 'Fee', '', 'CAD', '', '', '-2.63', ''),
+
+    ('9/21/2009', 'Sell', 'GE', 'USD', '16.722', '-100', '1667.25', ''),
+    ('9/21/2009', 'Buy', 'VBK', 'USD', '57.75', '34', '-1968.45', ''),
+    ('9/21/2009', 'FX', '', 'CAD', '', '', '-322.57', 'AUTO CONV @ 1.071 %US PREM'),
+    ('9/21/2009', 'FX', '', 'USD', '', '', '301.20', 'AUTO CONV @ 1.071 %US PREM'),
+
+    ('9/30/2009', 'Dividend', 'IGR', 'USD', '', '100', '3.82', ''),
+    ('9/30/2009', 'Dividend', 'VUG', 'USD', '', '30', '3.62', ''),
+    ('9/30/2009', 'FX', '', 'CAD', '', '', '7.91', 'AUTO CONV @ 1.0625 %US PREM'),
+    ('9/30/2009', 'FX', '', 'USD', '', '', '-7.44', 'AUTO CONV @ 1.0625 %US PREM'),
+
+    ('10/14/2009', 'Fee', '', 'CAD', '', '', '-1.58', ''),
+
+    ('10/30/2009', 'Dividend', 'IGR', 'USD', '', '100', '3.82', ''),
+    ('10/30/2009', 'FX', '', 'CAD', '', '', '4.09', 'AUTO CONV @ 1.07100 %US PREM'),
+    ('10/30/2009', 'FX', '', 'USD', '', '', '-3.82', 'AUTO CONV @ 1.07100 %US PREM'),
+
+    ('11/30/2009', 'Dividend', 'IGR', 'USD', '', '100', '3.82', ''),
+    ('11/30/2009', 'FX', '', 'CAD', '', '', '4.01', 'AUTO CONV @ 1.04850 %US PREM'),
+    ('11/30/2009', 'FX', '', 'USD', '', '', '-3.82', 'AUTO CONV @ 1.04850 %US PREM'),
+
     ('12/7/2009', 'Buy', 'ECA.TO', 'CAD', '56.13', '33', '-1857.36', ''),
     ('12/7/2009', 'Sell', 'ECA.TO', 'CAD', '56.24', '-33', '1850.85', ''),
-    ('12/7/2009', 'Sell', 'IGR', 'USD', '6.14', '-100', '643.38', 'CONV'),
-    ('12/7/2009', 'Buy', 'MCD', 'USD', '62.91', '28', '-1866.06', 'CONV TO CAD @1.0564 %US PREM'),
+
+    ('12/7/2009', 'Sell', 'IGR', 'USD', '6.14', '-100', '609.05', ''),
+    ('12/7/2009', 'Buy', 'MCD', 'USD', '62.91', '28', '-1766.43', ''),
+    ('12/7/2009', 'FX', '', 'CAD', '', '', '-1222.68', 'AUTO CONV @ 1.0564 %US PREM'),
+    ('12/7/2009', 'FX', '', 'USD', '', '', '1157.38', 'AUTO CONV @ 1.0564 %US PREM'),
+
     ('12/7/2009', 'Sell', 'WJA.TO', 'CAD', '12', '-100', '1195.05', ''),
-    ('12/11/2009', 'Sell', 'MCD', 'USD', '58.9', '-1', '58.9', 'CONV TO CAD @1.058 %US PREM'),
-    ('12/29/2009', 'Dividend', 'VUG', 'USD', '', '30', '4.72', 'CONVERT TO CAD @ 1.03600'),
-    ('12/31/2009', 'Dividend', 'VBK', 'USD', '', '34', '6.87', 'CONVERT TO CAD @ 1.03900'),
+
+    ('12/11/2009', 'Sell', 'MCD', 'USD', '60.62', '-1', '55.67', ''),
+    ('12/11/2009', 'FX', '', 'CAD', '', '', '58.9', 'AUTO CONV @ 1.058 %US PREM'),
+    ('12/11/2009', 'FX', '', 'USD', '', '', '-55.67', 'AUTO CONV @ 1.058 %US PREM'),
+
+    ('12/29/2009', 'Dividend', 'VUG', 'USD', '', '30', '4.56', ''),
+    ('12/29/2009', 'FX', '', 'CAD', '', '', '4.72', 'AUTO CONV @ 1.03600 %US PREM'),
+    ('12/29/2009', 'FX', '', 'USD', '', '', '-4.56', 'AUTO CONV @ 1.03600 %US PREM'),
+
+    ('12/31/2009', 'Dividend', 'VBK', 'USD', '', '34', '6.61', ''),
+    ('12/31/2009', 'FX', '', 'CAD', '', '', '6.87', 'AUTO CONV @ 1.03900 %US PREM'),
+    ('12/31/2009', 'FX', '', 'USD', '', '', '-6.61', 'AUTO CONV @ 1.03900 %US PREM'),
     ('1/5/2010', 'Deposit', '', 'CAD', '', '', '5000', ''),
-    ('1/11/2010', 'Buy', 'VUG', 'USD', '45.08', '88', '-4941.21', 'CONV TO CAD @1.0372 %US PREM'),
-    ('1/29/2010', 'Buy', 'ATVI', 'USD', '10.08', '175', '-1888.71', 'CONV TO CAD @1.0677 %US PREM'),
-    ('1/29/2010', 'Sell', 'MCD', 'USD', '63.39', '-27', '1822.08', 'CONV TO CAD @1.0677 %US PREM'),
-    ('3/31/2010', 'Dividend', 'VUG', 'USD', '', '118', '14.67', 'CONVERT TO CAD @ 1.00850'),
-    ('4/5/2010', 'Dividend', 'ATVI', 'USD', '', '175', '22.27', 'CONVERT TO CAD @ 0.99800'),
+
+    ('1/11/2010', 'Buy', 'VUG', 'USD', '54.08', '88', '-4763.99', ''),
+    ('1/11/2010', 'FX', '', 'CAD', '', '', '-4941.21', 'AUTO CONV @ 1.0372 %US PREM'),
+    ('1/11/2010', 'FX', '', 'USD', '', '', '4763.99', 'AUTO CONV @ 1.0372 %US PREM'),
+
+    ('1/29/2010', 'Buy', 'ATVI', 'USD', '10.08', '175', '-1768.95', ''),
+    ('1/29/2010', 'Sell', 'MCD', 'USD', '63.39', '-27', '1706.55', ''),
+    ('1/29/2010', 'FX', '', 'CAD', '', '', '-66.63', 'AUTO CONV @ 1.0677 %US PREM'),
+    ('1/29/2010', 'FX', '', 'USD', '', '', '62.4', 'AUTO CONV @ 1.0677 %US PREM'),
+
+    ('3/31/2010', 'Dividend', 'VUG', 'USD', '', '118', '14.55', ''),
+    ('3/31/2010', 'FX', '', 'CAD', '', '', '14.67', 'AUTO CONV @ 1.00850 %US PREM'),
+    ('3/31/2010', 'FX', '', 'USD', '', '', '-14.55', 'AUTO CONV @ 1.00850 %US PREM'),
+
+    ('4/5/2010', 'Dividend', 'ATVI', 'USD', '', '175', '22.31', ''),
+    ('4/5/2010', 'FX', '', 'CAD', '', '', '22.27', 'AUTO CONV @ 0.99800 %US PREM'),
+    ('4/5/2010', 'FX', '', 'USD', '', '', '-22.31', 'AUTO CONV @ 0.99800 %US PREM'),
+
     ('6/30/2010', 'Dividend', 'VUG', 'USD', '', '118', '14.94', ''),
     ('9/30/2010', 'Dividend', 'VUG', 'USD', '', '118', '20.36', ''),
-    ('11/12/2010', 'Sell', 'ATVI', 'USD', '', '-175', '2065.28', ''),
-    ('11/15/2010', 'Buy', 'AGNC', 'USD', '', '70', '-2051.05', ''),
+    ('11/12/2010', 'Sell', 'ATVI', 'USD', '11.83', '-175', '2065.3', ''),
+    ('11/15/2010', 'Buy', 'AGNC', 'USD', '29.23', '70', '-2051.05', ''),
     ('12/15/2010', 'Fee', '', 'CAD', '', '', '4.95', ''),
     ('12/31/2010', 'Dividend', 'VBK', 'USD', '', '', '10.41', ''),
     ('12/31/2010', 'Dividend', 'VUG', 'USD', '', '', '20.36', ''),
-    ('1/27/2011', 'Dividend', 'AGNC', 'USD', '', '', '83.3', ''),
 ]
 
 rrsp_activity_data = [
     ('11/2/2009', 'Transfer', '', 'CAD', '', '', '6951.09', 'RE: SEC.146(16) ITA'),
     ('11/12/2009', 'Buy', 'XIU.TO', 'CAD', '16.77', '200', '-3359.69', ''),
-    ('11/12/2009', 'Buy', 'VWO', 'USD', '39.66', '80', '-3430.38', 'CONV TO CAD @1.0795 %US PREM'),
+
+    ('11/12/2009', 'Buy', 'VWO', 'USD', '39.66', '80', '-3177.75', ''),
+    ('11/12/2009', 'FX', '', 'CAD', '', '', '-3430.38', 'AUTO CONV @ 1.0795 %US PREM'),
+    ('11/12/2009', 'FX', '', 'USD', '', '', '3177.75', 'AUTO CONV @ 1.0795 %US PREM'),
+
     ('12/31/2009', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.17', ''),
-    ('12/31/2009', 'Dividend', 'VWO', 'USD', '', '80', '45.3', 'CONVERT TO CAD @ 1.03900'),
+
+    ('12/31/2009', 'Dividend', 'VWO', 'USD', '', '80', '43.6', ''),
+    ('12/31/2009', 'FX', '', 'CAD', '', '', '45.3', 'AUTO CONV @ 1.03900 %US PREM'),
+    ('12/31/2009', 'FX', '', 'USD', '', '', '-43.6', 'AUTO CONV @ 1.03900 %US PREM'),
+
     ('2/24/2010', 'Deposit', '', 'CAD', '', '', '6000', ''),
-    ('3/2/2010', 'Buy', 'VOT', 'USD', '47.83', '120', '-6121.97', ''),
-    ('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.5', ''),
-    ('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.03', ''),
+    ('3/2/2010', 'Buy', 'VOT', 'USD', '47.83', '120', '-5744.55', ''),
+    ('3/2/2010', 'FX', '', 'CAD', '', '', '-6121.97', 'AUTO CONV @ 1.0657 %US PREM'),
+    ('3/2/2010', 'FX', '', 'USD', '', '', '5744.55', 'AUTO CONV @ 1.0657 %US PREM'),
+
+    ('3/24/2010', 'Fee', '', 'CAD', '', '', '-0.53', ''),
     ('3/31/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '24.34', ''),
     ('4/1/2010', 'Deposit', '', 'CAD', '', '', '6000', ''),
-    ('4/13/2010', 'Buy', 'VWO', 'USD', '43.33', '140', '-6119.72', 'CONV TO CAD @1.008 %US PREM'),
-    ('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.5', ''),
-    ('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.03', ''),
+
+    ('4/13/2010', 'Buy', 'VWO', 'USD', '43.33', '140', '-6071.15', ''),
+    ('4/13/2010', 'FX', '', 'CAD', '', '', '-6119.72', 'AUTO CONV @ 1.008 %US PREM'),
+    ('4/13/2010', 'FX', '', 'USD', '', '', '6071.15', 'AUTO CONV @ 1.008 %US PREM'),
+
+    ('5/13/2010', 'Fee', '', 'CAD', '', '', '-0.53', ''),
     ('6/17/2010', 'Deposit', '', 'CAD', '', '', '5000', ''),
     ('6/24/2010', 'FX', '', 'CAD', '', '', '-4764.75', ''),
-    ('6/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.81', ''),
     ('6/24/2010', 'FX', '', 'USD', '', '', '4543.92', ''),
     ('6/29/2010', 'Buy', 'EA', 'USD', '15.129', '300', '-4543.92', ''),
+    ('6/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '21.81', ''),
     ('9/30/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '22.21', ''),
     ('10/4/2010', 'Sell', 'EA    101120C00018000', 'USD', '44', '-3', '119.04', ''),
     ('11/19/2010', 'Expiry', 'EA    101120C00018000', 'USD', '', '3', '', ''),
     ('12/31/2010', 'Dividend', 'XIU.TO', 'CAD', '', '200', '20.76', ''),
     ('12/29/2010', 'Dividend', 'VWO', 'USD', '', '220', '179.3', ''),
     ('12/31/2010', 'Dividend', 'VOT', 'USD', '', '120', '38.64', ''),
+    ('1/12/2011', 'Sell', 'EA    110219C00017000', 'USD', '40', '-3', '107.04', ''),
     ('1/25/2011', 'Deposit', '', 'CAD', '', '', '7000', ''),
     ('1/26/2011', 'FX', '', 'CAD', '', '', '187.4', ''),
-    ('1/31/2011', 'Buy', 'XSB.TO', 'CAD', '28.81', '260', '-7496.51', ''),
-    ('1/12/2011', 'Sell', 'EA    110219C00017000', 'USD', '40', '-3', '107.04', ''),
     ('1/26/2011', 'FX', '', 'USD', '', '', '-189.37', ''),
+    ('1/31/2011', 'Buy', 'XSB.TO', 'CAD', '28.81', '260', '-7496.51', ''),
     ('2/3/2011', 'Buy', 'EA    110219C00017000', 'USD', '120', '3', '-372.95', ''),
     ('2/7/2011', 'Sell', 'EA', 'USD', '18.063', '-300', '5413.94', '')
 ]
 
 sarah_tfsa_data = [
-    ('1/1/2011', 'Deposit', 'VBR', 'USD', '0', '90', '',
-     'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Deposit', 'XSB.TO', 'CAD', '0', '85',
-     '', 'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Deposit', 'XIN.TO', 'CAD', '0', '140',
-     '', 'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Transfer', '', 'CAD', '', '', '147.25',
-     'Faked past history - fix this with real data'),
-    ('1/1/2011', 'Transfer', '', 'USD', '', '', '97.15',
-     'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'VBR', 'USD', '0', '90', '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'XSB.TO', 'CAD', '0', '85', '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', 'XIN.TO', 'CAD', '0', '140', '', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', '', 'CAD', '', '', '147.25', 'Faked past history - fix this with real data'),
+    ('1/1/2011', 'Deposit', '', 'USD', '', '', '97.15', 'Faked past history - fix this with real data'),
     ]
 
 
@@ -351,7 +431,6 @@ def AddManualRawActivity():
                              (51419220, sarah_tfsa_data),
                              (51424829, rrsp_activity_data)
                              ]:
-        account = BaseAccount.objects.get(id=account_id)
         for date, type, symbol, currency, price, qty, netAmount, description in data:
             act = ManualRawActivity.objects.create(day=parser.parse(date),
                                     symbol=symbol,
@@ -361,6 +440,4 @@ def AddManualRawActivity():
                                     price=price if price else '0',
                                     netAmount=netAmount if netAmount else '0',
                                     description=description,
-                                    account=account)
-
-            act.CreateActivity()
+                                    account_id=account_id)

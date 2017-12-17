@@ -91,7 +91,11 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
         return sum(self._CreateRawActivities(account, start, end) for start, end in date_range)
 
     def Refresh(self):
-        self.SyncAccounts()
+        try:
+            self.SyncAccounts()
+        except requests.exceptions.HTTPError:
+            print("Couldn't sync accounts - possible server failure?")
+
         for account in self.accounts.all():
             new_activities = self.SyncActivities(account)
             # TODO: Better error handling when we can't actually sync new activities from server. Should we still regen here?
@@ -274,9 +278,14 @@ class ManualRawActivity(BaseRawActivity):
             except Security.DoesNotExist:
                   security = Security.objects.Create(self.symbol, self.currency)
 
+        commission = 0
+        if self.type in [Activity.Type.Buy, Activity.Type.Sell]:
+            commission = self.qty * self.price + self.netAmount
+
         Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
                                 description=self.description, cash_id=self.currency, qty=self.qty,
-                                price=self.price, netAmount=self.netAmount, type=self.type, raw=self)
+                                price=self.price, netAmount=self.netAmount,
+                                commission = commission, type=self.type, raw=self)
 
 
 class ActivityManager(models.Manager):
@@ -291,12 +300,12 @@ class ActivityManager(models.Manager):
                 raw.CreateActivity()
 
     def create_with_deposit(self, *args, **kwargs):
-        super().create(*args, **kwargs)
+        self.create(*args, **kwargs)
 
         kwargs.update({'security' : None, 'description' : 'Generated Deposit', 'qty' : 0,
                       'price' : 0, 'type' : Activity.Type.Deposit})
         kwargs['netAmount'] *= -1
-        super().create(*args, **kwargs)
+        self.create(*args, **kwargs)
 
 
 class ActivityQuerySet(models.query.QuerySet):
@@ -330,6 +339,7 @@ class Activity(models.Model):
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    commission = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell',
                    'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)

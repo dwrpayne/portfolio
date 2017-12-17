@@ -77,7 +77,7 @@ class CashSecurityManager(SecurityManager):
 
 class OptionSecurityManager(SecurityManager):
     def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Option)
+        return super().get_queryset().filter(type__in=[Security.Type.Option, Security.Type.OptionMini])
 
     def Create(self, callput, symbol, expiry, strike, currency_str):
         """
@@ -87,6 +87,10 @@ class OptionSecurityManager(SecurityManager):
         strike is a Decimal
         currency_str is the 3 digit currency code
         """
+        type = self.model.Type.Option
+        if '7' in symbol:
+            symbol = symbol.strip('7')
+            type = self.model.Type.OptionMini
         optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
             '%y%m%d'), callput[0], Decimal(strike) * 1000)
         option, created = super().get_or_create(
@@ -94,7 +98,7 @@ class OptionSecurityManager(SecurityManager):
             defaults={
                 'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike,
                                                                                     expiry),
-                'type': self.model.Type.Option,
+                'type': type,
                 'currency': currency_str
             })
 
@@ -116,7 +120,7 @@ class MutualFundSecurityManager(SecurityManager):
         )
 
 class Security(models.Model):
-    Type = Choices('Stock', 'Option', 'Cash', 'MutualFund')
+    Type = Choices('Stock', 'Option', 'OptionMini', 'Cash', 'MutualFund')
     symbol = models.CharField(max_length=32, primary_key=True)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
@@ -146,7 +150,7 @@ class Security(models.Model):
     @cached_property
     def earliest_price_needed(self):
         if not self.activities.exists():
-            return datetime.date(2009, 1, 1)
+            return datetime.date.today()
         return self.activities.earliest().tradeDate
 
     @cached_property
@@ -154,6 +158,13 @@ class Security(models.Model):
         if not self.activities.exists() or self.holdings.current().exists():
             return datetime.date.today()
         return self.activities.latest().tradeDate
+
+    @cached_property
+    def price_multiplier(self):
+        if self.type == self.Type.Option:
+            return 100
+        if self.type == self.Type.OptionMini:
+            return 10
 
     def GetShouldSyncRange(self):
         """ Returns a pair (start,end) of datetime.dates that need to be synced."""
@@ -175,12 +186,19 @@ class Security(models.Model):
     def live_price(self):
         try:
             return self.prices.get(day=datetime.date.today()).price
-        except Security.DoesNotExist:
+        except SecurityPrice.DoesNotExist:
             return self.prices.latest().price
 
     @live_price.setter
     def live_price(self, value):
         self.prices.update_or_create(day=datetime.date.today(), defaults={'price': value})
+
+    @property
+    def yesterday_price(self):
+        try:
+            return self.prices.get(day=datetime.date.today() - datetime.timedelta(days=1)).price
+        except SecurityPrice.DoesNotExist:
+            return 0
 
     def SyncRates(self):
         start, end = self.GetShouldSyncRange()
