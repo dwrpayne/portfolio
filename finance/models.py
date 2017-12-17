@@ -221,7 +221,6 @@ class Holding(models.Model):
     enddate = models.DateField(null=True)
 
     objects = HoldingManager.from_queryset(HoldingQuerySet)()
-    objects.use_for_related_fields = True
 
     class Meta:
         unique_together = ('account', 'security', 'startdate')
@@ -346,7 +345,6 @@ class Activity(models.Model):
     raw = models.ForeignKey(BaseRawActivity, on_delete=models.CASCADE)
 
     objects = ActivityManager.from_queryset(ActivityQuerySet)()
-    objects.use_for_related_fields = True
 
     class Meta:
         unique_together = ('raw', 'type')
