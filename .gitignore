@@ -105,5 +105,5 @@ ENV/
 .mypy_cache/
 
 # Custom stuff
-private/
+_private/
 celerybeat*
