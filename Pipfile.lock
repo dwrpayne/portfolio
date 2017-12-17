@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c556db2f06fc6a38b039379fabf57da1b6ed4a2a351fd994e4e8edde43bce5e2"
+            "sha256": "1bc76577be5e894e5c92c83252cbdaf36dfbe33a4a749ac4454e0bf4b5ca6405"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -73,14 +73,6 @@
                 "sha256:84ab92ed1c4d4f16916e05906b6b75a6c0fb5db821cc65e70cbd64a3e2a5eaae"
             ],
             "version": "==3.0.4"
-        },
-        "colorama": {
-            "hashes": [
-                "sha256:463f8483208e921368c9f306094eb6f725c6ca42b0f97e313cb5d5512459feda",
-                "sha256:48eb22f4f8461b1df5734a074b57042430fb06e1d61bd1e11b078c0fe6d7a1f1"
-            ],
-            "markers": "sys_platform == 'win32'",
-            "version": "==0.3.9"
         },
         "decorator": {
             "hashes": [
@@ -204,26 +196,12 @@
             ],
             "version": "==2.6"
         },
-        "ipython": {
-            "hashes": [
-                "sha256:fcc6d46f08c3c4de7b15ae1c426e15be1b7932bcda9d83ce1a4304e8c1129df3",
-                "sha256:51c158a6c8b899898d1c91c6b51a34110196815cc905f9be0fa5878e19355608"
-            ],
-            "version": "==6.2.1"
-        },
         "ipython-genutils": {
             "hashes": [
                 "sha256:72dd37233799e619666c9f639a9da83c34013a73e8bbc79a7a6348d93c61fab8",
                 "sha256:eb2e116e75ecef9d4d228fdc66af54269afa26ab4463042e33785b887c628ba8"
             ],
             "version": "==0.2.0"
-        },
-        "jedi": {
-            "hashes": [
-                "sha256:d795f2c2e659f5ea39a839e5230d70a0b045d0daee7ca2403568d8f348d0ad89",
-                "sha256:d6e799d04d1ade9459ed0f20de47c32f2285438956a677d083d3c98def59fa97"
-            ],
-            "version": "==0.11.1"
         },
         "jsonschema": {
             "hashes": [
@@ -305,13 +283,6 @@
             "git": "https://github.com/dwrpayne/pandas-datareader.git",
             "ref": "bankofcanada"
         },
-        "parso": {
-            "hashes": [
-                "sha256:a7bb86fe0844304869d1c08e8bd0e52be931228483025c422917411ab82d628a",
-                "sha256:5815f3fe254e5665f3c5d6f54f086c2502035cb631a91341591b5a564203cffb"
-            ],
-            "version": "==0.1.1"
-        },
         "pendulum": {
             "hashes": [
                 "sha256:44ed222f2bcbbda64a4a9f7503bfbb7c539420f0a163a007c92cea9878d60dea",
@@ -325,26 +296,11 @@
             ],
             "version": "==1.3.2"
         },
-        "pickleshare": {
-            "hashes": [
-                "sha256:c9a2541f25aeabc070f12f452e1f2a8eae2abd51e1cd19e8430402bdf4c1d8b5",
-                "sha256:84a9257227dfdd6fe1b4be1319096c20eb85ff1e82c7932f36efccfe1b09737b"
-            ],
-            "version": "==0.7.4"
-        },
         "plotly": {
             "hashes": [
                 "sha256:dadd2263f1c0449b248fd3742a077d9594935921a9597529be76d6a841237ab0"
             ],
             "version": "==2.2.3"
-        },
-        "prompt-toolkit": {
-            "hashes": [
-                "sha256:3f473ae040ddaa52b52f97f6b4a493cfa9f5920c255a12dc56a7d34397a398a4",
-                "sha256:1df952620eccb399c53ebb359cc7d9a8d3a9538cb34c5a1344bdbeb29fbcc381",
-                "sha256:858588f1983ca497f1cf4ffde01d978a3ea02b01c8a26a8bbc5cd2e66d816917"
-            ],
-            "version": "==1.0.15"
         },
         "psycopg2": {
             "hashes": [
@@ -382,13 +338,6 @@
             ],
             "version": "==2.7.3.2"
         },
-        "pygments": {
-            "hashes": [
-                "sha256:78f3f434bcc5d6ee09020f92ba487f95ba50f1e3ef83ae96b9d5ffa1bab25c5d",
-                "sha256:dbae1046def0efb574852fab9e90209b23f556367b5a320c0bcb871c77c3e8cc"
-            ],
-            "version": "==2.2.0"
-        },
         "python-dateutil": {
             "hashes": [
                 "sha256:95511bae634d69bc7329ba55e646499a842bc4ec342ad54a8cdb65645a0aad3c",
@@ -423,12 +372,6 @@
                 "sha256:9c443e7324ba5b85070c4a818ade28bfabedf16ea10206da1132edaa6dda237e"
             ],
             "version": "==2.18.4"
-        },
-        "simplegeneric": {
-            "hashes": [
-                "sha256:dc972e06094b9af5b855b3df4a646395e43d1c9d0d39ed345b7393560d0b9173"
-            ],
-            "version": "==0.8.1"
         },
         "simplejson": {
             "hashes": [
@@ -504,13 +447,6 @@
                 "sha256:52116d59bc45392af9fdd3b75ed98ae48a93e822cee21e5fda249105c59a7a72"
             ],
             "version": "==1.1.4"
-        },
-        "wcwidth": {
-            "hashes": [
-                "sha256:f4ebe71925af7b40a864553f761ed559b43544f8f71746c2d756c7fe788ade7c",
-                "sha256:3df37372226d6e63e1b1e1eda15c594bca98a22d33a23832a90998faa96bc65e"
-            ],
-            "version": "==0.1.7"
         },
         "werkzeug": {
             "hashes": [

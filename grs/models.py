@@ -94,7 +94,7 @@ class GrsClient(BaseClient):
 
 class GrsDataSource(DataSourceMixin):
     symbol = models.CharField(max_length=32)
-    client = models.ForeignKey(GrsClient, null=True, default=None)
+    client = models.ForeignKey(GrsClient, on_delete=models.CASCADE)
 
     def _Retrieve(self, start, end):
         with self.client as client:
