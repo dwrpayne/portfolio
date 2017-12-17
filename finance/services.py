@@ -3,6 +3,7 @@ from itertools import accumulate
 import plotly
 import plotly.graph_objs as go
 from django.db.models import Sum
+from django.db.models.functions import ExtractYear
 
 from utils.misc import find_le_index
 from .models import Activity, HoldingDetail
@@ -78,3 +79,8 @@ def GeneratePlot(user):
         traces, filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
     user.userprofile.plotly_url = plotly_url
     user.userprofile.save()
+
+def GetCommissionByYear(user):
+    return dict(Activity.objects.for_user(user).annotate(
+        year=ExtractYear('tradeDate')
+    ).order_by().values('year').annotate(c=Sum('commission')).values_list('year', 'c'))
