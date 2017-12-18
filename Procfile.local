@@ -1,3 +1,0 @@
-web: python manage.py runserver 0:80
-celerybeat: celery -A portfolio beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-celery: celery worker -A portfolio -E -l INFO -P eventlet
