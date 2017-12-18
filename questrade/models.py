@@ -17,7 +17,7 @@ from utils.api import api_response
 class QuestradeActivityTypeManager(models.Manager):
     def GetActivityType(self, type, action):
         try:
-            return QuestradeActivityType.objects.get(q_type=type, q_action=action).activity_type
+            return self.get(q_type=type, q_action=action).activity_type
         except QuestradeActivityType.DoesNotExist:
             print('No action type mapping for "{}" "{}"'.format(type, action))
             return Activity.Type.NotImplemented
@@ -219,11 +219,14 @@ class QuestradeClient(BaseClient):
         return self._GetRequest('accounts')
 
     def SyncAccounts(self):
-        for account_json in self.GetAccounts():
-            QuestradeAccount.objects.get_or_create(
-                type=account_json['type'], id=account_json['number'], client=self, defaults={'taxable' : False})
+        try:
+            for account_json in self.GetAccounts():
+                QuestradeAccount.objects.get_or_create(
+                    type=account_json['type'], id=account_json['number'], client=self, defaults={'taxable' : False})
+        except requests.exceptions.HTTPError:
+            print("Couldn't sync accounts - possible server failure?")
 
-    def _CreateRawActivities(self, account, start, end):
+    def CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0, microsecond=0)
         try:
             json = self._GetRequest('accounts/{}/activities'.format(account.id),

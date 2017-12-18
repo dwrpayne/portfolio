@@ -1,8 +1,4 @@
 import datetime
-from collections import defaultdict
-from decimal import Decimal
-
-import arrow
 import requests
 from django.conf import settings
 from django.db import models, transaction, connection
@@ -70,22 +66,13 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
         """
         return 0
 
-    def Refresh(self):
-        try:
-            self.SyncAccounts()
-        except requests.exceptions.HTTPError:
-            print("Couldn't sync accounts - possible server failure?")
-
-        for account in self.accounts.all():
-            account.SyncAndRegenerate()
-
     def SyncCurrentAccountBalances(self):
         pass
 
 
 class BaseAccountQuerySet(PolymorphicQuerySet):
     def for_user(self, user):
-        return self.filter(client__user=user)
+        return self.filter(client__user=user) if user else self
 
     def get_balance_totals(self):
         properties = ['cur_balance', 'cur_cash_balance', 'yesterday_balance', 'today_balance_change']
@@ -153,7 +140,8 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
 
         print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
-        new_count = sum(self.client.GetRawActivities(self, start, end) for start, end in date_range)
+        with self.client as c:
+            new_count = sum(c.CreateRawActivities(self, start, end) for start, end in date_range)
         # TODO: Better error handling when we can't actually sync new activities from server.
         # Should we still regenerate here?
         if new_count >= 0:
@@ -169,7 +157,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def _RegenerateHoldings(self):
         self.holding_set.all().delete()
         for activity in self.activities.all():
-            for security, qty_delta in activity.GetHoldingEffects().items():
+            for security, qty_delta in activity.GetHoldingEffects():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
 

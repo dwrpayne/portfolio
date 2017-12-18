@@ -99,14 +99,17 @@ class TangerineClient(BaseClient):
         self.client = tangerine.tangerinelib.TangerineClient(secrets)
 
     def SyncAccounts(self):
-        with self.client.login():
-            accounts = self.client.list_accounts()
-            for a in accounts:
-                TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={
-                    'type': a['description'], 'internal_display_name': a['display_name'],
-                    'account_balance': a['account_balance']})
+        try:
+            with self.client.login():
+                accounts = self.client.list_accounts()
+                for a in accounts:
+                    TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={
+                        'type': a['description'], 'internal_display_name': a['display_name'],
+                        'account_balance': a['account_balance']})
+        except requests.exceptions.HTTPError:
+            print("Couldn't sync accounts - possible server failure?")
 
-    def _CreateRawActivities(self, account, start, end):
+    def CreateRawActivities(self, account, start, end):
         with self.client.login():
             transactions = self.client.list_transactions([account.id], start.date(), end.date())
             count = 0

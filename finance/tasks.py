@@ -9,9 +9,12 @@ def LiveSecurityUpdateTask():
     HoldingDetail.Refresh()
 
 @shared_task
-def RefreshClientTask(user=None):
-    from .models import BaseClient
-    clients = user.clients.all() if user else BaseClient.objects.all()
-    for client in clients:
-        with client:
-            client.Refresh()
+def SyncActivityTask(user=None):
+    from .models import BaseAccount, HoldingDetail
+    for account in BaseAccount.objects.for_user(user):
+        account.SyncAndRegenerate()
+
+@shared_task
+def DailyUpdateAll():
+    SyncActivityTask()
+    LiveSecurityUpdateTask()

@@ -6,7 +6,7 @@ import re
 from more_itertools import split_before
 from dateutil import parser
 from django.db import models, transaction
-import utils
+import utils.dates
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
 from securities.models import Security
@@ -30,7 +30,7 @@ class GrsRawActivityManager(PolymorphicManager):
         soup = BeautifulSoup(html, 'html.parser')
         tags = soup.find_all(class_=re.compile('activities-d-*'))
         if not tags:
-            return
+            return 0
 
         rows = split_before(tags, lambda tag: tag.class_ == tags[0].class_)
         with transaction.atomic():
@@ -90,15 +90,6 @@ class GrsAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 360
 
-    def CreateRawActivities(self):
-        with self.client as c:
-            c.PrepareRateRetrieval()
-            c.GetRawActivities()
-
-        GrsRawActivity.objects.create_from_html(response.text, account)
-        pass
-
-
 class GrsClient(BaseClient):
     username = models.CharField(max_length=32)
     password = models.CharField(max_length=100)
@@ -128,17 +119,16 @@ class GrsClient(BaseClient):
         response.raise_for_status()
         return response
 
-    def GetRawActivities(self, id, start, end):
+    def CreateRawActivities(self, account, start, end):
         response = self.session.post(
             'https://ssl.grsaccess.com/english/member/activity_reports_details.aspx',
             data={
-                'MbrPlanId': id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
+                'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
                 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'
             }
         )
-        GrsRawActivity.objects.create_from_html(response.text, account)
         response.raise_for_status()
-        return response.text
+        return GrsRawActivity.objects.create_from_html(response.text, account)
 
 
 class GrsDataSource(DataSourceMixin):
