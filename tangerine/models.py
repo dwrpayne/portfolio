@@ -62,6 +62,9 @@ class TangerineAccount(BaseAccount):
     def cur_balance(self):
         return self.account_balance
 
+    @property
+    def activitySyncDateRange(self):
+        return 2000
 
 class TangerineClient(BaseClient):
     username = models.CharField(max_length=32)
@@ -76,9 +79,6 @@ class TangerineClient(BaseClient):
     def __repr__(self):
         return 'TangerineClient<{}>'.format(self.display_name)
 
-    @property
-    def activitySyncDateRange(self):
-        return 2000
 
     @staticmethod
     def _GetRequest(url, params=None):

@@ -36,10 +36,6 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
 
     objects = BaseClientManager()
 
-    @property
-    def activitySyncDateRange(self):
-        return 30
-
     def __str__(self):
         return "{}".format(self.display_name)
 
@@ -63,32 +59,8 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     def currentSecurities(self):
         return Security.objects.filter(holdings__account__client=self, holdings__enddate=None).distinct()
 
-    def _CreateRawActivities(self, account, start, end):
-        """ 
-        Retrieve raw activity data from your client source for the specified account and start/end period.
-        Store it in the DB as a subclass of BaseRawActivity.
-        Return the number of new raw activities created.
-        """
-        return 0
-
     def SyncAccounts(self):
         pass
-
-    def SyncActivities(self, account):
-        """
-        Syncs all raw activities for the specified account from data source.
-        Returns the number of new raw activities created.
-        """
-        start = account.GetMostRecentActivityDate()
-        if start:
-            start = arrow.get(start).shift(days=+1)
-        else:
-            start = arrow.get('2011-02-01')
-
-        date_range = arrow.Arrow.interval('day', start, arrow.now(), self.activitySyncDateRange)
-
-        print('Syncing all activities for {} in {} chunks.'.format(account, len(date_range)))
-        return sum(self._CreateRawActivities(account, start, end) for start, end in date_range)
 
     def Refresh(self):
         try:
@@ -97,7 +69,7 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
             print("Couldn't sync accounts - possible server failure?")
 
         for account in self.accounts.all():
-            new_activities = self.SyncActivities(account)
+            new_activities = account.SyncActivities()
             # TODO: Better error handling when we can't actually sync new activities from server. Should we still regen here?
             if new_activities >= 0:
                 account.RegenerateActivities()
@@ -157,6 +129,35 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def today_balance_change(self):
         return self.cur_balance - self.yesterday_balance
 
+    @property
+    def activitySyncDateRange(self):
+        return 30
+
+    @property
+    def sync_from_date(self):
+        last_activity = self.activities.newest_date()
+        if last_activity:
+            return last_activity + datetime.timedelta(days=1)
+        return self.creation_date
+
+    def SyncActivities(self):
+        """
+        Syncs all raw activities for the specified account from our associated client.
+        Returns the number of new raw activities created.
+        """
+        date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
+
+        print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
+        return sum(self.client.GetRawActivities(self, start, end) for start, end in date_range)
+
+    def CreateRawActivities(self, account, start, end):
+        """
+        Retrieve raw activity data from your client source for the specified account and start/end period.
+        Store it in the DB as a subclass of BaseRawActivity.
+        Return the number of new raw activities created.
+        """
+        return 0
+
     def RegenerateActivities(self):
         self.activities.all().delete()
         Activity.objects.GenerateFromRawActivities(self.rawactivities.all())
@@ -167,12 +168,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             for security, qty_delta in activity.GetHoldingEffect().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
-
-    def GetMostRecentActivityDate(self):
-        try:
-            return self.activities.latest().tradeDate
-        except Activity.DoesNotExist:
-            return None
 
     def GetValueAtDate(self, date):
         return self.holdingdetail_set.at_date(date).total_values().first()[1]
@@ -292,6 +287,12 @@ class ActivityManager(models.Manager):
         if 'cash_id' in kwargs and not kwargs['cash_id']:
             kwargs['cash_id'] = None
         super().create(*args, **kwargs)
+
+    def newest_date(self):
+        try:
+            return self.get_queryset().latest().tradeDate
+        except self.model.DoesNotExist:
+            return None
 
     def GenerateFromRawActivities(self, rawactivities):
         with transaction.atomic():

@@ -86,6 +86,18 @@ class GrsAccount(BaseAccount):
     def __repr__(self):
         return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
 
+    @property
+    def activitySyncDateRange(self):
+        return 360
+
+    def CreateRawActivities(self):
+        with self.client as c:
+            c.PrepareRateRetrieval()
+            c.GetRawActivities()
+
+        GrsRawActivity.objects.create_from_html(response.text, account)
+        pass
+
 
 class GrsClient(BaseClient):
     username = models.CharField(max_length=32)
@@ -93,10 +105,6 @@ class GrsClient(BaseClient):
 
     def __repr__(self):
         return 'GrsClient<{}>'.format(self.display_name)
-
-    @property
-    def activitySyncDateRange(self):
-        return 360
 
     def Authorize(self):
         self.session = requests.Session()
@@ -117,15 +125,17 @@ class GrsClient(BaseClient):
                                          'EndDate': end.format('MM/DD/YYYY'), }
                                 )
 
-    def _CreateRawActivities(self, account, start, end):
+    def GetRawActivities(self, id, start, end):
         response = self.session.post(
             'https://ssl.grsaccess.com/english/member/activity_reports_details.aspx',
             data={
-                'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
+                'MbrPlanId': id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
                 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'
             }
         )
         GrsRawActivity.objects.create_from_html(response.text, account)
+        response.raise_for_status()
+        return response.text
 
 
 class GrsDataSource(DataSourceMixin):

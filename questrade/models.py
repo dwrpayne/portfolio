@@ -144,6 +144,10 @@ class QuestradeAccount(BaseAccount):
     def yesterday_balance(self):
         return self.sodBalanceSynced
 
+    @property
+    def activitySyncDateRange(self):
+        return 28
+
     def UpdateSyncedBalances(self, json):
         current = sum([
             Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
@@ -168,10 +172,6 @@ class QuestradeClient(BaseClient):
 
     def __repr__(self):
         return "QuestradeClient<{}>".format(self.display_name)
-
-    @property
-    def activitySyncDateRange(self):
-        return 28
 
     @property
     def needs_refresh(self):
@@ -222,8 +222,6 @@ class QuestradeClient(BaseClient):
         for account_json in self.GetAccounts():
             QuestradeAccount.objects.get_or_create(
                 type=account_json['type'], id=account_json['number'], client=self, defaults={'taxable' : False})
-            
-        AddManualRawActivity()
 
     def _CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0, microsecond=0)
