@@ -12,11 +12,11 @@ admin.site.register(GrsRawActivity, GrsRawActivityAdmin)
 
 
 class GrsAccountAdmin(admin.ModelAdmin):
-    list_display = ['client', 'type', 'id', 'plan_data']
+    list_display = ['client', 'type', 'id']
 
 admin.site.register(GrsAccount, GrsAccountAdmin)
 
 class GrsDataSourceAdmin(admin.ModelAdmin):
-    list_display = ['symbol']
+    list_display = ['symbol', 'plan_data']
 
 admin.site.register(GrsDataSource, GrsDataSourceAdmin)
