@@ -1,12 +1,12 @@
 from decimal import Decimal
 
-import arrow
 import requests
 from bs4 import BeautifulSoup
 import re
 from more_itertools import split_before
 from dateutil import parser
 from django.db import models, transaction
+import utils
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
 from securities.models import Security
@@ -108,8 +108,9 @@ class GrsClient(BaseClient):
 
     def Authorize(self):
         self.session = requests.Session()
-        self.session.post('https://ssl.grsaccess.com/Information/login.aspx',
+        response = self.session.post('https://ssl.grsaccess.com/Information/login.aspx',
                           data={'username': self.username, 'password': self.password})
+        response.raise_for_status()
 
     def CloseSession(self):
         self.session.close()
@@ -119,11 +120,13 @@ class GrsClient(BaseClient):
                            params={'Selected_Info': plan_data})
 
     def RequestRates(self, symbol, start, end):
-        return self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
+        response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
                                    data={'PlanFund': symbol,
                                          'StartDate': start.format('MM/DD/YYYY'),
                                          'EndDate': end.format('MM/DD/YYYY'), }
                                 )
+        response.raise_for_status()
+        return response
 
     def GetRawActivities(self, id, start, end):
         response = self.session.post(
@@ -149,8 +152,8 @@ class GrsDataSource(DataSourceMixin):
 
     def _Retrieve(self, start, end):
         with self.client as client:
-            client.PrepareRateRetrieval()
-            for s, e in arrow.Arrow.interval('day', arrow.get(start), arrow.get(end), self.max_sync_days):
+            client.PrepareRateRetrieval(self.plan_data)
+            for s, e in utils.dates.day_intervals(self.max_sync_days, start, end):
                 response = client.RequestRates(self.symbol, s, e)
 
                 soup = BeautifulSoup(response.text, 'html.parser')
