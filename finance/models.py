@@ -62,6 +62,14 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     def SyncAccounts(self):
         pass
 
+    def CreateRawActivities(self, account, start, end):
+        """
+        Retrieve raw activity data from your client source for the specified account and start/end period.
+        Store it in the DB as a subclass of BaseRawActivity.
+        Return the number of new raw activities created.
+        """
+        return 0
+
     def Refresh(self):
         try:
             self.SyncAccounts()
@@ -69,11 +77,7 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
             print("Couldn't sync accounts - possible server failure?")
 
         for account in self.accounts.all():
-            new_activities = account.SyncActivities()
-            # TODO: Better error handling when we can't actually sync new activities from server. Should we still regen here?
-            if new_activities >= 0:
-                account.RegenerateActivities()
-                account.RegenerateHoldings()
+            account.SyncAndRegenerate()
 
     def SyncCurrentAccountBalances(self):
         pass
@@ -140,7 +144,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             return last_activity + datetime.timedelta(days=1)
         return self.creation_date
 
-    def SyncActivities(self):
+    def SyncAndRegenerate(self):
         """
         Syncs all raw activities for the specified account from our associated client.
         Returns the number of new raw activities created.
@@ -148,24 +152,23 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
 
         print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
-        return sum(self.client.GetRawActivities(self, start, end) for start, end in date_range)
+        new_count = sum(self.client.GetRawActivities(self, start, end) for start, end in date_range)
+        # TODO: Better error handling when we can't actually sync new activities from server.
+        # Should we still regenerate here?
+        if new_count >= 0:
+            self._RegenerateActivities()
+            self._RegenerateHoldings()
 
-    def CreateRawActivities(self, account, start, end):
-        """
-        Retrieve raw activity data from your client source for the specified account and start/end period.
-        Store it in the DB as a subclass of BaseRawActivity.
-        Return the number of new raw activities created.
-        """
-        return 0
-
-    def RegenerateActivities(self):
+    def _RegenerateActivities(self):
         self.activities.all().delete()
-        Activity.objects.GenerateFromRawActivities(self.rawactivities.all())
+        with transaction.atomic():
+            for raw in self.rawactivities.all():
+                raw.CreateActivity()
 
-    def RegenerateHoldings(self):
+    def _RegenerateHoldings(self):
         self.holding_set.all().delete()
         for activity in self.activities.all():
-            for security, qty_delta in activity.GetHoldingEffect().items():
+            for security, qty_delta in activity.GetHoldingEffects().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
 
@@ -294,11 +297,6 @@ class ActivityManager(models.Manager):
         except self.model.DoesNotExist:
             return None
 
-    def GenerateFromRawActivities(self, rawactivities):
-        with transaction.atomic():
-            for raw in rawactivities:
-                raw.CreateActivity()
-
     def create_with_deposit(self, *args, **kwargs):
         self.create(*args, **kwargs)
 
@@ -361,23 +359,22 @@ class Activity(models.Model):
         return "Activity({},{},{},{},{},{},{},{})".format(self.tradeDate, self.security, self.cash, self.qty,
                                                           self.price, self.netAmount, self.type, self.description)
 
-    def GetHoldingEffect(self):
+    def GetHoldingEffects(self):
+        """Yields a (security, amount) for each security that is affected by this activity."""
         """Generates a dict {security:amount, ...}"""
-        effect = defaultdict(Decimal)
-
         if self.type in [Activity.Type.Buy, Activity.Type.Sell, Activity.Type.Deposit, Activity.Type.Withdrawal]:
-            effect[self.security] = self.qty
+            yield self.security, self.qty
             if self.cash:
-                effect[self.cash] = self.netAmount
+                yield self.cash, self.netAmount
 
         elif self.type in [Activity.Type.Transfer, Activity.Type.Dividend, Activity.Type.Fee, Activity.Type.Interest,
                            Activity.Type.FX]:
-            effect[self.cash] = self.netAmount
+            yield self.cash, self.netAmount
 
         elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
-            effect[self.security] = self.qty
+            yield self.security, self.qty
 
-        return effect
+        return
 
 
 class Allocation(models.Model):

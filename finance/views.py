@@ -173,7 +173,7 @@ def capgains(request, symbol):
         else:
             act.acbchange = -prevacbpershare * abs(act.qty)
 
-        for s, amt in act.GetHoldingEffect().items():
+        for s, amt in act.GetHoldingEffects().items():
             if s.symbol == symbol:
                 totalqty += amt
 
