@@ -122,6 +122,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     id = models.CharField(max_length=100, primary_key=True)
     taxable = models.BooleanField(default=True)
     display_name = models.CharField(max_length=100, editable=False, default='')
+    creation_date = models.DateField(default='2009-01-01')
 
     objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
 

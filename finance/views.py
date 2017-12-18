@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from utils.misc import plotly_iframe_from_url
-from .models import BaseAccount, HoldingDetail, Activity
+from .models import BaseAccount, HoldingDetail
 from securities.models import Security, SecurityPrice, SecurityPriceDetail
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, RefreshClientTask
