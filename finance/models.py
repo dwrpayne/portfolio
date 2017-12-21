@@ -38,10 +38,6 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     def CloseSession(self):
         pass
 
-    @cached_property
-    def currentSecurities(self):
-        return Security.objects.filter(holdings__account__client=self, holdings__enddate=None).distinct()
-
     def SyncAccounts(self):
         pass
 
