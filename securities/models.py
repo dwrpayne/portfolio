@@ -31,7 +31,7 @@ class StockSecurityManager(SecurityManager):
         return super().get_queryset().filter(type=Security.Type.Stock)
 
     def create(self, *args, **kwargs):
-        if not 'datasource' in kwargs:
+        if 'datasource' not in kwargs:
             kwargs['datasource'], _ = AlphaVantageDataSource.objects.get_or_create(symbol=kwargs['symbol'])
         kwargs['type'] = Security.Type.Stock
         return super().create(*args, **kwargs)
@@ -46,7 +46,7 @@ class CashSecurityManager(SecurityManager):
         return super().get_queryset().filter(type=Security.Type.Cash)
 
     def create(self, *args, **kwargs):
-        if not 'datasource' in kwargs:
+        if 'datasource' not in kwargs:
             if kwargs['symbol'] == 'CAD':
                 datasource, _ = ConstantDataSource.objects.get_or_create()
             else:
@@ -91,11 +91,11 @@ class MutualFundSecurityManager(SecurityManager):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
 
     def create(self, *args, **kwargs):
-        if not 'datasource' in kwargs:
+        if 'datasource' not in kwargs:
             kwargs['datasource'], _ = MorningstarDataSource.objects.get_or_create(symbol=kwargs['symbol'])
         kwargs['type'] = Security.Type.MutualFund
         return super().create(*args, **kwargs)
-    
+
 
 class Security(models.Model):
     Type = Choices('Stock', 'Option', 'OptionMini', 'Cash', 'MutualFund')

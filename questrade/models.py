@@ -90,7 +90,7 @@ class QuestradeRawActivity(BaseRawActivity):
         if json['action'] == 'FXT':
             if 'AS OF ' in json['description']:
                 tradeDate = pendulum.parse(json['tradeDate'])
-                asof = pendulum.parse(json['description'].split('AS OF ')[1].split(' ')[0], '%m/%d/%y')
+                asof = pendulum.from_format(json['description'].split('AS OF ')[1].split(' ')[0], '%m/%d/%y')
                 if (tradeDate - asof).days > 365:
                     asof = asof.add(years=1)
                 json['tradeDate'] = asof.isoformat()
