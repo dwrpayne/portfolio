@@ -209,8 +209,7 @@ class Holding(models.Model):
         unique_together = ('account', 'security', 'startdate')
         get_latest_by = 'startdate'
         indexes = [
-            models.Index(fields=['security_id', 'startdate', 'enddate']),
-            models.Index(fields=['startdate']),
+            models.Index(fields=['security_id', 'enddate']),
             models.Index(fields=['enddate']),
         ]
 
@@ -349,7 +348,6 @@ class Activity(models.Model):
 
     def GetHoldingEffects(self):
         """Yields a (security, amount) for each security that is affected by this activity."""
-        """Generates a dict {security:amount, ...}"""
         if self.cash:
             yield self.cash, self.netAmount
 
