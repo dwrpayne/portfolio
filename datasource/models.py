@@ -86,10 +86,11 @@ class AlphaVantageDataSource(DataSourceMixin):
         return "AlphaVantageDataSource<{}>".format(self.symbol)
 
     def _Retrieve(self, start, end):
-        params = {'function': self.function,
-                  'symbol': self.symbol, 'apikey': self.api_key}
+        params = {'function': self.function, 'apikey': self.api_key,
+                  'symbol': self.symbol}
         if (datetime.date.today() - start).days >= 100:
             params['outputsize'] = 'full'
+
         r = requests.get('https://www.alphavantage.co/query', params=params)
         if r.ok:
             json = r.json()
@@ -99,6 +100,20 @@ class AlphaVantageDataSource(DataSourceMixin):
         else:
             print('Failed to get data, response: {}'.format(r.content))
         return []
+
+# TODO: Yuck, this is really hacky and needs a refactor. I just need it working for now.
+# TODO: Maybe a ManyToMany field to support multiple data sources per security?
+# TODO: Or maybe a DataSource that aggregates data from multiple sources
+def GetLiveAlphaVantageExchangeRate(symbol):
+    params = {'function': 'CURRENCY_EXCHANGE_RATE', 'apikey': 'P38D2XH1GFHST85V',
+              'from_currency': symbol, 'to_currency': 'CAD'}
+    r = requests.get('https://www.alphavantage.co/query', params=params)
+    if r.ok:
+        json = r.json()
+        return Decimal(json['Realtime Currency Exchange Rate']['5. Exchange Rate'])
+    else:
+        print('Failed to get data, response: {}'.format(r.content))
+    return None
 
 
 class MorningstarDataSource(DataSourceMixin):

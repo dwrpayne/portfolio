@@ -6,7 +6,7 @@ from django.db import models, transaction, connection
 from django.utils.functional import cached_property
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
-    MorningstarDataSource, StartEndDataSource
+    MorningstarDataSource, StartEndDataSource, GetLiveAlphaVantageExchangeRate
 
 import requests
 from model_utils import Choices
@@ -39,12 +39,6 @@ class SecurityManager(models.Manager):
             queryset = queryset.filter(holdings__enddate__isnull=True).distinct()
         for security in queryset:
             security.SyncRates(live_update)
-
-            #TODO USD live sync hack
-            if security.symbol == 'USD':
-                request = requests.get('https://openexchangerates.org/api/latest.json',
-                                       params={'app_id': '2f666e800586440088f5fc22d688f520', 'symbols': 'CAD'})
-                security.live_price = Decimal(str(request.json()['rates']['CAD']))
 
 
 class StockSecurityManager(SecurityManager):
