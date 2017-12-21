@@ -10,7 +10,7 @@ from django.shortcuts import redirect, render
 
 from utils.misc import plotly_iframe_from_url
 from .models import BaseAccount, HoldingDetail
-from securities.models import Security, SecurityPrice
+from securities.models import Security, SecurityPrice, SecurityPriceDetail
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
@@ -153,15 +153,15 @@ def securitydetail(request, symbol):
 def capgains(request, symbol):
     # TODO: Capital gains report is completely broken with the Dec 13 Security/Cash refactor.
     security = Security.objects.get(symbol=symbol)
-    activities = security.activities.for_user(request.user).taxable().without_dividends().annotate(
-        exch=Sum(F('security__currency__rates__price')))
+    activities = security.activities.for_user(request.user).taxable().without_dividends().filter(
+        tradeDate=F('security__securitypricedetail__day')).annotate(
+        cadprice=Sum(F('security__securitypricedetail__cadprice'))
+    )
 
-    totalqty = Decimal('0')
-    totalacb = Decimal('0')
+    totalqty = Decimal(0)
+    totalacb = Decimal(0)
     activities = list(activities)
     for act in activities:
-
-        act.cadprice = act.exch * act.price
         if not act.cadprice:
             act.cadprice = act.security.GetPriceCAD(act.tradeDate)
 
@@ -176,7 +176,7 @@ def capgains(request, symbol):
         else:
             act.acbchange = -prevacbpershare * abs(act.qty)
 
-        for s, amt in act.GetHoldingEffects().items():
+        for s, amt in act.GetHoldingEffects():
             if s.symbol == symbol:
                 totalqty += amt
 
@@ -187,7 +187,7 @@ def capgains(request, symbol):
         act.totalacb = totalacb
         act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
 
-    pendinggain = security.live_price_cad * totalqty - totalacb
+    pendinggain = SecurityPriceDetail.objects.filter(security=security).latest().cadprice * totalqty - totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/capgains.html', context)

@@ -354,6 +354,8 @@ class Activity(models.Model):
         if self.security and self.type != Activity.Type.Dividend:
             yield self.security, self.qty
 
+        return
+
 
 class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
