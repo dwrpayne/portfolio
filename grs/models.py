@@ -136,6 +136,12 @@ class GrsDataSource(DataSourceMixin):
     client = models.ForeignKey(GrsClient, on_delete=models.CASCADE)
     plan_data = models.CharField(max_length=100)
 
+    def __str__(self):
+        return "GRS Client {} for symbol {}".format(self.client, self.symbol)
+
+    def __repr__(self):
+        return "GrsDataSource<{},{}>".format(self.symbol, self.client)
+
     @property
     def max_sync_days(self):
         return 15

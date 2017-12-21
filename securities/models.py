@@ -13,25 +13,10 @@ from model_utils import Choices
 
 
 class SecurityManager(models.Manager):
-    def Create(self, symbol, currency):
-        if len(symbol) >= 20:
-            return self.CreateOptionRaw(symbol, currency)
-        else:
-            return self.CreateStock(symbol, currency)
-
-    def CreateStock(self, symbol, currency):
-        return self.create(
-            symbol=symbol,
-            type=self.model.Type.Stock,
-            currency=currency
-        )
-
-    def CreateOptionRaw(self, optsymbol, currency):
-        return self.create(
-            symbol=optsymbol,
-            type=self.model.Type.Option,
-            currency=currency
-        )
+    def create(self, *args, **kwargs):
+        if 'symbol' in kwargs:
+            kwargs['type'] = self.model.Type.Stock if len(kwargs['symbol'] < 20) else self.model.Type.Option
+        return super().create(*args, **kwargs)
 
     def Sync(self, live_update):
         queryset = self.get_queryset()
@@ -48,7 +33,7 @@ class StockSecurityManager(SecurityManager):
     def create(self, *args, **kwargs):
         if not 'datasource' in kwargs:
             kwargs['datasource'], _ = AlphaVantageDataSource.objects.get_or_create(symbol=kwargs['symbol'])
-        super().create(*args, **kwargs)
+        return super().create(*args, **kwargs)
 
         def DefaultInit(self):
             self.create(symbol='CAD')
@@ -68,9 +53,7 @@ class CashSecurityManager(SecurityManager):
                     symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
             kwargs['datasource'] = datasource
 
-        cash = super().create(*args, **kwargs)
-        return cash
-
+        return super().create(*args, **kwargs)
 
 class OptionSecurityManager(SecurityManager):
     def get_queryset(self):

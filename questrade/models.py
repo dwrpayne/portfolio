@@ -104,11 +104,11 @@ class QuestradeRawActivity(BaseRawActivity):
         json['qty'] = json['quantity']
         del json['quantity']
 
+        json['cash_id'] = json['currency']
+
         if json['symbol']:
-            try:
-                json['security'] = Security.objects.get(symbol=json['symbol'])
-            except Security.DoesNotExist:
-                json['security'] = Security.objects.CreateStock(json['symbol'], json['currency'])
+            json['security'], _ = Security.objects.get_or_create(symbol=json['symbol'],
+                                                                 defaults={'currency': json['currency']})
         else:
             json['security'] = None
 
@@ -118,20 +118,13 @@ class QuestradeRawActivity(BaseRawActivity):
         json = self.GetCleanedJson()
 
         create_args = {'account': self.account, 'raw': self}
-        for item in ['description', 'tradeDate', 'type', 'security', 'commission']:
+        for item in ['description', 'tradeDate', 'type', 'security', 'commission', 'cash_id']:
             create_args[item] = json[item]
         for item in ['price', 'netAmount', 'qty']:
             create_args[item] = Decimal(str(json[item]))
 
-        create_args['cash_id'] = json['currency']
-
         Activity.objects.create(**create_args)
 
-
-class QuestradeAccountManager(PolymorphicManager):
-    def SyncAllBalances(self):
-        for account in self.get_queryset():
-                account.UpdateSyncedBalances()
 
 class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
@@ -155,9 +148,9 @@ class QuestradeAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 28
 
-    def UpdateSyncedBalances(self):
+    def SyncBalances(self):
         with self.client as c:
-            json = c.GetAccountBalances()
+            json = c.GetAccountBalances(self.id)
             self.curBalanceSynced = sum([
                 Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
                 for entry in json['perCurrencyBalances']

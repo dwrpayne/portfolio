@@ -6,9 +6,9 @@ def SyncSecurityTask(live_update=False):
     Security.objects.Sync(live_update)
 
 @shared_task
-def SyncAccountBalanceTask(force_today=False):
-    from .models import BaseClient
-    BaseClient.objects.SyncAllBalances()
+def SyncAccountBalanceTask():
+    from .models import BaseAccount
+    BaseAccount.objects.SyncAllBalances()
 
 @shared_task
 def LiveSecurityUpdateTask():
@@ -20,8 +20,7 @@ def LiveSecurityUpdateTask():
 @shared_task
 def SyncActivityTask(user=None):
     from .models import BaseAccount
-    for account in BaseAccount.objects.for_user(user):
-        account.SyncAndRegenerate()
+    BaseAccount.objects.SyncActivitiesAndRegenerate(user)
 
 @shared_task
 def DailyUpdateAll():

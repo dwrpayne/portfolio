@@ -66,7 +66,7 @@ class TangerineClient(object):
         }
         return self._api_get('/pfm/v1/transactions?{}'.format(urlencode(params)))
 
-    @tangerine_api_response('token', check_response_status=None)
+    @tangerine_api_response('token', check_response_fn=None)
     def _get_transaction_download_token(self):
         return self._api_get('/v1/customers/my/security/transaction-download-token')
 

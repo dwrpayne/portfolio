@@ -63,6 +63,15 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
         return {p: sum(getattr(a, p) for a in self) for p in properties}
 
 
+class BaseAccountManager(PolymorphicManager):
+    def SyncAllBalances(self):
+        for account in self.get_queryset():
+                account.SyncBalances()
+
+    def SyncActivitiesAndRegenerate(self, user):
+        for account in self.for_user(user):
+                account.SyncAndRegenerate()
+
 class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
     type = models.CharField(max_length=100)
@@ -71,7 +80,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     display_name = models.CharField(max_length=100, editable=False, default='')
     creation_date = models.DateField(default='2009-01-01')
 
-    objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
+    objects = BaseAccountManager.from_queryset(BaseAccountQuerySet)()
 
     class Meta:
         ordering = ['id']
@@ -116,6 +125,9 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             return last_activity + datetime.timedelta(days=1)
         return self.creation_date
 
+    def SyncBalances(self):
+        pass
+
     def SyncAndRegenerate(self):
         """
         Syncs all raw activities for the specified account from our associated client.
@@ -133,7 +145,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             self._RegenerateHoldings()
 
     def _RegenerateActivities(self):
-        self.activities.LiveSecurityUpdateTaskall().delete()
+        self.activities.all().delete()
         with transaction.atomic():
             for raw in self.rawactivities.all():
                 raw.CreateActivity()
@@ -243,10 +255,8 @@ class ManualRawActivity(BaseRawActivity):
     def CreateActivity(self):
         security = None
         if self.symbol:
-            try:
-                security = Security.objects.get(symbol=self.symbol)
-            except Security.DoesNotExist:
-                  security = Security.objects.Create(self.symbol, self.currency)
+            security, _ = Security.objects.get_or_create(symbol=self.symbol,
+                                                         defaults={'currency': self.currency})
 
         commission = 0
         if self.type in [Activity.Type.Buy, Activity.Type.Sell]:
@@ -262,7 +272,7 @@ class ActivityManager(models.Manager):
     def create(self, *args, **kwargs):
         if 'cash_id' in kwargs and not kwargs['cash_id']:
             kwargs['cash_id'] = None
-        super().create(*args, **kwargs)
+        return super().create(*args, **kwargs)
 
     def newest_date(self):
         try:
