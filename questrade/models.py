@@ -2,7 +2,7 @@ import datetime
 import threading
 from decimal import Decimal
 
-import arrow
+import pendulum
 import requests
 import simplejson
 from dateutil import parser
@@ -89,15 +89,11 @@ class QuestradeRawActivity(BaseRawActivity):
 
         if json['action'] == 'FXT':
             if 'AS OF ' in json['description']:
-                tradeDate = arrow.get(json['tradeDate'])
-
-                asof = arrow.get(json['description'].split('AS OF ')[1].split(' ')[0], 'MM/DD/YY')
-                # print("FXT Transaction at {} (asof date: {}). Timedelta is {}".format(tradeDate, asof, tradeDate-asof))
+                tradeDate = pendulum.parse(json['tradeDate'])
+                asof = pendulum.parse(json['description'].split('AS OF ')[1].split(' ')[0], '%m/%d/%y')
                 if (tradeDate - asof).days > 365:
-                    asof = asof.shift(years=+1)
-
-                json['tradeDate'] = tradeDate.replace(
-                    year=asof.year, month=asof.month, day=asof.day).isoformat()
+                    asof = asof.add(years=1)
+                json['tradeDate'] = asof.isoformat()
 
         json['tradeDate'] = str(parser.parse(json['tradeDate']).date())
         json['type'] = QuestradeActivityType.objects.GetActivityType(json['type'], json['action'])
