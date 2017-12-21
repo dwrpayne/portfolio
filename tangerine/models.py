@@ -7,7 +7,6 @@ from dateutil import parser
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
 from securities.models import Security
 
-
 class TangerineRawActivity(BaseRawActivity):
     day = models.DateField()
     description = models.CharField(max_length=1000)

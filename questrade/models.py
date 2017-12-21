@@ -8,6 +8,7 @@ import simplejson
 from dateutil import parser
 from django.db import models
 from django.utils import timezone
+from polymorphic.manager import PolymorphicManager
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
@@ -41,6 +42,7 @@ class QuestradeRawActivity(BaseRawActivity):
     @classmethod
     def AllowDuplicate(cls, s):
         # Hack to support actual duplicate transactions (no disambiguation available)
+        # TODO: This should go in the database... somehow...
         return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
 
     @classmethod
@@ -68,7 +70,7 @@ class QuestradeRawActivity(BaseRawActivity):
             # Questrade options have price per share not per option.
             json['price'] *= security.price_multiplier
 
-        # Hack to fix invalid Questrade data just for me
+        # TODO: This should be in a database table for sure.
         if not json['symbol']:
             if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol'] = 'XIU.TO'
             elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol'] = 'VUG'
@@ -126,6 +128,11 @@ class QuestradeRawActivity(BaseRawActivity):
         Activity.objects.create(**create_args)
 
 
+class QuestradeAccountManager(PolymorphicManager):
+    def SyncAllBalances(self):
+        for account in self.get_queryset():
+                account.UpdateSyncedBalances()
+
 class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
@@ -148,18 +155,18 @@ class QuestradeAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 28
 
-    def UpdateSyncedBalances(self, json):
-        current = sum([
-            Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
-            for entry in json['perCurrencyBalances']
-        ])
-        sod = sum([
-            Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
-            for entry in json['sodPerCurrencyBalances']
-        ])
-        self.curBalanceSynced = current
-        self.sodBalanceSynced = sod
-        self.save()
+    def UpdateSyncedBalances(self):
+        with self.client as c:
+            json = c.GetAccountBalances()
+            self.curBalanceSynced = sum([
+                Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
+                for entry in json['perCurrencyBalances']
+            ])
+            self.sodBalanceSynced = sum([
+                Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
+                for entry in json['sodPerCurrencyBalances']
+            ])
+            self.save()
 
 
 class QuestradeClient(BaseClient):
@@ -218,13 +225,14 @@ class QuestradeClient(BaseClient):
     def GetAccounts(self):
         return self._GetRequest('accounts')
 
+    @api_response()
+    def GetAccountBalances(self, id):
+        return self._GetRequest('accounts/{}/balances'.format(id))
+
     def SyncAccounts(self):
-        try:
-            for account_json in self.GetAccounts():
-                QuestradeAccount.objects.get_or_create(
-                    type=account_json['type'], id=account_json['number'], client=self, defaults={'taxable' : False})
-        except requests.exceptions.HTTPError:
-            print("Couldn't sync accounts - possible server failure?")
+        for account_json in self.GetAccounts():
+            QuestradeAccount.objects.get_or_create(
+                type=account_json['type'], id=account_json['number'], client=self)
 
     def CreateRawActivities(self, account, start, end):
         end = end.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -240,10 +248,3 @@ class QuestradeClient(BaseClient):
                 count += 1
         return count
 
-    def SyncCurrentAccountBalances(self):
-        for a in self.accounts.all():
-            try:
-                json = self._GetRequest('accounts/{}/balances'.format(a.id))
-                a.UpdateSyncedBalances(json)
-            except requests.exceptions.HTTPError as ex:
-                print("Failed to connect to Questrade server: {}".format(ex))

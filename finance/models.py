@@ -14,24 +14,10 @@ import utils.dates
 from utils.misc import plotly_iframe_from_url
 from securities.models import Security, SecurityPriceDetail
 
-
-
-class BaseClientManager(PolymorphicManager):
-    def SyncAllBalances(self):
-        for client in self.get_queryset().all():
-            try:
-                with client:
-                    client.SyncCurrentAccountBalances()
-            except ConnectionError:
-                print("Perhaps the server is down.")
-
-
 class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='clients')
     display_name = models.CharField(max_length=100, null=True)
-
-    objects = BaseClientManager()
 
     def __str__(self):
         return "{}".format(self.display_name)
@@ -66,9 +52,6 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
         Return the number of new raw activities created.
         """
         return 0
-
-    def SyncCurrentAccountBalances(self):
-        pass
 
 
 class BaseAccountQuerySet(PolymorphicQuerySet):

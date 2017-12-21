@@ -11,6 +11,14 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_LOCALE = 'en_CA'
 
+import functools
+from utils.api import APIResponseError, api_response
+
+def valid_tangerine_response(json):
+    return json['response_status']['status_code'] == 'SUCCESS'
+
+tangerine_api_response = functools.partial(api_response, check_response_fn=valid_tangerine_response)
+
 
 class TangerineClient(object):
     def __init__(self, secret_provider, session=None, locale=DEFAULT_LOCALE):
@@ -35,19 +43,19 @@ class TangerineClient(object):
         finally:
             self.login_flow.end()
 
-    @api_response('customer')
+    @tangerine_api_response('customer')
     def me(self):
         return self._api_get('/v1/customers/my')
 
-    @api_response('accounts')
+    @tangerine_api_response('accounts')
     def list_accounts(self):
         return self._api_get('/pfm/v1/accounts')
 
-    @api_response('account_summary')
+    @tangerine_api_response('account_summary')
     def get_account(self, account_id: str):
         return self._api_get('/v1/accounts/{}?billing-cycle-ranges=true'.format(account_id))
 
-    @api_response('transactions')
+    @tangerine_api_response('transactions')
     def list_transactions(self, account_ids: list, period_from: datetime.date, period_to: datetime.date):
         params = {
             'accountIdentifiers': ','.join(account_ids),
@@ -58,7 +66,7 @@ class TangerineClient(object):
         }
         return self._api_get('/pfm/v1/transactions?{}'.format(urlencode(params)))
 
-    @api_response('token', check_response_status=False)
+    @tangerine_api_response('token', check_response_status=None)
     def _get_transaction_download_token(self):
         return self._api_get('/v1/customers/my/security/transaction-download-token')
 
