@@ -61,14 +61,14 @@ class GrsRawActivity(BaseRawActivity):
         return 'GrsRawActivity<{},{},{},{},{}>'.format(self.account, self.day, self.symbol, self.qty, self.price)
 
     def CreateActivity(self):
-        try:
-            security = Security.mutualfunds.get(symbol=self.symbol)
-        except Security.DoesNotExist:
+        security, created = Security.mutualfunds.get_or_create(symbol=self.symbol,
+                                           defaults={'currency':'CAD', 'datasource': None})
+        if created:
             datasource = GrsDataSource.objects.get_or_create(symbol=self.symbol)
-            security = Security.mutualfunds.Create(self.symbol, 'CAD', datasource=datasource)
+            security.datasource = datasource
+            security.save()
 
         total_cost = self.qty * self.price
-
         Activity.objects.create_with_deposit(account=self.account, tradeDate=self.day, security=security,
                                 cash_id=security.currency,
                                 description=self.description, qty=self.qty, raw=self,

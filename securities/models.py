@@ -33,6 +33,7 @@ class StockSecurityManager(SecurityManager):
     def create(self, *args, **kwargs):
         if not 'datasource' in kwargs:
             kwargs['datasource'], _ = AlphaVantageDataSource.objects.get_or_create(symbol=kwargs['symbol'])
+        kwargs['type'] = Security.Type.Stock
         return super().create(*args, **kwargs)
 
         def DefaultInit(self):
@@ -52,7 +53,7 @@ class CashSecurityManager(SecurityManager):
                 datasource, _ = PandasDataSource.objects.get_or_create(
                     symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
             kwargs['datasource'] = datasource
-
+        kwargs['type'] = Security.Type.Cash
         return super().create(*args, **kwargs)
 
 class OptionSecurityManager(SecurityManager):
@@ -73,7 +74,7 @@ class OptionSecurityManager(SecurityManager):
             type = self.model.Type.OptionMini
         optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
             '%y%m%d'), callput[0], Decimal(strike) * 1000)
-        option, created = super().get_or_create(
+        option, _ = super().get_or_create(
             symbol=optsymbol,
             defaults={
                 'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike,
@@ -89,15 +90,11 @@ class MutualFundSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type=Security.Type.MutualFund)
 
-    def Create(self, symbol, currency_str, datasource=None):
-        if not datasource:
-            datasource, _ = MorningstarDataSource.objects.get_or_create(symbol=symbol)
-        return super().create(
-            symbol=symbol,
-            type=self.model.Type.MutualFund,
-            currency=currency_str,
-            datasource=datasource
-        )
+    def create(self, *args, **kwargs):
+        if not 'datasource' in kwargs:
+            kwargs['datasource'], _ = MorningstarDataSource.objects.get_or_create(symbol=kwargs['symbol'])
+        kwargs['type'] = Security.Type.MutualFund
+        return super().create(*args, **kwargs)
 
 class Security(models.Model):
     Type = Choices('Stock', 'Option', 'OptionMini', 'Cash', 'MutualFund')
