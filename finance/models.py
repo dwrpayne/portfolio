@@ -3,6 +3,7 @@ import requests
 from django.conf import settings
 from django.db import models, transaction, connection
 from django.db.models import Sum
+from django.utils.functional import cached_property
 from model_utils import Choices
 from polymorphic.manager import PolymorphicManager
 from polymorphic.models import PolymorphicModel
@@ -51,7 +52,7 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     def CloseSession(self):
         pass
 
-    @property
+    @cached_property
     def currentSecurities(self):
         return Security.objects.filter(holdings__account__client=self, holdings__enddate=None).distinct()
 
@@ -102,22 +103,22 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         self.display_name = "{} {}".format(self.client, self.type)
         super().save(*args, **kwargs)
 
-    @property
+    @cached_property
     def cur_cash_balance(self):
         query = self.holdingdetail_set.cash().today().total_values()
         if query:
             return query.first()[1]
         return 0
 
-    @property
+    @cached_property
     def cur_balance(self):
         return self.GetValueToday()
 
-    @property
+    @cached_property
     def yesterday_balance(self):
         return self.GetValueAtDate(datetime.date.today() - datetime.timedelta(days=1))
 
-    @property
+    @cached_property
     def today_balance_change(self):
         return self.cur_balance - self.yesterday_balance
 
@@ -125,7 +126,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def activitySyncDateRange(self):
         return 30
 
-    @property
+    @cached_property
     def sync_from_date(self):
         last_activity = self.activities.newest_date()
         if last_activity:
