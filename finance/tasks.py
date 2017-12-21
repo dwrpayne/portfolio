@@ -14,8 +14,8 @@ def SyncAccountBalanceTask():
 def LiveSecurityUpdateTask():
     from .models import HoldingDetail
     SyncSecurityTask(live_update=True)
-    SyncAccountBalanceTask()
     HoldingDetail.Refresh()
+    SyncAccountBalanceTask()
 
 @shared_task
 def SyncActivityTask(user=None):
@@ -27,5 +27,5 @@ def DailyUpdateAll():
     from .models import HoldingDetail
     SyncActivityTask()
     SyncSecurityTask()
-    SyncAccountBalanceTask()
     HoldingDetail.Refresh()
+    SyncAccountBalanceTask()

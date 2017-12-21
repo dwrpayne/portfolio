@@ -374,8 +374,8 @@ class UserProfile(models.Model):
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
 
     def GetHeldSecurities(self):
-        return Holding.objects.for_user(self.user
-                                        ).current().values_list('security_id', flat=True).distinct()
+        return Holding.objects.for_user(
+            self.user).current().values_list('security_id', flat=True).distinct()
 
     def GetTaxableSecurities(self):
         return Holding.objects.filter(

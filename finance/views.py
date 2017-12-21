@@ -198,9 +198,8 @@ def index(request):
     context = {}
     last_update_days = SecurityPrice.objects.filter(
         day__gt=datetime.date.today() - datetime.timedelta(days=30)
-    ).order_by('security', '-day').distinct('security').filter(
-        security__holdings__enddate=None, security__holdings__account__client__user=request.user
-    ).values_list('day', flat=True)
+    ).filter(security__in=request.user.userprofile.GetHeldSecurities()).order_by('security','-day').distinct(
+        'security').values_list('day', flat=True)
     if any(day < datetime.date.today() for day in last_update_days):
         context['updating'] = True
         LiveSecurityUpdateTask.delay()
