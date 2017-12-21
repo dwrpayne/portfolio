@@ -272,6 +272,11 @@ class ActivityManager(models.Manager):
     def create(self, *args, **kwargs):
         if 'cash_id' in kwargs and not kwargs['cash_id']:
             kwargs['cash_id'] = None
+
+        # These types don't affect cash balance.
+        if kwargs['type'] in [Activity.Type.Expiry, Activity.Type.Journal]:
+            kwargs['cash_id'] = None
+
         return super().create(*args, **kwargs)
 
     def newest_date(self):
@@ -345,19 +350,11 @@ class Activity(models.Model):
     def GetHoldingEffects(self):
         """Yields a (security, amount) for each security that is affected by this activity."""
         """Generates a dict {security:amount, ...}"""
-        if self.type in [Activity.Type.Buy, Activity.Type.Sell, Activity.Type.Deposit, Activity.Type.Withdrawal]:
-            yield self.security, self.qty
-            if self.cash:
-                yield self.cash, self.netAmount
-
-        elif self.type in [Activity.Type.Transfer, Activity.Type.Dividend, Activity.Type.Fee, Activity.Type.Interest,
-                           Activity.Type.FX]:
+        if self.cash:
             yield self.cash, self.netAmount
 
-        elif self.type in [Activity.Type.Expiry, Activity.Type.Journal]:
+        if self.security and self.type != Activity.Type.Dividend:
             yield self.security, self.qty
-
-        return
 
 
 class Allocation(models.Model):

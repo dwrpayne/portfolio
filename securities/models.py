@@ -95,6 +95,7 @@ class MutualFundSecurityManager(SecurityManager):
             kwargs['datasource'], _ = MorningstarDataSource.objects.get_or_create(symbol=kwargs['symbol'])
         kwargs['type'] = Security.Type.MutualFund
         return super().create(*args, **kwargs)
+    
 
 class Security(models.Model):
     Type = Choices('Stock', 'Option', 'OptionMini', 'Cash', 'MutualFund')

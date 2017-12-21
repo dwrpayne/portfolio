@@ -143,7 +143,7 @@ def securitydetail(request, symbol):
     security = Security.objects.get(symbol=symbol)
     filename = GenerateSecurityPlot(security)
     iframe = plotly_iframe_from_url(filename)
-    activities = reversed(list(security.activities.filter(account__client__user=request.user)))
+    activities = reversed(list(security.activities.for_user(request.user)))
 
     context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}
     return render(request, 'finance/security.html', context)
@@ -151,6 +151,7 @@ def securitydetail(request, symbol):
 
 @login_required
 def capgains(request, symbol):
+    # TODO: Capital gains report is completely broken with the Dec 13 Security/Cash refactor.
     security = Security.objects.get(symbol=symbol)
     activities = security.activities.for_user(request.user).taxable().without_dividends().annotate(
         exch=Sum(F('security__currency__rates__price')))
