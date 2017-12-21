@@ -16,8 +16,10 @@ from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
 
 def GetHoldingsContext(user):
-    holdings_query = HoldingDetail.objects.for_user(user).at_dates(
-        datetime.date.today() - datetime.timedelta(days=1))
+    holdings_query = HoldingDetail.objects.for_user(user).date_range(
+        datetime.date.today() - datetime.timedelta(days=1),
+        datetime.date.today()
+    )
 
     total_vals = holdings_query.total_values()
     (_, yesterday_value), (_, today_value) = total_vals

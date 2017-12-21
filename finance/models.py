@@ -149,7 +149,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             self._RegenerateHoldings()
 
     def _RegenerateActivities(self):
-        self.activities.all().delete()
+        self.activities.LiveSecurityUpdateTaskall().delete()
         with transaction.atomic():
             for raw in self.rawactivities.all():
                 raw.CreateActivity()
@@ -411,7 +411,7 @@ class HoldingDetailQuerySet(models.query.QuerySet):
     def at_date(self, date):
         return self.filter(day=date)
 
-    def at_dates(self, startdate, enddate=datetime.date.today()):
+    def date_range(self, startdate, enddate):
         return self.filter(day__range=(startdate, enddate))
 
     def today(self):

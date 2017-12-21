@@ -33,9 +33,12 @@ class SecurityManager(models.Manager):
             currency=currency
         )
 
-    def Sync(self):
-        for security in self.get_queryset():
-            security.SyncRates()
+    def Sync(self, live_update):
+        queryset = self.get_queryset()
+        if live_update:
+            queryset = queryset.filter(holdings__enddate__isnull=True).distinct()
+        for security in queryset:
+            security.SyncRates(live_update)
 
             #TODO USD live sync hack
             if security.symbol == 'USD':
@@ -166,7 +169,7 @@ class Security(models.Model):
         if self.type == self.Type.OptionMini:
             return 10
 
-    def GetShouldSyncRange(self):
+    def GetShouldSyncRange(self, force_today):
         """ Returns a pair (start,end) of datetime.dates that need to be synced."""
         try:
             earliest = self.prices.earliest().day
@@ -177,7 +180,7 @@ class Security(models.Model):
         if earliest > self.earliest_price_needed:
             return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed
 
-        if latest < self.latest_price_needed:
+        if latest < self.latest_price_needed or force_today:
             return latest - datetime.timedelta(days=7), self.latest_price_needed
 
         return None, None
@@ -200,8 +203,8 @@ class Security(models.Model):
         except SecurityPrice.DoesNotExist:
             return 0
 
-    def SyncRates(self):
-        start, end = self.GetShouldSyncRange()
+    def SyncRates(self, force_today=False):
+        start, end = self.GetShouldSyncRange(force_today)
         if start is None:
             return []
 
