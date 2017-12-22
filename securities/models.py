@@ -6,7 +6,8 @@ from django.db import models, transaction, connection
 from django.utils.functional import cached_property
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
-    MorningstarDataSource, StartEndDataSource, GetLiveAlphaVantageExchangeRate
+    MorningstarDataSource, StartEndDataSource
+from datasource.services import GetLiveAlphaVantageExchangeRate
 
 import requests
 from model_utils import Choices
