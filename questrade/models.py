@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pendulum
 import requests
-import simplejson
+from json import dumps, loads, JSONDecodeError
 from dateutil import parser
 from django.db import models
 from django.utils import timezone
@@ -48,7 +48,7 @@ class QuestradeRawActivity(BaseRawActivity):
     @classmethod
     def Add(cls, json, account):
         """ Returns true if we added a new activity to the DB, false if it already existed. """
-        s = simplejson.dumps(json)
+        s = dumps(json)
         obj, created = QuestradeRawActivity.objects.get_or_create(jsonstr=s, account=account)
         if not created and cls.AllowDuplicate(s):
             s = s.replace('YOUR ACCOUNT   ', 'YOUR ACCOUNT X2')
@@ -58,7 +58,7 @@ class QuestradeRawActivity(BaseRawActivity):
         return created
 
     def GetCleanedJson(self):
-        json = simplejson.loads(self.jsonstr)
+        json = loads(self.jsonstr)
 
         # Handle Options cleanup
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
@@ -193,7 +193,7 @@ class QuestradeClient(BaseClient):
                     self.token_expiry = timezone.now() + datetime.timedelta(seconds=json['expires_in'])
                     # Make sure to save out to DB
                     self.save()
-                except simplejson.errors.JSONDecodeError:
+                except JSONDecodeError:
                     print("Failed to get a valid Questrade access token for {}.".format(self))
                     raise ConnectionError()
 
@@ -230,7 +230,7 @@ class QuestradeClient(BaseClient):
                                     {'startTime': start.isoformat(), 'endTime': end.isoformat()})
         except:
             return 0
-        print("Get activities from source returned: " + simplejson.dumps(json))
+        print("Get activities from source returned: " + dumps(json))
         count = 0
         for activity_json in json['activities']:
             if QuestradeRawActivity.Add(activity_json, account):

@@ -87,7 +87,6 @@ TEMPLATES = [
 SHELL_PLUS_PRE_IMPORTS = [
     'datetime',
     'pendulum',
-    'simplejson',
     'pandas',
     'plotly',
     ('plotly', 'graph_objs'),
