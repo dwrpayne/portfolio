@@ -1,4 +1,5 @@
 import datetime
+import pendulum
 from itertools import accumulate
 from decimal import Decimal
 from django.conf import settings
@@ -486,11 +487,10 @@ class UserProfile(models.Model):
         return xirr(zip(all_dates, all_values))
 
     def AllRatesOfReturn(self):
-        import arrow
-        start = self.GetInceptionDate().shift(days=1)
-        for end in arrow.Arrow.range('week', arrow.get(start).shift(days=1), arrow.now()):
-            end_date = end._datetime.date()
-            print(end_date, self.RateOfReturn(start, end_date))
+        start = pendulum.Date.instance(self.GetInceptionDate()).add(days=1)
+        period = pendulum.today().date() - pendulum.Date.instance(self.GetInceptionDate())
+        for day in period:
+            yield day, self.RateOfReturn(start, day)
 
     def GetInceptionDate(self):
         return self.GetActivities().earliest().tradeDate
