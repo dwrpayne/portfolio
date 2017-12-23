@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "d4eed702a66844b79e67c25e99ab822e4cf014c96d17617fdb606d79ca3d41e3"
+            "sha256": "1ff1a92119afab25fc7235aa5f890addb024ce583a5fa49a24f933ceaa02eff1"
         },
         "host-environment-markers": {
             "implementation_name": "cpython",
@@ -33,10 +33,6 @@
                 "sha256:cba1ace9d4ff6049b190d8b7991f9c1006b443a5238021aca96dd6ad2ac9da22"
             ],
             "version": "==2.2.2"
-        },
-        "arrow": {
-            "git": "https://github.com/dwrpayne/arrow.git",
-            "ref": "interval_fix"
         },
         "beautifulsoup4": {
             "hashes": [
@@ -284,17 +280,8 @@
             "ref": "bankofcanada"
         },
         "pendulum": {
-            "hashes": [
-                "sha256:44ed222f2bcbbda64a4a9f7503bfbb7c539420f0a163a007c92cea9878d60dea",
-                "sha256:44361188a07f76a26dc1ea41fb20746723db17951d525617ae0db4a256d3ca32",
-                "sha256:6eefa306dd3c9bf3ec6058fb7042877d0d7a12343925b67b62e6259a2541b899",
-                "sha256:e2cad79f49134d743024f9d59b71224117d2712350cf601c6e93c8be84a1c82b",
-                "sha256:aebffa08eefa3a4b9872dc1be87d5801a30604cde8dd7e25c9ec70ad2328e188",
-                "sha256:0bdeba610b66c4674764efa090088ce9a8bae780d8600e22ec55c4a4d01c01b5",
-                "sha256:beffaba5b2f5d22b1384062e4c4b0d6f710da225c8f43c1f03734c5e9d3bdfbb",
-                "sha256:9284b53fd013dc4357644009b8d055a32c8bbbdf20fb95bc338d70089b6ed0c8"
-            ],
-            "version": "==1.3.2"
+            "git": "https://github.com/dwrpayne/pendulum.git",
+            "ref": "split"
         },
         "plotly": {
             "hashes": [
@@ -359,13 +346,6 @@
             ],
             "version": "==2017.3"
         },
-        "pytzdata": {
-            "hashes": [
-                "sha256:cd5b72400a7378b3b45eef5929cbe97ed44c3368685c35c477e316ebaa7e1809",
-                "sha256:e87376f2ee7cb89af5ddea5ed07ce3e98a55f891d07ae87d8c49e99f069423f2"
-            ],
-            "version": "==2017.3.1"
-        },
         "requests": {
             "hashes": [
                 "sha256:6a1b267aa90cac58ac3a765d067950e7dbbf75b1da07e895d1f594193a40a38b",
@@ -401,12 +381,6 @@
                 "sha256:d514bd84b284dd3e844f0305ac07511f097e325171f6cc4a20878d11ad771849"
             ],
             "version": "==3.6.2"
-        },
-        "tzlocal": {
-            "hashes": [
-                "sha256:4ebeb848845ac898da6519b9b31879cf13b6626f7184c496037b818e238f2c4e"
-            ],
-            "version": "==1.5.1"
         },
         "urllib3": {
             "hashes": [

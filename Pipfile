@@ -20,12 +20,11 @@ django_celery_results = "*"
 django_celery_beat = "*"
 "psycopg2" = "*"
 django-model-utils = "*"
-arrow = {git = "https://github.com/dwrpayne/arrow.git", ref = "interval_fix"}
 "beautifulsoup4" = "*"
 Werkzeug = "*"
 django-debug-toolbar = "*"
 eventlet = "*"
-pendulum = "*"
+pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
 pandas-datareader = {git = "https://github.com/dwrpayne/pandas-datareader.git", ref = "bankofcanada"}
 
 
