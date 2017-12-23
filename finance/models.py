@@ -2,7 +2,7 @@ import datetime
 import requests
 from django.conf import settings
 from django.db import models, transaction, connection
-from django.db.models import Sum
+from django.db.models import F, Sum
 from django.utils.functional import cached_property
 from model_utils import Choices
 from polymorphic.manager import PolymorphicManager
@@ -58,15 +58,14 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
         properties = ['cur_balance', 'cur_cash_balance', 'yesterday_balance', 'today_balance_change']
         return {p: sum(getattr(a, p) for a in self) for p in properties}
 
-
-class BaseAccountManager(PolymorphicManager):
     def SyncAllBalances(self):
-        for account in self.get_queryset():
-                account.SyncBalances()
+        for account in self:
+            account.SyncBalances()
 
-    def SyncActivitiesAndRegenerate(self, user):
-        for account in self.for_user(user):
-                account.SyncAndRegenerate()
+    def SyncAllActivitiesAndRegenerate(self):
+        for account in self:
+            account.SyncAndRegenerate()
+
 
 class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
@@ -76,7 +75,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     display_name = models.CharField(max_length=100, editable=False, default='')
     creation_date = models.DateField(default='2009-01-01')
 
-    objects = BaseAccountManager.from_queryset(BaseAccountQuerySet)()
+    objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
 
     class Meta:
         ordering = ['id']
@@ -308,6 +307,15 @@ class ActivityQuerySet(models.query.QuerySet):
     def without_dividends(self):
         return self.exclude(type=Activity.Type.Dividend)
 
+    def for_security(self, symbol):
+        return self.filter(security_id=symbol)
+
+    def with_cadprices(self):
+        return self.filter(
+            tradeDate=F('security__pricedetails__day')).annotate(
+            cadprice=Sum(F('security__pricedetails__cadprice'))
+        )
+
 
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
@@ -373,6 +381,10 @@ class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
 
+    @property
+    def username(self):
+        return self.user.username
+
     def GetHeldSecurities(self):
         return Holding.objects.for_user(
             self.user).current().values_list('security_id', flat=True).distinct()
@@ -383,8 +395,25 @@ class UserProfile(models.Model):
         ).exclude(security__type=Security.Type.Cash
                   ).for_user(self.user).current().values_list('security_id', flat=True).distinct()
 
+    def GetHoldingDetails(self):
+        return HoldingDetail.objects.for_user(self.user)
+
     def GetAccounts(self):
-        return BaseAccount.objects.filter(client__user=self.user)
+        return BaseAccount.objects.for_user(self.user)
+
+    def GetAccount(self, account_id):
+        return self.GetAccounts().get(id=account_id)
+
+    def GetActivities(self):
+        return Activity.objects.for_user(self.user)
+
+    def GetAllocations(self):
+        return self.user.allocations.all()
+
+    def AreSecurityPricesUpToDate(self):
+        securities = self.GetHeldSecurities()
+        prices = SecurityPriceDetail.objects.for_securities(securities).today()
+        return securities.count() == prices.count()
 
     @property
     def portfolio_iframe(self):

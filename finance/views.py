@@ -10,13 +10,13 @@ from django.shortcuts import redirect, render
 
 from utils.misc import plotly_iframe_from_url
 from .models import BaseAccount, HoldingDetail
-from securities.models import Security, SecurityPrice, SecurityPriceDetail
+from securities.models import Security, SecurityPriceDetail
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
 
-def GetHoldingsContext(user):
-    holdings_query = HoldingDetail.objects.for_user(user).date_range(
+def GetHoldingsContext(userprofile):
+    holdings_query = userprofile.GetHoldingDetails().date_range(
         datetime.date.today() - datetime.timedelta(days=1),
         datetime.date.today()
     )
@@ -50,8 +50,8 @@ def GetHoldingsContext(user):
     return context
 
 
-def GetBalanceContext(user):
-    accounts = BaseAccount.objects.for_user(user)
+def GetBalanceContext(userprofile):
+    accounts = userprofile.GetAccounts()
     if not accounts.exists():
         return {}
 
@@ -65,27 +65,28 @@ def GetBalanceContext(user):
 
 @login_required
 def Portfolio(request):
-    if not request.user.userprofile.portfolio_iframe:
-        GeneratePlot(request.user)
+    userprofile = request.user.userprofile
+    if not userprofile.portfolio_iframe:
+        GeneratePlot(userprofile)
 
     if request.is_ajax():
         if 'refresh-live' in request.GET:
             LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
-            GeneratePlot(request.user)
+            GeneratePlot(userprofile)
 
         elif 'refresh-account' in request.GET:
-            SyncActivityTask(request.user)
+            SyncActivityTask(userprofile)
             LiveSecurityUpdateTask()
 
-    overall_context = {**GetHoldingsContext(request.user), **GetBalanceContext(request.user)}
+    overall_context = {**GetHoldingsContext(userprofile), **GetBalanceContext(userprofile)}
     return render(request, 'finance/portfolio.html', overall_context)
 
 
 @login_required
 def History(request, period):
-    holdings = HoldingDetail.objects.for_user(request.user)
+    holdings = request.user.userprofile.GetHoldingDetails()
     if period == 'year':
         holdings = holdings.year_end()
     elif period == 'month':
@@ -108,7 +109,7 @@ def History(request, period):
 
 @login_required
 def Rebalance(request):
-    allocs, missing = GetRebalanceInfo(request.user)
+    allocs, missing = GetRebalanceInfo(request.user.userprofile)
 
     total = [sum(a.desired_pct for a in allocs),
              sum(a.current_pct for a in allocs) + sum(s['current_pct'] for s in missing),
@@ -128,12 +129,8 @@ def Rebalance(request):
 
 @login_required
 def accountdetail(request, account_id):
-    account = BaseAccount.objects.get(id=account_id)
-    if not account.client.user == request.user:
-        return HttpResponse('Unauthorized', status=401)
-
+    account = request.user.userprofile.GetAccount(account_id)
     activities = reversed(list(account.activities.all()))
-
     context = {'account': account, 'activities': activities}
     return render(request, 'finance/account.html', context)
 
@@ -143,7 +140,7 @@ def securitydetail(request, symbol):
     security = Security.objects.get(symbol=symbol)
     filename = GenerateSecurityPlot(security)
     iframe = plotly_iframe_from_url(filename)
-    activities = reversed(list(security.activities.for_user(request.user)))
+    activities = request.user.userprofile.GetActivities().for_security(symbol)
 
     context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}
     return render(request, 'finance/security.html', context)
@@ -151,20 +148,13 @@ def securitydetail(request, symbol):
 
 @login_required
 def capgains(request, symbol):
-    # TODO: Capital gains report is completely broken with the Dec 13 Security/Cash refactor.
     security = Security.objects.get(symbol=symbol)
-    activities = security.activities.for_user(request.user).taxable().without_dividends().filter(
-        tradeDate=F('security__securitypricedetail__day')).annotate(
-        cadprice=Sum(F('security__securitypricedetail__cadprice'))
-    )
+    activities = request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_cadprices()
 
     totalqty = Decimal(0)
     totalacb = Decimal(0)
     activities = list(activities)
     for act in activities:
-        if not act.cadprice:
-            act.cadprice = act.security.GetPriceCAD(act.tradeDate)
-
         prevacbpershare = totalacb / totalqty if totalqty else 0
 
         act.capgain = 0
@@ -187,7 +177,7 @@ def capgains(request, symbol):
         act.totalacb = totalacb
         act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
 
-    pendinggain = SecurityPriceDetail.objects.filter(security=security).latest().cadprice * totalqty - totalacb
+    pendinggain = security.pricedetails.latest().cadprice * totalqty - totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/capgains.html', context)
@@ -196,11 +186,7 @@ def capgains(request, symbol):
 @login_required
 def index(request):
     context = {}
-    last_update_days = SecurityPrice.objects.filter(
-        day__gt=datetime.date.today() - datetime.timedelta(days=30)
-    ).filter(security__in=request.user.userprofile.GetHeldSecurities()).order_by('security','-day').distinct(
-        'security').values_list('day', flat=True)
-    if any(day < datetime.date.today() for day in last_update_days):
+    if not request.user.userprofile.AreSecurityPricesUpToDate():
         context['updating'] = True
         LiveSecurityUpdateTask.delay()
 

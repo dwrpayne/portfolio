@@ -207,6 +207,19 @@ class SecurityPriceQuerySet(models.query.QuerySet):
     def today(self):
         return self.filter(day=datetime.date.today())
 
+    def after(self, start):
+        return self.filter(day__gte=start)
+
+    def before(self, end):
+        return self.filter(day__lte=end)
+
+    def between(self, start, end):
+        return self.after(start).before(end)
+
+    def for_securities(self, security_iter):
+        return self.filter(security__in=security_iter)
+
+
 
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='prices')
@@ -227,13 +240,19 @@ class SecurityPrice(models.Model):
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
 
+class SecurityPriceDetailQuerySet(SecurityPriceQuerySet):
+    pass
+
 class SecurityPriceDetail(models.Model):
-    security = models.ForeignKey(Security, on_delete=models.DO_NOTHING)
+    security = models.ForeignKey(Security, on_delete=models.DO_NOTHING, related_name='pricedetails')
     day = models.DateField()
     price = models.DecimalField(max_digits=16, decimal_places=6)
     exch = models.DecimalField(max_digits=16, decimal_places=6)
     cadprice = models.DecimalField(max_digits=16, decimal_places=6)
     type = models.CharField(max_length=100)
+
+    objects = SecurityPriceDetailQuerySet.as_manager()
+
 
     @classmethod
     def CreateView(cls, drop_cascading=False):

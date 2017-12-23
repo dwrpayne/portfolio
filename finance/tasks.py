@@ -18,9 +18,10 @@ def LiveSecurityUpdateTask():
     SyncAccountBalanceTask()
 
 @shared_task
-def SyncActivityTask(user=None):
+def SyncActivityTask(userprofile=None):
     from .models import BaseAccount
-    BaseAccount.objects.SyncActivitiesAndRegenerate(user)
+    accounts = userprofile.GetAccounts() if userprofile else BaseAccount.objects.all()
+    accounts.SyncAllActivitiesAndRegenerate()
 
 @shared_task
 def DailyUpdateAll():

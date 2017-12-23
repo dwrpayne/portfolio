@@ -1,19 +1,19 @@
 from itertools import accumulate
-
+import datetime
 import plotly
 import plotly.graph_objs as go
 from django.db.models import Sum
 from django.db.models.functions import ExtractYear
 
 from utils.misc import find_le_index
-from .models import Activity, HoldingDetail
+from .models import Activity, HoldingDetail, SecurityPriceDetail
 
 
-def GetRebalanceInfo(user):
-    holdings = HoldingDetail.objects.for_user(user).today().by_security()
+def GetRebalanceInfo(userprofile):
+    holdings = userprofile.GetHoldingDetails().today().by_security()
     total_value = sum(h['total_val'] for h in holdings)
 
-    allocs = user.allocations.all()
+    allocs = userprofile.GetAllocations()
     for alloc in allocs:
         alloc.current_amt = holdings.filter(
             security__in=alloc.securities.all()).aggregate(
@@ -30,7 +30,7 @@ def GetRebalanceInfo(user):
 
 
 def GenerateSecurityPlot(security):
-    pairs = security.securitypricedetail_set.values_list('day', 'cadprice')
+    pairs = security.pricedetails.values_list('day', 'cadprice')
     dates, vals = list(zip(*pairs))
 
     filename = 'security-values-{}'.format(security.symbol)
@@ -42,14 +42,14 @@ def GenerateSecurityPlot(security):
     return plotly_url
 
 
-def GeneratePlot(user):
+def GeneratePlot(userprofile):
     traces = []
 
-    pairs = HoldingDetail.objects.for_user(user).week_end().total_values()
+    pairs = userprofile.GetHoldingDetails.week_end().total_values()
     dates, vals = list(zip(*pairs))
     traces.append(go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers'))
 
-    deposits = Activity.objects.for_user(user).deposits().values_list('tradeDate', 'netAmount')
+    deposits = userprofile.GetActivities.deposits().values_list('tradeDate', 'netAmount')
     deposit_dates, amounts = list(zip(*list(deposits)))
     running_deposits = list(accumulate(amounts))
     traces.append(go.Scatter(name='Deposits', x=deposit_dates, y=running_deposits, mode='lines+markers'))
@@ -76,11 +76,17 @@ def GeneratePlot(user):
     traces.append(go.Scatter(name='Growth', x=dates, y=growth_vals, mode='lines+markers'))
 
     plotly_url = plotly.plotly.plot(
-        traces, filename='portfolio-values-short-{}'.format(user.username), auto_open=False)
-    user.userprofile.plotly_url = plotly_url
-    user.userprofile.save()
+        traces, filename='portfolio-values-short-{}'.format(userprofile.username), auto_open=False)
+    userprofile.plotly_url = plotly_url
+    userprofile.save()
 
-def GetCommissionByYear(user):
-    return dict(Activity.objects.for_user(user).annotate(
+def GetCommissionByYear(userprofile):
+    return dict(userprofile.GetActivities().annotate(
         year=ExtractYear('tradeDate')
     ).order_by().values('year').annotate(c=Sum('commission')).values_list('year', 'c'))
+
+def GetLastUserUpdateDay(userprofile):
+    last_update_days = SecurityPriceDetail.objects.after(
+        datetime.date.today() - datetime.timedelta(days=30)
+    ).for_securities(userprofile.GetHeldSecurities()
+                     ).order_by('security','-day').distinct('security').values_list('day', flat=True)
