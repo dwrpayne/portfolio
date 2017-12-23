@@ -1,0 +1,1 @@
+[{"model": "securities.security", "pk": "CAD", "fields": {"description": "", "metadata": {}, "type": "Cash", "currency": "", "datasource": 0}}, {"model": "securities.security", "pk": "USD", "fields": {"description": "", "metadata": {}, "type": "Cash", "currency": "", "datasource": 1}}]

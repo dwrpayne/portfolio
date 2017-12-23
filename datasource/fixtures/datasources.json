@@ -1,0 +1,1 @@
+[{"model": "datasource.constantdatasource", "pk": 0, "fields": {"value": "1.000000"}}, {"model": "datasource.pandasdatasource", "pk": 1, "fields": {"symbol": "FXCADUSD", "source": "bankofcanada", "column": "FXCADUSD"}}]
