@@ -358,14 +358,15 @@ class Activity(models.Model):
                                                           self.price, self.netAmount, self.type, self.description)
 
     def GetHoldingEffects(self):
-        """Yields a (security, amount) for each security that is affected by this activity."""
+        """
+        Returns a map from symbol to amount for each security that is affected by this activity.
+        """
+        effects = {}
         if self.cash:
-            yield self.cash.symbol, self.netAmount
-
+            effects[self.cash.symbol] = self.netAmount
         if self.security and self.type != Activity.Type.Dividend:
-            yield self.security.symbol, self.qty
-
-        return
+            effects[self.security.symbol] = self.qty
+        return effects
 
 
 class Allocation(models.Model):

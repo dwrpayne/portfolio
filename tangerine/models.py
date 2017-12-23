@@ -34,17 +34,22 @@ class TangerineRawActivity(BaseRawActivity):
         except Security.DoesNotExist:
             security = Security.mutualfunds.Create(symbol, currency)
 
-        if self.type == 'Purchase':
+        creation_fn = Activity.objects.create
+        net_amount = self.qty * self.price
+
+        if self.type in ['Purchase', 'Transfer In']:
             activity_type = Activity.Type.Buy
-        else:
+            creation_fn = Activity.objects.create_with_deposit
+            net_amount = -net_amount
+        elif self.type == 'Distribution':
             activity_type = Activity.Type.Dividend
+        else:
+            activity_type = Activity.Type.NotImplemented
 
-        total_cost = self.qty * self.price
-
-        Activity.objects.create_with_deposit(account=self.account, tradeDate=self.day, security=security,
+        creation_fn(account=self.account, tradeDate=self.day, security=security,
                                 cash_id=security.currency,
                                 description=self.description, qty=self.qty,
-                                price=self.price, netAmount=-total_cost, type=activity_type, raw=self)
+                                price=self.price, netAmount=net_amount, type=activity_type, raw=self)
 
 
 class TangerineAccount(BaseAccount):
