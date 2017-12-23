@@ -148,7 +148,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def _RegenerateHoldings(self):
         self.holding_set.all().delete()
         for activity in self.activities.all():
-            for security, qty_delta in activity.GetHoldingEffects():
+            for security, qty_delta in activity.GetHoldingEffects().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
 
@@ -306,13 +306,6 @@ class ActivityQuerySet(models.query.QuerySet):
 
     def without_dividends(self):
         return self.exclude(type=Activity.Type.Dividend)
-
-    def affect_capital_gains(self):
-        # TODO: Dividends can affect capital gains.
-        types = [Activity.Type.Buy, Activity.Type.Sell, Activity.Type.Expiry,
-                 Activity.Type.Withdrawal, Activity.Type.Deposit]
-        query = self.exclude(qty=0).exclude(security=None)
-
 
     def for_security(self, symbol):
         return self.filter(security_id=symbol)

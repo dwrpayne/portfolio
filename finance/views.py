@@ -162,11 +162,7 @@ def capgains(request, symbol):
         else:
             act.acbchange = act.qty * act.cadprice - act.commission
 
-        for s, amt in act.GetHoldingEffects():
-            if s == symbol:
-                totalqty += amt
-
-        act.totalqty = totalqty
+        act.totalqty = totalqty = totalqty + act.qty
         act.totalacb = totalacb = max(0, totalacb + act.acbchange)
         act.acbpershare = acbpershare = totalacb / totalqty if totalqty else 0
 

@@ -35,14 +35,16 @@ class TangerineRawActivity(BaseRawActivity):
             security = Security.mutualfunds.Create(symbol, currency)
 
         creation_fn = Activity.objects.create
-        net_amount = self.qty * self.price
 
         if self.type in ['Purchase', 'Transfer In']:
             activity_type = Activity.Type.Buy
             creation_fn = Activity.objects.create_with_deposit
-            net_amount = -net_amount
+            net_amount = -(self.qty * self.price)
         elif self.type == 'Distribution':
-            activity_type = Activity.Type.Dividend
+            # Tangerine uses this to indicate a DRIP - aka deposit of shares
+            # We'll consider it a Buy, with no cash effect and no associated deposit
+            activity_type = Activity.Type.Buy
+            net_amount = 0
         else:
             activity_type = Activity.Type.NotImplemented
 
