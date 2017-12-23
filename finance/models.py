@@ -260,11 +260,11 @@ class ManualRawActivity(BaseRawActivity):
         Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
                                 description=self.description, cash_id=self.currency, qty=self.qty,
                                 price=self.price, netAmount=self.netAmount,
-                                commission = commission, type=self.type, raw=self)
+                                commission=commission, type=self.type, raw=self)
 
 
 class ActivityManager(models.Manager):
-    def create(self, *args, **kwargs):
+    def create(self, **kwargs):
         if 'cash_id' in kwargs and not kwargs['cash_id']:
             kwargs['cash_id'] = None
 
@@ -272,7 +272,7 @@ class ActivityManager(models.Manager):
         if kwargs['type'] in [Activity.Type.Expiry, Activity.Type.Journal]:
             kwargs['cash_id'] = None
 
-        return super().create(*args, **kwargs)
+        return super().create(**kwargs)
 
     def newest_date(self):
         try:
@@ -280,13 +280,13 @@ class ActivityManager(models.Manager):
         except self.model.DoesNotExist:
             return None
 
-    def create_with_deposit(self, *args, **kwargs):
-        self.create(*args, **kwargs)
+    def create_with_deposit(self, **kwargs):
+        self.create(**kwargs)
 
         kwargs.update({'security' : None, 'description' : 'Generated Deposit', 'qty' : 0,
                       'price' : 0, 'type' : Activity.Type.Deposit})
         kwargs['netAmount'] *= -1
-        self.create(*args, **kwargs)
+        self.create(**kwargs)
 
 
 class ActivityQuerySet(models.query.QuerySet):
