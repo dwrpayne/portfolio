@@ -4,20 +4,33 @@ from decimal import Decimal
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, transaction, connection
 from django.utils.functional import cached_property
+from django.contrib.postgres.fields import JSONField
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
-from datasource.services import GetLiveAlphaVantageExchangeRate
+from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
 
 import requests
 from model_utils import Choices
 
 
 class SecurityManager(models.Manager):
-    def create(self, *args, **kwargs):
-        if 'symbol' in kwargs:
-            kwargs['type'] = self.model.Type.Stock if len(kwargs['symbol'] < 20) else self.model.Type.Option
-        return super().create(*args, **kwargs)
+    @classmethod
+    def get_default_datasource(cls, type, symbol):
+        if type == cls.model.Type.Stock:
+            return AlphaVantageDataSource.objects.get_or_create(symbol=symbol)
+        if type == cls.model.Type.Cash:
+            return PandasDataSource.objects.create_bankofcanada(currency_code=symbol)
+        if type == cls.model.Type.MutualFund:
+            return MorningstarDataSource.objects.get_or_create(symbol=symbol)
+        return None
+
+    def create(self, **kwargs):
+        kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
+        kwargs.setdefault('datasource', self.get_default_datasource(kwargs['type'], kwargs['symbol']))
+        if kwargs['type'] == self.model.Type.Stock:
+            kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
+        return super().create(**kwargs)
 
     def Sync(self, live_update):
         queryset = self.get_queryset()
@@ -29,39 +42,36 @@ class SecurityManager(models.Manager):
 
 class StockSecurityManager(SecurityManager):
     def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Stock)
+        return super().get_queryset().filter(type=self.model.Type.Stock)
 
-    def create(self, *args, **kwargs):
-        if 'datasource' not in kwargs:
-            kwargs['datasource'], _ = AlphaVantageDataSource.objects.get_or_create(symbol=kwargs['symbol'])
-        kwargs['type'] = Security.Type.Stock
-        return super().create(*args, **kwargs)
-
-        def DefaultInit(self):
-            self.create(symbol='CAD')
-            self.create(symbol='USD')
+    def create(self, **kwargs):
+        kwargs['type'] = self.model.Type.Stock
+        return super().create(**kwargs)
 
 
 class CashSecurityManager(SecurityManager):
     def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.Cash)
+        return super().get_queryset().filter(type=self.model.Type.Cash)
 
-    def create(self, *args, **kwargs):
-        if 'datasource' not in kwargs:
-            if kwargs['symbol'] == 'CAD':
-                datasource, _ = ConstantDataSource.objects.get_or_create()
-            else:
-                datasource, _ = PandasDataSource.objects.get_or_create(
-                    symbol='FXCADUSD', source='bankofcanada', column='FXCADUSD')
-            kwargs['datasource'] = datasource
-        kwargs['type'] = Security.Type.Cash
-        return super().create(*args, **kwargs)
+    def create(self, **kwargs):
+        kwargs['type'] = self.model.Type.Cash
+        return super().create(**kwargs)
+
+
+class MutualFundSecurityManager(SecurityManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(type=self.model.Type.MutualFund)
+
+    def create(self, **kwargs):
+        kwargs['type'] = self.model.Type.MutualFund
+        return super().create(**kwargs)
+
 
 class OptionSecurityManager(SecurityManager):
     def get_queryset(self):
-        return super().get_queryset().filter(type__in=[Security.Type.Option, Security.Type.OptionMini])
+        return super().get_queryset().filter(type__in=[self.model.Type.Option, self.model.Type.OptionMini])
 
-    def Create(self, callput, symbol, expiry, strike, currency_str):
+    def CreateFromDetails(self, callput, symbol, expiry, strike, currency_str):
         """
         callput is either 'call' or 'put'.
         symbol is the base symbol of the underlying
@@ -87,21 +97,11 @@ class OptionSecurityManager(SecurityManager):
         return option
 
 
-class MutualFundSecurityManager(SecurityManager):
-    def get_queryset(self):
-        return super().get_queryset().filter(type=Security.Type.MutualFund)
-
-    def create(self, *args, **kwargs):
-        if 'datasource' not in kwargs:
-            kwargs['datasource'], _ = MorningstarDataSource.objects.get_or_create(symbol=kwargs['symbol'])
-        kwargs['type'] = Security.Type.MutualFund
-        return super().create(*args, **kwargs)
-
-
 class Security(models.Model):
     Type = Choices('Stock', 'Option', 'OptionMini', 'Cash', 'MutualFund')
     symbol = models.CharField(max_length=32, primary_key=True)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
+    metadata = JSONField()
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
     currency = models.CharField(max_length=3, default='XXX')
     datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
@@ -144,6 +144,10 @@ class Security(models.Model):
             return 100
         if self.type == self.Type.OptionMini:
             return 10
+
+    def RefreshMetadata(self):
+        if self.type == self.Type.Stock:
+            self.metadata = GetYahooStockData(self.symbol)
 
     def GetShouldSyncRange(self, force_today):
         """ Returns a pair (start,end) of datetime.dates that need to be synced."""

@@ -64,7 +64,7 @@ class QuestradeRawActivity(BaseRawActivity):
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
             callput, symbol, expiry, strike = json['description'].split()[:4]
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
-            security = Security.options.Create(callput, symbol, expiry, strike, json['currency'])
+            security = Security.options.CreateFromDetails(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
 
             # Questrade options have price per share not per option.

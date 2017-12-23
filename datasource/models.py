@@ -60,6 +60,12 @@ class PandasDataSource(DataSourceMixin):
     source = models.CharField(max_length=32, default=None)
     column = models.CharField(max_length=32, default=None)
 
+    @classmethod
+    def create_bankofcanada(cls, currency_code):
+        source = 'bankofcanada'
+        symbol = "FX{}CAD".format(currency_code)
+        return cls.objects.create(symbol=symbol, source=source, column=symbol)
+
     def __str__(self):
         return "Pandas {} for {}".format(self.source, self.symbol)
 
