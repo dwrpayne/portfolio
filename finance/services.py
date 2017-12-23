@@ -11,14 +11,12 @@ from .models import SecurityPriceDetail
 
 
 def GetRebalanceInfo(userprofile):
-    holdings = userprofile.GetHoldingDetails().today().by_security()
+    holdings = userprofile.GetHoldingDetails().today().group_by_security()
     total_value = sum(h['total_val'] for h in holdings)
 
     allocs = userprofile.GetAllocations()
     for alloc in allocs:
-        alloc.current_amt = holdings.filter(
-            security__in=alloc.securities.all()).aggregate(
-            total=Sum('total_val'))['total']
+        alloc.current_amt = holdings.for_securities(alloc.securities.all()).aggregate_total_value()
         alloc.current_pct = alloc.current_amt / total_value
         alloc.desired_amt = alloc.desired_pct * total_value
         alloc.buysell = alloc.desired_amt - alloc.current_amt

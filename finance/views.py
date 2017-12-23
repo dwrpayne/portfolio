@@ -22,8 +22,8 @@ def GetHoldingsContext(userprofile):
     (_, yesterday_value), (_, today_value) = total_vals
     total_gain = today_value - yesterday_value
 
-    holdings = holdings_query.by_security()
-    holdings_byacc = holdings_query.by_security(True)
+    holdings = holdings_query.group_by_security()
+    holdings_byacc = holdings_query.group_by_security(True)
 
     def extract_today_with_deltas(holding_list):
         todays = []
@@ -145,7 +145,6 @@ def securitydetail(request, symbol):
 
 @login_required
 def capgains(request, symbol):
-    security = Security.objects.get(symbol=symbol)
     activities = list(request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_cadprices())
 
     totalqty = Decimal(0)
@@ -163,6 +162,7 @@ def capgains(request, symbol):
         act.totalacb = totalacb = max(0, totalacb + act.acbchange)
         act.acbpershare = acbpershare = totalacb / totalqty if totalqty else 0
 
+    security = Security.objects.get(symbol=symbol)
     pendinggain = security.pricedetails.latest().cadprice * totalqty - totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}

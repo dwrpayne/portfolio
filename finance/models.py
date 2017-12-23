@@ -426,6 +426,9 @@ class HoldingDetailQuerySet(models.query.QuerySet):
     def for_user(self, user):
         return self.filter(account__client__user=user)
 
+    def for_securities(self, symbol_iter):
+        return self.filter(security_id__in=symbol_iter)
+
     def at_date(self, date):
         return self.filter(day=date)
 
@@ -456,13 +459,23 @@ class HoldingDetailQuerySet(models.query.QuerySet):
     def total_values(self):
         return self.values_list('day').annotate(Sum('value'))
 
-    def by_security(self, by_account=False):
+    def group_by_security(self, by_account=False):
         columns = ['security', 'day']
         if by_account:
             columns.insert(1, 'account')
         return self.values(*columns, 'price', 'exch', 'cad',
                            ).annotate(total_qty=Sum('qty'), total_val=Sum('value')
                                       ).order_by(*columns)
+
+    def aggregate_total_value(self):
+        if not self:
+            return 0
+        if not 'total_val' in self.first():
+            print('You can only call this function on a queryset after calling group_by_security first')
+            return 0
+        return self.aggregate(total=Sum('total_val'))['total']
+
+
 
 
 class HoldingDetail(models.Model):
