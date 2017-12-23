@@ -2,8 +2,8 @@ import functools
 
 
 class APIResponseError(RuntimeError):
-    def __init__(self, api_response):
-        self.api_response = api_response
+    def __init__(self, resp):
+        self.api_response = resp
 
     def __str__(self):
         return 'The API request did not receive a successful response: {!r}'.format(self.api_response)

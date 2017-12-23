@@ -11,8 +11,8 @@ def GetLiveAlphaVantageExchangeRate(symbol):
               'from_currency': symbol, 'to_currency': 'CAD'}
     r = requests.get('https://www.alphavantage.co/query', params=params)
     if r.ok:
-        json = r.json()
-        return Decimal(json['Realtime Currency Exchange Rate']['5. Exchange Rate'])
+        j = r.json()
+        return Decimal(j['Realtime Currency Exchange Rate']['5. Exchange Rate'])
     else:
         print('Failed to get data, response: {}'.format(r.content))
     return None

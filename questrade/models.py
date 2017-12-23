@@ -1,19 +1,19 @@
 import datetime
 import threading
 from decimal import Decimal
+from json import dumps, loads, JSONDecodeError
 
 import pendulum
 import requests
-from json import dumps, loads, JSONDecodeError
 from dateutil import parser
 from django.db import models
 from django.utils import timezone
-from polymorphic.manager import PolymorphicManager
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
 from securities.models import Security
 from utils.api import api_response
+
 
 class QuestradeActivityTypeManager(models.Manager):
     def GetActivityType(self, type, action):

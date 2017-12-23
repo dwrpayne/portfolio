@@ -1,5 +1,5 @@
 import datetime
-import requests
+
 from django.conf import settings
 from django.db import models, transaction, connection
 from django.db.models import F, Sum
@@ -11,8 +11,9 @@ from polymorphic.query import PolymorphicQuerySet
 from polymorphic.showfields import ShowFieldTypeAndContent
 
 import utils.dates
-from utils.misc import plotly_iframe_from_url
 from securities.models import Security, SecurityPriceDetail
+from utils.misc import plotly_iframe_from_url
+
 
 class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
@@ -172,7 +173,7 @@ class HoldingManager(models.Manager):
                 previous_qty = current_holding.qty
 
         except Holding.MultipleObjectsReturned:
-            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, security, date))
+            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, symbol, date))
         except Holding.DoesNotExist:
             pass
 

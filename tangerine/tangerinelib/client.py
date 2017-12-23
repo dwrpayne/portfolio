@@ -1,18 +1,19 @@
+import contextlib
+import datetime
+import logging
 from urllib.parse import urlencode, quote
+
+import requests
+
 from . import exceptions
 from .login import TangerineLoginFlow
-import datetime
-import contextlib
-import requests
-import logging
-from utils.api import api_response
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_LOCALE = 'en_CA'
 
 import functools
-from utils.api import APIResponseError, api_response
+from utils.api import api_response
 
 def valid_tangerine_response(json):
     return json['response_status']['status_code'] == 'SUCCESS'

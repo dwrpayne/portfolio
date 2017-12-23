@@ -1,17 +1,15 @@
 import datetime
 from decimal import Decimal
 
+from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, transaction, connection
 from django.utils.functional import cached_property
-from django.contrib.postgres.fields import JSONField
+from model_utils import Choices
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
-from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
-
-import requests
-from model_utils import Choices
+from datasource.services import GetYahooStockData
 
 
 class SecurityManager(models.Manager):

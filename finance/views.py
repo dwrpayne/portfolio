@@ -4,13 +4,10 @@ from decimal import Decimal
 import numpy
 import pandas
 from django.contrib.auth.decorators import login_required
-from django.db.models import F, Sum
-from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
+from securities.models import Security
 from utils.misc import plotly_iframe_from_url
-from .models import BaseAccount, HoldingDetail
-from securities.models import Security, SecurityPriceDetail
 from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
