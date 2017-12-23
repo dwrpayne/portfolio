@@ -76,8 +76,7 @@ def GeneratePlot(userprofile):
 
     plotly_url = plotly.plotly.plot(
         traces, filename='portfolio-values-short-{}'.format(userprofile.username), auto_open=False)
-    userprofile.plotly_url = plotly_url
-    userprofile.save()
+    userprofile.update_plotly_url(plotly_url)
 
 def GetCommissionByYear(userprofile):
     return dict(userprofile.GetActivities().annotate(

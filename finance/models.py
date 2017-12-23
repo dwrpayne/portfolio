@@ -387,6 +387,10 @@ class UserProfile(models.Model):
     def username(self):
         return self.user.username
 
+    def update_plotly_url(self, new_url):
+        self.plotly_url = new_url
+        self.save()
+
     def GetHeldSecurities(self):
         return Holding.objects.for_user(
             self.user).current().values_list('security_id', flat=True).distinct()

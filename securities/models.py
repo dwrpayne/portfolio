@@ -143,6 +143,10 @@ class Security(models.Model):
         if self.type == self.Type.OptionMini:
             return 10
 
+    def SetDataSource(self, datasource):
+        self.datasource = datasource
+        self.save()
+
     def RefreshMetadata(self):
         if self.type == self.Type.Stock:
             self.metadata = GetYahooStockData(self.symbol)
