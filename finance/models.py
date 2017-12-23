@@ -1,5 +1,6 @@
 import datetime
-
+from itertools import accumulate
+from decimal import Decimal
 from django.conf import settings
 from django.db import models, transaction, connection
 from django.db.models import F, Sum
@@ -11,6 +12,7 @@ from polymorphic.query import PolymorphicQuerySet
 from polymorphic.showfields import ShowFieldTypeAndContent
 
 import utils.dates
+from utils.misc import xirr
 from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
 
@@ -274,12 +276,6 @@ class ActivityManager(models.Manager):
 
         return super().create(**kwargs)
 
-    def newest_date(self):
-        try:
-            return self.get_queryset().latest().tradeDate
-        except self.model.DoesNotExist:
-            return None
-
     def create_with_deposit(self, **kwargs):
         self.create(**kwargs)
 
@@ -296,11 +292,20 @@ class ActivityQuerySet(models.query.QuerySet):
     def taxable(self):
         return self.filter(account__taxable=True)
 
+    def after(self, start):
+        return self.filter(tradeDate__gte=start)
+
+    def before(self, end):
+        return self.filter(tradeDate__lte=end)
+
+    def between(self, start, end):
+        return self.after(start).before(end)
+
     def for_user(self, user):
         return self.filter(account__client__user=user)
 
     def deposits(self):
-        return self.filter(type=Activity.Type.Deposit)
+        return self.filter(type__in=[Activity.Type.Deposit, Activity.Type.Transfer])
 
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)
@@ -311,11 +316,60 @@ class ActivityQuerySet(models.query.QuerySet):
     def for_security(self, symbol):
         return self.filter(security_id=symbol)
 
+    def get_deposits_with_running_totals(self):
+        """
+        :return: three lists dates, amounts, running_totals (if collate False)
+        """
+        if not self:
+            return [],[],[]
+        deposits = self.deposits().values_list('tradeDate', 'netAmount')
+        deposit_dates, amounts = list(zip(*list(deposits)))
+        running_deposits = list(accumulate(amounts))
+        return deposit_dates, amounts, running_deposits
+
+    def newest_date(self):
+        """
+        :return: The date of the most recent activity.
+        """
+        try:
+            return self.latest().tradeDate
+        except self.model.DoesNotExist:
+            return None
+
     def with_cadprices(self):
+        """
+        Annotates each member of the QuerySet with a "cadprice" field.
+        """
         return self.filter(
             tradeDate=F('security__pricedetails__day')).annotate(
             cadprice=Sum(F('security__pricedetails__cadprice'))
         )
+
+    def with_capgains_data(self):
+        """
+        Annotations as follows.
+        capgain: The capital gain (or loss) for this activity specifically.
+        acbchange: The change in total ACB from the previous activity.
+        totalacb: The total ACB of this security after this activity.
+        totalqty: The total quantity of shares held after this activity.
+        acbpershare: The average per-share ACB after this activity.
+        :return: A list of activities, each annotated with the above additional attributes.
+        """
+        totalqty = Decimal(0)
+        totalacb = Decimal(0)
+        acbpershare = Decimal(0)
+        activities = list(self.with_cadprices())
+        for act in activities:
+            if act.qty < 0:
+                act.capgain = act.qty * (acbpershare - act.cadprice) + act.commission
+                act.acbchange = act.qty * acbpershare
+            else:
+                act.acbchange = act.qty * act.cadprice - act.commission
+
+            act.totalqty = totalqty = totalqty + act.qty
+            act.totalacb = totalacb = max(0, totalacb + act.acbchange)
+            act.acbpershare = acbpershare = totalacb / totalqty if totalqty else 0
+        return activities
 
 
 class Activity(models.Model):
@@ -421,6 +475,43 @@ class UserProfile(models.Model):
         prices = SecurityPriceDetail.objects.for_securities(securities).today()
         return securities.count() == prices.count()
 
+    def RateOfReturn(self, start, end):
+        dates, deps, _ = self.GetActivities().between(start+datetime.timedelta(days=1), end).get_deposits_with_running_totals()
+        start_value = self.GetHoldingDetails().at_date(start).total_values()[0][1]
+        end_value = self.GetHoldingDetails().at_date(end).total_values()[0][1]
+
+        all_dates = (start, *dates, end)
+        all_values = (-start_value, *(-dep for dep in deps), end_value)
+        if sum(all_values) < 1: return 0
+        return xirr(zip(all_dates, all_values))
+
+    def AllRatesOfReturn(self):
+        import arrow
+        start = self.GetInceptionDate().shift(days=1)
+        for end in arrow.Arrow.range('week', arrow.get(start).shift(days=1), arrow.now()):
+            end_date = end._datetime.date()
+            print(end_date, self.RateOfReturn(start, end_date))
+
+    def GetInceptionDate(self):
+        return self.GetActivities().earliest().tradeDate
+
+    def GetRebalanceInfo(self):
+        holdings = self.GetHoldingDetails().today().group_by_security()
+        total_value = sum(h['total_val'] for h in holdings)
+
+        allocs = self.GetAllocations()
+        for alloc in allocs:
+            alloc.current_amt = holdings.for_securities(alloc.securities.all()).aggregate_total_value()
+            alloc.current_pct = alloc.current_amt / total_value
+            alloc.desired_amt = alloc.desired_pct * total_value
+            alloc.buysell = alloc.desired_amt - alloc.current_amt
+
+        missing = holdings.exclude(security__in=allocs.values_list('securities'))
+        for h in missing:
+            h['current_pct'] = h['total_val'] / total_value
+
+        return allocs, missing
+
     @property
     def portfolio_iframe(self):
         return plotly_iframe_from_url(self.plotly_url)
@@ -478,8 +569,6 @@ class HoldingDetailQuerySet(models.query.QuerySet):
             print('You can only call this function on a queryset after calling group_by_security first')
             return 0
         return self.aggregate(total=Sum('total_val'))['total']
-
-
 
 
 class HoldingDetail(models.Model):

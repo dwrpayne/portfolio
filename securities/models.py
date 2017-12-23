@@ -218,6 +218,9 @@ class SecurityPriceQuerySet(models.query.QuerySet):
     def between(self, start, end):
         return self.after(start).before(end)
 
+    def for_security(self, symbol):
+        return self.filter(security=symbol)
+
     def for_securities(self, security_iter):
         return self.filter(security__in=security_iter)
 

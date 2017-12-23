@@ -1,6 +1,6 @@
 import datetime
 from itertools import accumulate
-
+import pendulum
 import plotly
 import plotly.graph_objs as go
 from django.db.models import Sum
@@ -8,25 +8,6 @@ from django.db.models.functions import ExtractYear
 
 from utils.misc import find_le_index
 from .models import SecurityPriceDetail
-
-
-def GetRebalanceInfo(userprofile):
-    holdings = userprofile.GetHoldingDetails().today().group_by_security()
-    total_value = sum(h['total_val'] for h in holdings)
-
-    allocs = userprofile.GetAllocations()
-    for alloc in allocs:
-        alloc.current_amt = holdings.for_securities(alloc.securities.all()).aggregate_total_value()
-        alloc.current_pct = alloc.current_amt / total_value
-        alloc.desired_amt = alloc.desired_pct * total_value
-        alloc.buysell = alloc.desired_amt - alloc.current_amt
-
-    missing = holdings.exclude(security__in=allocs.values_list('securities'))
-    for h in missing:
-        h['current_pct'] = h['total_val'] / total_value
-
-    return allocs, missing
-
 
 def GenerateSecurityPlot(security):
     pairs = security.pricedetails.values_list('day', 'cadprice')
@@ -40,18 +21,21 @@ def GenerateSecurityPlot(security):
 
     return plotly_url
 
+def GenerateReturnPlot(userprofile):
+    traces = []
+    start = userprofile.GetInceptionDate()
+    
+
 
 def GeneratePlot(userprofile):
     traces = []
 
-    pairs = userprofile.GetHoldingDetails.week_end().total_values()
+    pairs = userprofile.GetHoldingDetails().week_end().total_values()
     dates, vals = list(zip(*pairs))
     traces.append(go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers'))
 
-    deposits = userprofile.GetActivities.deposits().values_list('tradeDate', 'netAmount')
-    deposit_dates, amounts = list(zip(*list(deposits)))
-    running_deposits = list(accumulate(amounts))
-    traces.append(go.Scatter(name='Deposits', x=deposit_dates, y=running_deposits, mode='lines+markers'))
+    deposit_dates, deposit_amounts, deposit_running_totals = userprofile.GetActivities().get_deposits_with_running_totals()
+    traces.append(go.Scatter(name='Deposits', x=deposit_dates, y=deposit_running_totals, mode='lines+markers'))
 
     # dep_dict = dict(deposits)
     # sp = Security.objects.get(symbol='SPXTR')
@@ -71,7 +55,7 @@ def GeneratePlot(userprofile):
     # sp_lists = list(zip(*sorted(list(sp_vals.items()))))
     # traces.append( go.Scatter(name='SP 500', x=sp_lists[0], y=sp_lists[1], mode='lines+markers') )
 
-    growth_vals = [val - sum(amounts[0:find_le_index(deposit_dates, date, 0) + 1]) for date, val in pairs]
+    growth_vals = [val - sum(deposit_amounts[0:find_le_index(deposit_dates, date, 0) + 1]) for date, val in pairs]
     traces.append(go.Scatter(name='Growth', x=dates, y=growth_vals, mode='lines+markers'))
 
     plotly_url = plotly.plotly.plot(

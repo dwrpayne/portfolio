@@ -6,9 +6,9 @@ import pandas
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
-from securities.models import Security
+from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
-from .services import GetRebalanceInfo, GeneratePlot, GenerateSecurityPlot
+from .services import GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
 
@@ -106,7 +106,7 @@ def History(request, period):
 
 @login_required
 def Rebalance(request):
-    allocs, missing = GetRebalanceInfo(request.user.userprofile)
+    allocs, missing = request.user.userprofile.GetRebalanceInfo()
 
     total = [sum(a.desired_pct for a in allocs),
              sum(a.current_pct for a in allocs) + sum(s['current_pct'] for s in missing),
@@ -145,25 +145,9 @@ def securitydetail(request, symbol):
 
 @login_required
 def capgains(request, symbol):
-    activities = list(request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_cadprices())
-
-    totalqty = Decimal(0)
-    totalacb = Decimal(0)
-    acbpershare = Decimal(0)
-    prevact = None
-    for act in activities:
-        if act.qty < 0:
-            act.capgain = act.qty * (acbpershare - act.cadprice) + act.commission
-            act.acbchange = act.qty * acbpershare
-        else:
-            act.acbchange = act.qty * act.cadprice - act.commission
-
-        act.totalqty = totalqty = totalqty + act.qty
-        act.totalacb = totalacb = max(0, totalacb + act.acbchange)
-        act.acbpershare = acbpershare = totalacb / totalqty if totalqty else 0
-
-    security = Security.objects.get(symbol=symbol)
-    pendinggain = security.pricedetails.latest().cadprice * totalqty - totalacb
+    activities = list(request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_capgains_data())
+    last_activity = activities[-1]
+    pendinggain = SecurityPriceDetail.for_security(symbol).latest().cadprice * last_activity.totalqty - last_activity.totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/capgains.html', context)
