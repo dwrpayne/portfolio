@@ -149,33 +149,26 @@ def securitydetail(request, symbol):
 @login_required
 def capgains(request, symbol):
     security = Security.objects.get(symbol=symbol)
-    activities = request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_cadprices()
+    activities = list(request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_cadprices())
 
     totalqty = Decimal(0)
     totalacb = Decimal(0)
-    activities = list(activities)
+    acbpershare = Decimal(0)
+    prevact = None
     for act in activities:
-        prevacbpershare = totalacb / totalqty if totalqty else 0
-
-        act.capgain = 0
         if act.qty < 0:
-            act.capgain = (act.cadprice * abs(act.qty)) - act.commission - (prevacbpershare * abs(act.qty))
-
-        if act.qty > 0:
-            act.acbchange = act.cadprice * act.qty + act.commission
+            act.capgain = act.qty * (acbpershare - act.cadprice) + act.commission
+            act.acbchange = act.qty * acbpershare
         else:
-            act.acbchange = -prevacbpershare * abs(act.qty)
+            act.acbchange = act.qty * act.cadprice - act.commission
 
         for s, amt in act.GetHoldingEffects():
-            if s.symbol == symbol:
+            if s == symbol:
                 totalqty += amt
 
         act.totalqty = totalqty
-
-        totalacb += act.acbchange
-        totalacb = max(0, totalacb)
-        act.totalacb = totalacb
-        act.acbpershare = act.totalacb / act.totalqty if totalqty else 0
+        act.totalacb = totalacb = max(0, totalacb + act.acbchange)
+        act.acbpershare = acbpershare = totalacb / totalqty if totalqty else 0
 
     pendinggain = security.pricedetails.latest().cadprice * totalqty - totalacb
 

@@ -160,10 +160,10 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
 
 class HoldingManager(models.Manager):
-    def add_effect(self, account, security, qty_delta, date):
+    def add_effect(self, account, symbol, qty_delta, date):
         previous_qty = 0
         try:
-            current_holding = self.get(security=security, enddate=None)
+            current_holding = self.get(security_id=symbol, enddate=None)
             if current_holding.startdate == date:
                 current_holding.AddQty(qty_delta)
                 return
@@ -178,8 +178,8 @@ class HoldingManager(models.Manager):
 
         new_qty = previous_qty + qty_delta
         if new_qty:
-            print("Creating {} {} {} {}".format(security, new_qty, date, None))
-            self.create(account=account, security=security,
+            print("Creating {} {} {} {}".format(symbol, new_qty, date, None))
+            self.create(account=account, security_id=symbol,
                         qty=new_qty, startdate=date, enddate=None)
 
 
@@ -307,6 +307,13 @@ class ActivityQuerySet(models.query.QuerySet):
     def without_dividends(self):
         return self.exclude(type=Activity.Type.Dividend)
 
+    def affect_capital_gains(self):
+        # TODO: Dividends can affect capital gains.
+        types = [Activity.Type.Buy, Activity.Type.Sell, Activity.Type.Expiry,
+                 Activity.Type.Withdrawal, Activity.Type.Deposit]
+        query = self.exclude(qty=0).exclude(security=None)
+
+
     def for_security(self, symbol):
         return self.filter(security_id=symbol)
 
@@ -353,10 +360,10 @@ class Activity(models.Model):
     def GetHoldingEffects(self):
         """Yields a (security, amount) for each security that is affected by this activity."""
         if self.cash:
-            yield self.cash, self.netAmount
+            yield self.cash.symbol, self.netAmount
 
         if self.security and self.type != Activity.Type.Dividend:
-            yield self.security, self.qty
+            yield self.security.symbol, self.qty
 
         return
 
