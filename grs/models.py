@@ -111,8 +111,8 @@ class GrsClient(BaseClient):
     def RequestRates(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
                                    data={'PlanFund': symbol,
-                                         'StartDate': start.format('MM/DD/YYYY'),
-                                         'EndDate': end.format('MM/DD/YYYY'), }
+                                         'StartDate': start.format('%m/%d/%y'),
+                                         'EndDate': end.format('%m/%d/%y')}
                                 )
         response.raise_for_status()
         return response
@@ -147,8 +147,8 @@ class GrsDataSource(DataSourceMixin):
     def _Retrieve(self, start, end):
         with self.client as client:
             client.PrepareRateRetrieval(self.plan_data)
-            for s, e in utils.dates.day_intervals(self.max_sync_days, start, end):
-                response = client.RequestRates(self.symbol, s, e)
+            for period in utils.dates.day_intervals(self.max_sync_days, start, end):
+                response = client.RequestRates(self.symbol, period.start, period.end)
 
                 soup = BeautifulSoup(response.text, 'html.parser')
                 table_header = soup.find('tr', 'table-header')

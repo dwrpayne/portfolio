@@ -8,24 +8,24 @@ name = "pypi"
 [packages]
 
 celery = "==4.0.2"
-Django = "*"
+django = "*"
 requests = "*"
 dj-database-url = "*"
 plotly = "*"
 pandas = "*"
-django_polymorphic = "*"
+django-polymorphic = "*"
 django-extensions = "*"
 whitenoise = "*"
-django_celery_results = "*"
-django_celery_beat = "*"
+django-celery-results = "*"
+django-celery-beat = "*"
 "psycopg2" = "*"
 django-model-utils = "*"
 "beautifulsoup4" = "*"
-Werkzeug = "*"
+werkzeug = "*"
 django-debug-toolbar = "*"
 eventlet = "*"
-pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
 pandas-datareader = {git = "https://github.com/dwrpayne/pandas-datareader.git", ref = "bankofcanada"}
+pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
 
 
 [dev-packages]

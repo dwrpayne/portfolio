@@ -9,7 +9,7 @@ from model_utils import Choices
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
-from datasource.services import GetYahooStockData
+from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
 
 
 class SecurityManager(models.Manager):
@@ -36,6 +36,8 @@ class SecurityManager(models.Manager):
             queryset = queryset.filter(holdings__enddate__isnull=True).distinct()
         for security in queryset:
             security.SyncRates(live_update)
+            if live_update and security.type==self.model.Type.Cash and not security.symbol == 'CAD':
+                security.live_price = GetLiveAlphaVantageExchangeRate(security.symbol)
 
 
 class StockSecurityManager(SecurityManager):
