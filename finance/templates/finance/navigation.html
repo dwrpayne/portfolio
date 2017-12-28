@@ -20,6 +20,8 @@
                 </li>       
                 <li class="{% navactive request 'finance:rebalance' %}">
                     <a href="{% url 'finance:rebalance' %}">Rebalance</a></li>
+                <li class="{% navactive request 'finance:snapshot' %}">
+                    <a href="{% url 'finance:snapshot' %}">Snapshot</a></li>
                 <li class="dropdown {% navactive request 'finance:capgains' %}">
                     <a class="dropdown-toggle" data-toggle="dropdown" href="#">Capital Gains
                     <span class="caret"></span></a>

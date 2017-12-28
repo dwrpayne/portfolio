@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import numpy
 import pandas
+import pendulum
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
@@ -12,9 +13,11 @@ from .services import GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
 
-def GetHoldingsContext(userprofile):
-    holdings_query = userprofile.GetHoldingDetails().after(
-        datetime.date.today() - datetime.timedelta(days=1)
+def GetHoldingsContext(userprofile, as_of_date=None):
+    as_of_date = as_of_date or datetime.date.today()
+    holdings_query = userprofile.GetHoldingDetails().between(
+        as_of_date - datetime.timedelta(days=1),
+        as_of_date
     )
 
     total_vals = holdings_query.total_values()
@@ -156,6 +159,14 @@ def capgains(request, symbol):
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/capgains.html', context)
 
+@login_required
+def Snapshot(request):
+    day = request.GET.get('day', None)
+    day = pendulum.parse(day).date() if day else pendulum.Date.today()
+    context = GetHoldingsContext(request.user.userprofile, day)
+    context['day'] = day.to_formatted_date_string()
+    context['activities'] = request.user.userprofile.GetActivities().at_date(day)
+    return render(request, 'finance/snapshot.html', context)
 
 @login_required
 def index(request):

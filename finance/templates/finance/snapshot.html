@@ -1,0 +1,44 @@
+{% extends "finance/base.html" %}
+{% load mytags %}
+{% load static %}
+{% block title %} {{request.user.username}} {% endblock title %}
+{% block content %}
+<div class="row">
+    <div class="col-sm-5">
+        <h2>Portfolio view as of {{ day }} <br/></h2>
+        {% include "finance/holdings.html" %}
+    </div>
+    <div class="col-sm-2">
+        <div class="container">
+            <div class="row">
+                <div class="form-group">
+                    <form action="" id="date-submit-form" method="get">
+                        <p>See portfolio as of: <input type="text" id="datepicker" name="day"></p>
+                        <button type="submit">Submit</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-sm-12">
+        <h2>Activities on this day</h2>
+        {% include "finance/activity_table.html" with show_account="true" show_security="true" %}
+    </div>
+</div>
+{% endblock content %}
+{% block footer_javascript_page %}
+    <script type="text/javascript">
+        $(function () {
+            $('#datepicker').datepicker({
+                dateFormat: "yy-mm-dd"
+            });
+        });
+    //    $('#date-submit-form').submit(function() {
+      //      this.action = '' + $('#datepicker').val() + '/';
+        //    return true;
+        //});
+    </script>
+
+{% endblock footer_javascript_page %}
