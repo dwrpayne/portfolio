@@ -21,23 +21,23 @@ class SecurityMixinQuerySet:
 class DayMixinQuerySet:
     day_field = 'day'
     def today(self):
-        return self.filter(**{self.day_field, date.today()})
+        return self.filter(**{self.day_field: date.today()})
 
     def yesterday(self):
-        return self.at_date(**{self.day_field, date.today() - timedelta(days=1)})
+        return self.at_date(**{self.day_field: date.today() - timedelta(days=1)})
 
     def at_date(self, date):
-        return self.filter(**{self.day_field, date})
+        return self.filter(**{self.day_field: date})
 
     def after(self, start):
-        return self.filter(**{self.day_field+'__gte',start})
+        return self.filter(**{self.day_field+'__gte':start})
 
     def before(self, end):
-        return self.filter(**{self.day_field+'__lte',end})
+        return self.filter(**{self.day_field+'__lte':end})
 
     def between(self, start, end):
-        return self.filter(**{self.day_field+'__range',(start, end)})
+        return self.filter(**{self.day_field+'__range':(start, end)})
 
     def in_year(self, year):
-        return self.filter(**{self.day_field+'__year',year})
+        return self.filter(**{self.day_field+'__year':year})
 
