@@ -13,9 +13,8 @@ from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 
 
 def GetHoldingsContext(userprofile):
-    holdings_query = userprofile.GetHoldingDetails().date_range(
-        datetime.date.today() - datetime.timedelta(days=1),
-        datetime.date.today()
+    holdings_query = userprofile.GetHoldingDetails().after(
+        datetime.date.today() - datetime.timedelta(days=1)
     )
 
     total_vals = holdings_query.total_values()
@@ -66,12 +65,17 @@ def Portfolio(request):
     if not userprofile.portfolio_iframe:
         GeneratePlot(userprofile)
 
+    if not userprofile.AreSecurityPricesUpToDate():
+        LiveSecurityUpdateTask.delay()
+        return render(request, 'finance/index.html', {'updating':True})
+
     if request.is_ajax():
         if 'refresh-live' in request.GET:
             LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
-            GeneratePlot(userprofile)
+            url = GeneratePlot(userprofile)
+            userprofile.update_plotly_url(url)
 
         elif 'refresh-account' in request.GET:
             SyncActivityTask(userprofile)
@@ -147,7 +151,7 @@ def securitydetail(request, symbol):
 def capgains(request, symbol):
     activities = list(request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_capgains_data())
     last_activity = activities[-1]
-    pendinggain = SecurityPriceDetail.for_security(symbol).latest().cadprice * last_activity.totalqty - last_activity.totalacb
+    pendinggain = SecurityPriceDetail.objects.for_security(symbol).latest().cadprice * last_activity.totalqty - last_activity.totalacb
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/capgains.html', context)

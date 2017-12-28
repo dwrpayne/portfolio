@@ -1,41 +1,55 @@
-import datetime
-from itertools import accumulate
-import pendulum
 import plotly
 import plotly.graph_objs as go
-from django.db.models import Sum
-from django.db.models.functions import ExtractYear
 
 from utils.misc import find_le_index
-from .models import SecurityPriceDetail
+
+
+class LineGraph:
+    def __init__(self, graph_name_unique):
+        self.traces = []
+        self.filename = graph_name_unique
+        self.url = None
+
+    @property
+    def is_plotted(self):
+        return not self.url
+
+    def add_trace(self, name, tuples, mode='lines+markers'):
+        self.add_trace_xy(name, *list(zip(*tuples)))
+
+    def add_trace_xy(self, name, x_values, y_values, mode='lines+markers'):
+        self.traces.append(go.Scattergl(name=name, x=x_values, y=y_values, mode=mode))
+
+    def plot(self):
+        self.url = plotly.plotly.plot(self.traces, filename=self.filename, auto_open=False)
+        return self.url
+
 
 def GenerateSecurityPlot(security):
-    pairs = security.pricedetails.values_list('day', 'cadprice')
-    dates, vals = list(zip(*pairs))
+    graph = LineGraph('security-values-{}'.format(security.symbol))
+    graph.add_trace('Price (CAD)', security.pricedetails.values_list('day', 'cadprice'))
+    return graph.plot()
 
-    filename = 'security-values-{}'.format(security.symbol)
-
-    plotly_url = plotly.plotly.plot(
-        [go.Scatter(name='Price (CAD)', x=dates, y=vals, mode='lines+markers')],
-        filename=filename, auto_open=False)
-
-    return plotly_url
 
 def GenerateReturnPlot(userprofile):
-    traces = []
-    start = userprofile.GetInceptionDate()
-    
+    graph = LineGraph('returns-{}'.format(userprofile.username))
+    graph.add_trace('MROR%', userprofile.PeriodicRatesOfReturn())
+    graph.add_trace('YROR%', userprofile.PeriodicRatesOfReturn('years'))
+    return graph.plot()
 
 
 def GeneratePlot(userprofile):
-    traces = []
+    graph = LineGraph('portfolio-values-short-{}'.format(userprofile.username))
+    day_val_pairs = userprofile.GetHoldingDetails().total_values()
+    graph.add_trace('Total', day_val_pairs)
 
-    pairs = userprofile.GetHoldingDetails().week_end().total_values()
-    dates, vals = list(zip(*pairs))
-    traces.append(go.Scatter(name='Total', x=dates, y=vals, mode='lines+markers'))
+    deposits = userprofile.GetActivities().get_all_deposits(running_totals=True)
+    dep_dates, dep_totals = list(zip(*deposits))
+    graph.add_trace_xy('Deposits', x_values=dep_dates, y_values=dep_totals)
 
-    deposit_dates, deposit_amounts, deposit_running_totals = userprofile.GetActivities().get_deposits_with_running_totals()
-    traces.append(go.Scatter(name='Deposits', x=deposit_dates, y=deposit_running_totals, mode='lines+markers'))
+    growth = [(day, val - dep_totals[find_le_index(dep_dates, day, 0)]) for day, val in day_val_pairs]
+    graph.add_trace('Growth', growth)
+    return graph.plot()
 
     # dep_dict = dict(deposits)
     # sp = Security.objects.get(symbol='SPXTR')
@@ -45,8 +59,7 @@ def GeneratePlot(userprofile):
     #        'day', F('price') * F('security__currency__rates__price')
     #    ))
     # sp_qtys = {}
-    # deps = dict(deposits)
-    # running_qty = 0
+    # deps = dict(deposits)    # running_qty = 0
     # for day, dep in deps.items():
     #    running_qty += dep / sp_prices_byday[day]
     #    sp_qtys[day]=running_qty
@@ -54,21 +67,3 @@ def GeneratePlot(userprofile):
     # sp_vals = {day : sp_qtys[find_le(list(sp_qtys), day, dates[0])] * sp_prices_byday[day] for day in dates}
     # sp_lists = list(zip(*sorted(list(sp_vals.items()))))
     # traces.append( go.Scatter(name='SP 500', x=sp_lists[0], y=sp_lists[1], mode='lines+markers') )
-
-    growth_vals = [val - sum(deposit_amounts[0:find_le_index(deposit_dates, date, 0) + 1]) for date, val in pairs]
-    traces.append(go.Scatter(name='Growth', x=dates, y=growth_vals, mode='lines+markers'))
-
-    plotly_url = plotly.plotly.plot(
-        traces, filename='portfolio-values-short-{}'.format(userprofile.username), auto_open=False)
-    userprofile.update_plotly_url(plotly_url)
-
-def GetCommissionByYear(userprofile):
-    return dict(userprofile.GetActivities().annotate(
-        year=ExtractYear('tradeDate')
-    ).order_by().values('year').annotate(c=Sum('commission')).values_list('year', 'c'))
-
-def GetLastUserUpdateDay(userprofile):
-    last_update_days = SecurityPriceDetail.objects.after(
-        datetime.date.today() - datetime.timedelta(days=30)
-    ).for_securities(userprofile.GetHeldSecurities()
-                     ).order_by('security','-day').distinct('security').values_list('day', flat=True)

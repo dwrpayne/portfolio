@@ -24,6 +24,23 @@ def year_ends(start, end=None):
 
 
 def day_intervals(days, start, end=None):
+    return time_intervals('days', days, start, end)
+
+
+def time_intervals(time_period, count, start, end=None):
+    """
+    :param time_period: 'days', 'weeks', 'months', 'years'
+    :param count: count of the time_period that each returned interval should span
+    :param start: start date of period
+    :param end: end date of period
+    :return:
+    """
     end = end or datetime.date.today()
     period = Date.instance(end) - Date.instance(start)
-    return period.split('days', days)
+    return period.split(time_period, count)
+
+
+def day_list(start, end=None):
+    end = end or datetime.date.today()
+    period = Date.instance(end) - Date.instance(start)
+    return period

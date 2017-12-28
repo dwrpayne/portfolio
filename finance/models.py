@@ -1,10 +1,10 @@
 import datetime
 import pendulum
-from itertools import accumulate
 from decimal import Decimal
 from django.conf import settings
 from django.db import models, transaction, connection
-from django.db.models import F, Sum
+from django.db.models import Func, F, Sum
+from django.db.models.functions import ExtractYear
 from django.utils.functional import cached_property
 from model_utils import Choices
 from polymorphic.manager import PolymorphicManager
@@ -13,8 +13,10 @@ from polymorphic.query import PolymorphicQuerySet
 from polymorphic.showfields import ShowFieldTypeAndContent
 
 import utils.dates
-from utils.misc import xirr
-from securities.models import Security, SecurityPriceDetail
+from utils.db import RunningSum
+from utils.misc import xirr, total_return
+from securities.models import Security, SecurityPriceDetail, SecurityPriceQuerySet
+from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
 from utils.misc import plotly_iframe_from_url
 
 
@@ -286,21 +288,11 @@ class ActivityManager(models.Manager):
         self.create(**kwargs)
 
 
-class ActivityQuerySet(models.query.QuerySet):
-    def in_year(self, year):
-        return self.filter(tradeDate__year=year)
+class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQuerySet):
+    day_field = 'tradeDate'
 
     def taxable(self):
         return self.filter(account__taxable=True)
-
-    def after(self, start):
-        return self.filter(tradeDate__gte=start)
-
-    def before(self, end):
-        return self.filter(tradeDate__lte=end)
-
-    def between(self, start, end):
-        return self.after(start).before(end)
 
     def for_user(self, user):
         return self.filter(account__client__user=user)
@@ -314,19 +306,18 @@ class ActivityQuerySet(models.query.QuerySet):
     def without_dividends(self):
         return self.exclude(type=Activity.Type.Dividend)
 
-    def for_security(self, symbol):
-        return self.filter(security_id=symbol)
-
-    def get_deposits_with_running_totals(self):
+    def get_all_deposits(self, running_totals=False):
         """
-        :return: three lists dates, amounts, running_totals (if collate False)
+        :return: a list of (date, amt, total) tuples
         """
         if not self:
-            return [],[],[]
-        deposits = self.deposits().values_list('tradeDate', 'netAmount')
-        deposit_dates, amounts = list(zip(*list(deposits)))
-        running_deposits = list(accumulate(amounts))
-        return deposit_dates, amounts, running_deposits
+            return []
+        if running_totals:
+            return self.deposits().annotate(
+                cum_total = RunningSum('netAmount', 'tradeDate')
+            ).values_list('tradeDate', 'netAmount', 'cum_total')
+        else:
+            return self.deposits().values_list('tradeDate', 'netAmount')
 
     def newest_date(self):
         """
@@ -476,21 +467,50 @@ class UserProfile(models.Model):
         prices = SecurityPriceDetail.objects.for_securities(securities).today()
         return securities.count() == prices.count()
 
-    def RateOfReturn(self, start, end):
-        dates, deps, _ = self.GetActivities().between(start+datetime.timedelta(days=1), end).get_deposits_with_running_totals()
+    def GetCommissionByYear(self):
+        return dict(self.GetActivities().annotate(
+            year=ExtractYear('tradeDate')
+        ).order_by().values('year').annotate(c=Sum('commission')).values_list('year', 'c'))
+
+    def RateOfReturn(self, start, end, annualized=True):
+        deposits = self.GetActivities().between(start+datetime.timedelta(days=1), end).get_all_deposits()
+        dates, amounts = (list(zip(*deposits))) if deposits else ([], [])
+
         start_value = self.GetHoldingDetails().at_date(start).total_values()[0][1]
         end_value = self.GetHoldingDetails().at_date(end).total_values()[0][1]
 
         all_dates = (start, *dates, end)
-        all_values = (-start_value, *(-dep for dep in deps), end_value)
-        if sum(all_values) < 1: return 0
-        return xirr(zip(all_dates, all_values))
+        all_values = (-start_value, *(-dep for dep in amounts), end_value)
+        if -1 < sum(all_values) < 1: return 0
+        f = xirr if annualized else total_return
+        return 100 * f(zip(all_dates, all_values))
 
-    def AllRatesOfReturn(self):
-        start = pendulum.Date.instance(self.GetInceptionDate()).add(days=1)
-        period = pendulum.today().date() - pendulum.Date.instance(self.GetInceptionDate())
-        for day in period:
-            yield day, self.RateOfReturn(start, day)
+    def AllRatesOfReturnFromInception(self, time_period='months'):
+        """
+        :param time_period: Can be 'days', 'weeks', 'months', 'years'.
+        :return:
+        """
+        inception = pendulum.Date.instance(self.GetInceptionDate())
+        period = pendulum.today().date() - inception.add(days=3)
+        for day in period.range(time_period):
+            yield day, self.RateOfReturn(inception, day)
+
+    def PeriodicRatesOfReturn(self, period_type='months'):
+        """
+        :param time_period: Can be 'months', 'years'.
+        :return:
+        """
+        inception = pendulum.Date.instance(self.GetInceptionDate())
+        period = pendulum.today().date() - inception.add(days=3)
+        period_type_singular = period_type.rstrip('s')
+        for day in period.range(period_type, 1):
+            start = max(inception,
+                        day.start_of(period_type_singular))
+            end = min(pendulum.today().date(),
+                      day.end_of(period_type_singular))
+            ror = self.RateOfReturn(start, end, annualized=False)
+            print (start, end, ror)
+            yield end, ror
 
     def GetInceptionDate(self):
         return self.GetActivities().earliest().tradeDate
@@ -517,24 +537,9 @@ class UserProfile(models.Model):
         return plotly_iframe_from_url(self.plotly_url)
 
 
-class HoldingDetailQuerySet(models.query.QuerySet):
+class HoldingDetailQuerySet(SecurityPriceQuerySet):
     def for_user(self, user):
         return self.filter(account__client__user=user)
-
-    def for_securities(self, symbol_iter):
-        return self.filter(security_id__in=symbol_iter)
-
-    def at_date(self, date):
-        return self.filter(day=date)
-
-    def date_range(self, startdate, enddate):
-        return self.filter(day__range=(startdate, enddate))
-
-    def today(self):
-        return self.at_date(datetime.date.today())
-
-    def yesterday(self):
-        return self.at_date(datetime.date.today() - datetime.timedelta(days=1))
 
     def cash(self):
         return self.filter(type=Security.Type.Cash)

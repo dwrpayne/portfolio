@@ -10,6 +10,7 @@ from model_utils import Choices
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
     MorningstarDataSource, StartEndDataSource
 from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
+from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 
 
 class SecurityManager(models.Manager):
@@ -207,26 +208,10 @@ class Security(models.Model):
         return today, (today - yesterday) / yesterday
 
 
-class SecurityPriceQuerySet(models.query.QuerySet):
-    def today(self):
-        return self.filter(day=datetime.date.today())
-
-    def after(self, start):
-        return self.filter(day__gte=start)
-
-    def before(self, end):
-        return self.filter(day__lte=end)
-
-    def between(self, start, end):
-        return self.after(start).before(end)
-
-    def for_security(self, symbol):
-        return self.filter(security=symbol)
-
-    def for_securities(self, security_iter):
-        return self.filter(security__in=security_iter)
-
-
+class SecurityPriceQuerySet(models.query.QuerySet,
+                            SecurityMixinQuerySet,
+                            DayMixinQuerySet):
+    pass
 
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='prices')
@@ -247,9 +232,6 @@ class SecurityPrice(models.Model):
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
 
-class SecurityPriceDetailQuerySet(SecurityPriceQuerySet):
-    pass
-
 class SecurityPriceDetail(models.Model):
     security = models.ForeignKey(Security, on_delete=models.DO_NOTHING, related_name='pricedetails')
     day = models.DateField()
@@ -258,7 +240,7 @@ class SecurityPriceDetail(models.Model):
     cadprice = models.DecimalField(max_digits=16, decimal_places=6)
     type = models.CharField(max_length=100)
 
-    objects = SecurityPriceDetailQuerySet.as_manager()
+    objects = SecurityPriceQuerySet.as_manager()
 
 
     @classmethod

@@ -1,5 +1,4 @@
 import bisect
-import datetime
 
 def find_le(a, x, default=None):
     i = bisect.bisect_right(a, x)
@@ -17,6 +16,8 @@ def find_le_index(a, x, default=None):
     if default is not None:
         return default
     raise ValueError
+
+
 
 
 def plotly_iframe_from_url(url):
@@ -95,3 +96,10 @@ def xirr(cashflows, guess=0.1):
     cashflows = list(cashflows)
     return secant_method(0.0001,lambda r: xnpv(r,cashflows),guess)
     #return optimize.newton(lambda r: xnpv(r, cashflows), guess)
+
+def total_return(cashflows):
+    cashflows = list(cashflows)
+    delta = cashflows[-1][0] - cashflows[0][0]
+    fraction = delta.days / 365
+    ror = xirr(cashflows)
+    return pow(1 + ror, fraction) - 1
