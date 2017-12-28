@@ -164,7 +164,9 @@ def Snapshot(request):
     day = request.GET.get('day', None)
     day = pendulum.parse(day).date() if day else pendulum.Date.today()
     context = GetHoldingsContext(request.user.userprofile, day)
-    context['day'] = day.to_formatted_date_string()
+    age_in_days = (datetime.date.today() - request.user.userprofile.GetInceptionDate()).days
+    context['inception_days_ago'] = age_in_days-1
+    context['day'] = day
     context['activities'] = request.user.userprofile.GetActivities().at_date(day)
     return render(request, 'finance/snapshot.html', context)
 

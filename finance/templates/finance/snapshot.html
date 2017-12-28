@@ -4,20 +4,17 @@
 {% block title %} {{request.user.username}} {% endblock title %}
 {% block content %}
 <div class="row">
-    <div class="col-sm-5">
+    <div class="col-sm-10">
         <h2>Portfolio view as of {{ day }} <br/></h2>
         {% include "finance/holdings.html" %}
     </div>
     <div class="col-sm-2">
-        <div class="container">
-            <div class="row">
-                <div class="form-group">
-                    <form action="" id="date-submit-form" method="get">
-                        <p>See portfolio as of: <input type="text" id="datepicker" name="day"></p>
-                        <button type="submit">Submit</button>
-                    </form>
-                </div>
-            </div>
+        <div class="form-group">
+            <form action="" id="date-submit-form" method="get">
+                <label for="datepicker">See portfolio as of</label>
+                <input type="text" class="form-control" id="datepicker" placeholder="{{ day }}" name="day">
+                <button type="submit">Submit</button>
+            </form>
         </div>
     </div>
 </div>
@@ -32,13 +29,16 @@
     <script type="text/javascript">
         $(function () {
             $('#datepicker').datepicker({
-                dateFormat: "yy-mm-dd"
+                dateFormat: "yy-mm-dd",
+                changeMonth: true,
+                changeYear: true,
+                showButtonPanel: true,
+                showOtherMonths: true,
+                selectOtherMonths: true,
+                minDate: -{{ inception_days_ago }},
+                maxDate: 0,
+                defaultDate: "{{ day.isoformat }}"
             });
         });
-    //    $('#date-submit-form').submit(function() {
-      //      this.action = '' + $('#datepicker').val() + '/';
-        //    return true;
-        //});
     </script>
-
 {% endblock footer_javascript_page %}
