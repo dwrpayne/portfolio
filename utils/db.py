@@ -21,10 +21,10 @@ class SecurityMixinQuerySet:
 class DayMixinQuerySet:
     day_field = 'day'
     def today(self):
-        return self.filter(**{self.day_field: date.today()})
+        return self.at_date(date.today())
 
     def yesterday(self):
-        return self.at_date(**{self.day_field: date.today() - timedelta(days=1)})
+        return self.at_date(date.today() - timedelta(days=1))
 
     def at_date(self, date):
         return self.filter(**{self.day_field: date})
