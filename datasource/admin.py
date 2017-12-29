@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
-    MorningstarDataSource, StartEndDataSource
+    MorningstarDataSource, InterpolatedDataSource
 
 class ConstantDataSourceAdmin(admin.ModelAdmin):
     list_display = ['value']
@@ -19,8 +19,8 @@ class MorningstarDataSourceAdmin(admin.ModelAdmin):
     list_display = ['symbol', 'raw_url']
 admin.site.register(MorningstarDataSource, MorningstarDataSourceAdmin)
 
-class StartEndDataSourceAdmin(admin.ModelAdmin):
+class InterpolatedDataSourceAdmin(admin.ModelAdmin):
     list_display = ['start_day', 'start_val', 'end_day', 'end_val']
-admin.site.register(StartEndDataSource, StartEndDataSourceAdmin)
+admin.site.register(InterpolatedDataSource, InterpolatedDataSourceAdmin)
 
 

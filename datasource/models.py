@@ -14,30 +14,30 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
     Just need to override a function that grabs the data.
     """
 
-    @staticmethod
-    def ProcessRateData(data, end_date):
+    @classmethod
+    def _ProcessRateData(cls, pairs, end_date):
         """ Expects an iterator of day, price pairs"""
-        dates_and_prices = list(zip(*data))
+        dates_and_prices = list(zip(*pairs))
         if len(dates_and_prices) == 0:
             return []
 
         dates, prices = dates_and_prices
-        data = pandas.Series(prices, index=dates, dtype='float64')
+        series = pandas.Series(prices, index=dates, dtype='float64')
 
-        data = data.sort_index()
-        index = pandas.DatetimeIndex(start=min(data.index), end=end_date, freq='D').date
-        data = data.reindex(index).ffill()
-        return data.iteritems()
+        series = series.sort_index()
+        index = pandas.DatetimeIndex(start=min(series.index), end=end_date, freq='D').date
+        series = series.reindex(index).ffill()
+        return series.iteritems()
 
     def GetData(self, start, end):
         print("Getting data from {} for {} to {}".format(self, start, end))
-        return self.ProcessRateData(self._Retrieve(start, end), end)
+        return self._ProcessRateData(self._Retrieve(start, end), end)
 
     def _Retrieve(self, start, end):
         """
         Given datetime.date 'start' and 'end', return
         an iterator of (datetime.date, price) pairs.
-        This is the only function you should override.
+        This is the only function you need to override.
         """
         return []
 
@@ -128,7 +128,7 @@ class MorningstarDataSource(DataSourceMixin):
         return []
 
 
-class StartEndDataSource(DataSourceMixin):
+class InterpolatedDataSource(DataSourceMixin):
     start_day = models.DateField()
     start_val = models.DecimalField(max_digits=19, decimal_places=6)
     end_day = models.DateField()
@@ -139,8 +139,11 @@ class StartEndDataSource(DataSourceMixin):
             self.start_day, self.start_val, self.end_day, self.end_val)
 
     def __repr__(self):
-        return "StartEndDataSource<{},{},{},{}>".format(
+        return "InterpolatedDataSource<{},{},{},{}>".format(
             self.start_day, self.start_val, self.end_day, self.end_val)
 
     def _Retrieve(self, start, end):
-        return (self.start_day, self.start_val), (self.end_day, self.end_val),
+        series = pandas.Series(index=pandas.date_range(self.start_day, self.end_day))
+        series[self.start_day] = self.start_val
+        series[self.end_day] = self.end_val
+        return series.interpolate()[start:end].iteritems()

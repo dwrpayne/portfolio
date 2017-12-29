@@ -1,3 +1,5 @@
+import datetime
+
 from django import template
 from django.template.defaultfilters import stringfilter
 from django.utils.safestring import mark_safe
@@ -38,3 +40,11 @@ def percentage(amount, decimals=2):
 @register.filter()
 def parens(s):
     return '({})'.format(s)
+
+@register.filter()
+def prev_day(day):
+    return day - datetime.timedelta(days=1)
+
+@register.filter()
+def next_day(day):
+    return day + datetime.timedelta(days=1)

@@ -8,7 +8,7 @@ from django.utils.functional import cached_property
 from model_utils import Choices
 
 from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
-    MorningstarDataSource, StartEndDataSource
+    MorningstarDataSource, InterpolatedDataSource
 from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
 from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 
@@ -71,6 +71,15 @@ class MutualFundSecurityManager(SecurityManager):
 class OptionSecurityManager(SecurityManager):
     def get_queryset(self):
         return super().get_queryset().filter(type__in=[self.model.Type.Option, self.model.Type.OptionMini])
+
+    def UpdateDataSources(self):
+        for option in self.get_queryset():
+            start, *_, end = option.activities.values_list('tradeDate', 'price')
+            datasource, created = InterpolatedDataSource.objects.get_or_create(start_day=start[0],
+                                                                      start_val=start[1],
+                                                                      end_day=end[0],
+                                                                      end_val=end[1])
+            option.SetDataSource(datasource)
 
     def CreateFromDetails(self, callput, symbol, expiry, strike, currency_str):
         """
