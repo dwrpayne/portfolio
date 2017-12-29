@@ -415,13 +415,7 @@ class AllocationManager(models.Manager):
 
         allocs = self.get_queryset()
         for alloc in allocs:
-            alloc.current_amt = sum(h.value for h in holdings.for_securities(alloc.securities.all()))
-            if alloc.securities.filter(type=Security.Type.Cash).exists():
-                alloc.current_amt += cashadd
-
-            alloc.current_pct = alloc.current_amt / total_value
-            alloc.desired_amt = alloc.desired_pct * total_value
-            alloc.buysell = alloc.desired_amt - alloc.current_amt
+            alloc.update_rebalance_info(cashadd)
 
         return allocs
 
@@ -442,6 +436,17 @@ class Allocation(models.Model):
     def list_securities(self):
         return ', '.join([s.symbol for s in self.securities.all()])
 
+    def update_rebalance_info(self, cashadd=0):
+        holdings = self.user.userprofile.GetHoldingDetails().today()
+        total_value = sum(h.value for h in holdings) + cashadd
+        self.current_amt = sum(h.value for h in holdings.for_securities(self.securities.all()))
+        if self.securities.filter(type=Security.Type.Cash).exists():
+            self.current_amt += cashadd
+
+        self.current_pct = self.current_amt / total_value
+        self.desired_amt = self.desired_pct * total_value
+        self.buysell = self.desired_amt - self.current_amt
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -454,6 +459,10 @@ class UserProfile(models.Model):
     def update_plotly_url(self, new_url):
         self.plotly_url = new_url
         self.save()
+
+    @property
+    def portfolio_iframe(self):
+        return plotly_iframe_from_url(self.plotly_url)
 
     def GetHeldSecurities(self):
         return Holding.objects.for_user(
@@ -540,10 +549,6 @@ class UserProfile(models.Model):
             h['current_pct'] = h['total_val'] / total_value
 
         return allocs, missing
-
-    @property
-    def portfolio_iframe(self):
-        return plotly_iframe_from_url(self.plotly_url)
 
 
 class HoldingDetailQuerySet(SecurityPriceQuerySet):
