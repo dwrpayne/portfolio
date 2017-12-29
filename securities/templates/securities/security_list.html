@@ -1,0 +1,9 @@
+{% extends "finance/base.html" %}
+{% block content %}
+    <h2>Securities</h2>
+    <ul>
+        {% for security in object_list %}
+            <li>{{ security.symbol }}</li>
+        {% endfor %}
+    </ul>
+{% endblock content %}

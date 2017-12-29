@@ -7,10 +7,32 @@ import pendulum
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
+from django.views.generic import DetailView, ListView
+
 from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
 from .services import GeneratePlot, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
+from .models import BaseAccount
+
+
+class SecurityList(ListView):
+    model = Security
+
+
+class AccountDetail(DetailView):
+    model = BaseAccount
+    template_name = 'finance/account.html'
+    context_object_name = 'account'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['activities'] = reversed(list(self.object.activities.all()))
+        return context
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.for_user(self.request.user)
 
 
 def GetHoldingsContext(userprofile, as_of_date=None):
@@ -133,14 +155,6 @@ def Rebalance(request):
     }
 
     return render(request, 'finance/rebalance.html', context)
-
-
-@login_required
-def accountdetail(request, account_id):
-    account = request.user.userprofile.GetAccount(account_id)
-    activities = reversed(list(account.activities.all()))
-    context = {'account': account, 'activities': activities}
-    return render(request, 'finance/account.html', context)
 
 
 @login_required
