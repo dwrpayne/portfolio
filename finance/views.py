@@ -113,7 +113,8 @@ def History(request, period):
 
 @login_required
 def Rebalance(request):
-    allocs, missing = request.user.userprofile.GetRebalanceInfo()
+    cashadd = int(request.GET.get('cashadd', 0))
+    allocs, missing = request.user.userprofile.GetRebalanceInfo(cashadd)
 
     total = [sum(a.desired_pct for a in allocs),
              sum(a.current_pct for a in allocs) + sum(s['current_pct'] for s in missing),
