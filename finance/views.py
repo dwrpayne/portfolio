@@ -25,10 +25,11 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     total_gain = today_value - yesterday_value
 
     holdings = holdings_query.group_by_security()
-    holdings_byacc = holdings_query.group_by_security(True)
 
     def extract_today_with_deltas(holding_list):
         todays = []
+        for h in holding_list:
+            if not 'total_val' in h: h['total_val'] = h['value']
         for yesterday, today in zip(holding_list[::2], holding_list[1::2]):
             today['price_delta'] = today['price'] - yesterday['price']
             today['percent_gain'] = today['price_delta'] / yesterday['price']
@@ -38,9 +39,11 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         return todays
 
     holding_data = extract_today_with_deltas(holdings)
-    account_data = extract_today_with_deltas(holdings_byacc)
+    account_data = extract_today_with_deltas(holdings_query.
+                                             order_by('security', 'account', 'day').
+                                             values())
     for h in holding_data:
-        h['account_data'] = [d for d in account_data if d['security'] == h['security']]
+        h['account_data'] = [d for d in account_data if d['security_id'] == h['security']]
 
     holding_data.sort(key=lambda r: r['total_val'], reverse=True)
 

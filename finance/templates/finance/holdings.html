@@ -31,12 +31,12 @@
                 {% for account in holding_detail.account_data %}
                 <tr class="collapse holdings-table-child-{{forloop.parentloop.counter}}">
                     <td></td>
-                    <td>{{account.account}}</td>
+                    <td>{{account.account_id}}</td>
                     <td>{{account.price | floatformat:2}}</td>
                     <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_gain | percentage | parens | colorize}}</td>
-                    <td>{{account.total_qty | floatformat:0}}</td>
+                    <td>{{account.qty | floatformat:0}}</td>
                     <td>{{account.value_delta | currency | colorize}}</td>
-                    <td>{{account.total_val | currency}}</td>
+                    <td>{{account.value | currency}}</td>
                     <td>{{account.percent | floatformat:1}}</td>
                 </tr>
                 {% endfor %}

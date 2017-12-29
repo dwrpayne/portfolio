@@ -409,11 +409,29 @@ class Activity(models.Model):
         return effects
 
 
+class AllocationManager(models.Manager):
+    def with_rebalance_info(self, holdings, cashadd):
+        total_value = sum(h.value for h in holdings) + cashadd
+
+        allocs = self.get_queryset()
+        for alloc in allocs:
+            alloc.current_amt = sum(h.value for h in holdings.for_securities(alloc.securities.all()))
+            if alloc.securities.filter(type=Security.Type.Cash).exists():
+                alloc.current_amt += cashadd
+
+            alloc.current_pct = alloc.current_amt / total_value
+            alloc.desired_amt = alloc.desired_pct * total_value
+            alloc.buysell = alloc.desired_amt - alloc.current_amt
+
+        return allocs
+
+
 class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='allocations')
     securities = models.ManyToManyField(Security)
     desired_pct = models.DecimalField(max_digits=6, decimal_places=4)
+    objects = AllocationManager()
 
     def __str__(self):
         return "{} - {} - {}".format(self.user, self.desired_pct, self.list_securities())
@@ -458,9 +476,6 @@ class UserProfile(models.Model):
 
     def GetActivities(self):
         return Activity.objects.for_user(self.user)
-
-    def GetAllocations(self):
-        return self.user.allocations.all()
 
     def AreSecurityPricesUpToDate(self):
         securities = self.GetHeldSecurities()
@@ -515,18 +530,12 @@ class UserProfile(models.Model):
     def GetInceptionDate(self):
         return self.GetActivities().earliest().tradeDate
 
-    def GetRebalanceInfo(self):
-        holdings = self.GetHoldingDetails().today().group_by_security()
-        total_value = sum(h['total_val'] for h in holdings)
-
-        allocs = self.GetAllocations()
-        for alloc in allocs:
-            alloc.current_amt = holdings.for_securities(alloc.securities.all()).aggregate_total_value()
-            alloc.current_pct = alloc.current_amt / total_value
-            alloc.desired_amt = alloc.desired_pct * total_value
-            alloc.buysell = alloc.desired_amt - alloc.current_amt
+    def GetRebalanceInfo(self, cashadd=0):
+        holdings = self.GetHoldingDetails().today()
+        allocs = self.user.allocations.with_rebalance_info(holdings, cashadd)
 
         missing = holdings.exclude(security__in=allocs.values_list('securities'))
+        total_value = sum(h.value for h in holdings) + cashadd
         for h in missing:
             h['current_pct'] = h['total_val'] / total_value
 
@@ -559,21 +568,10 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
     def total_values(self):
         return self.values_list('day').annotate(Sum('value'))
 
-    def group_by_security(self, by_account=False):
-        columns = ['security', 'day']
-        if by_account:
-            columns.insert(1, 'account')
-        return self.values(*columns, 'price', 'exch', 'cad',
+    def group_by_security(self):
+        return self.values('security', 'day', 'price', 'exch', 'cad',
                            ).annotate(total_qty=Sum('qty'), total_val=Sum('value')
-                                      ).order_by(*columns)
-
-    def aggregate_total_value(self):
-        if not self:
-            return 0
-        if not 'total_val' in self.first():
-            print('You can only call this function on a queryset after calling group_by_security first')
-            return 0
-        return self.aggregate(total=Sum('total_val'))['total']
+                                      ).order_by('security', 'day')
 
 
 class HoldingDetail(models.Model):
