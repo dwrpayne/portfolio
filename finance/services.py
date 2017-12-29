@@ -15,7 +15,7 @@ class LineGraph:
         return not self.url
 
     def add_trace(self, name, tuples, mode='lines+markers'):
-        self.add_trace_xy(name, *list(zip(*tuples)))
+        self.add_trace_xy(name, *list(zip(*tuples)), mode)
 
     def add_trace_xy(self, name, x_values, y_values, mode='lines+markers'):
         self.traces.append(go.Scattergl(name=name, x=x_values, y=y_values, mode=mode))
@@ -38,7 +38,7 @@ def GenerateReturnPlot(userprofile):
     return graph.plot()
 
 
-def GeneratePlot(userprofile):
+def GeneratePortfolioPlots(userprofile):
     graph = LineGraph('portfolio-values-short-{}'.format(userprofile.username))
     day_val_pairs = userprofile.GetHoldingDetails().total_values()
     graph.add_trace('Total', day_val_pairs)
@@ -49,7 +49,17 @@ def GeneratePlot(userprofile):
 
     growth = [(day, val - dep_totals[find_le_index(dep_dates, day, 0)]) for day, val in day_val_pairs]
     graph.add_trace('Growth', growth)
-    return graph.plot()
+    plot1 = graph.plot()
+
+    graph = LineGraph('portfolio-growth-short-{}'.format(userprofile.username))
+    daily_growth = []
+    for (y_day, y_val), (t_day, t_val) in zip(growth, growth[1:]):
+        if abs(t_val - y_val) > 1:
+            daily_growth.append((t_day, t_val - y_val))
+    graph.add_trace('Daily growth', daily_growth, mode='markers')
+    plot2 = graph.plot()
+
+    return plot1, plot2
 
     # dep_dict = dict(deposits)
     # sp = Security.objects.get(symbol='SPXTR')

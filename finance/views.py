@@ -11,7 +11,7 @@ from django.views.generic import DetailView, ListView
 
 from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
-from .services import GeneratePlot, GenerateSecurityPlot
+from .services import GeneratePortfolioPlots, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 from .models import BaseAccount
 
@@ -91,7 +91,7 @@ def GetBalanceContext(userprofile):
 def Portfolio(request):
     userprofile = request.user.userprofile
     if not userprofile.portfolio_iframe:
-        GeneratePlot(userprofile)
+        GeneratePortfolioPlots(userprofile)
 
     if not userprofile.AreSecurityPricesUpToDate():
         LiveSecurityUpdateTask.delay()
@@ -102,8 +102,8 @@ def Portfolio(request):
             LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
-            url = GeneratePlot(userprofile)
-            userprofile.update_plotly_url(url)
+            urls = GeneratePortfolioPlots(userprofile)
+            userprofile.update_plotly_urls(urls)
 
         elif 'refresh-account' in request.GET:
             SyncActivityTask(userprofile)
@@ -183,7 +183,7 @@ def Snapshot(request):
     day = pendulum.parse(day).date() if day else pendulum.Date.today()
     context = GetHoldingsContext(request.user.userprofile, day)
     age_in_days = (datetime.date.today() - request.user.userprofile.GetInceptionDate()).days
-    context['inception_days_ago'] = age_in_days-1
+    context['inception_days_ago'] = age_in_days - 1
     context['day'] = day
     context['activities'] = request.user.userprofile.GetActivities().at_date(day)
     return render(request, 'finance/snapshot.html', context)

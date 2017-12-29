@@ -315,7 +315,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         if running_totals:
             return self.deposits().annotate(
                 cum_total = RunningSum('netAmount', 'tradeDate')
-            ).values_list('tradeDate', 'netAmount', 'cum_total')
+            ).values_list('tradeDate', 'cum_total')
         else:
             return self.deposits().values_list('tradeDate', 'netAmount')
 
@@ -451,18 +451,23 @@ class Allocation(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
+    plotly_url2 = models.CharField(max_length=500, null=True, blank=True)
 
     @property
     def username(self):
         return self.user.username
 
-    def update_plotly_url(self, new_url):
-        self.plotly_url = new_url
+    def update_plotly_urls(self, urls):
+        self.plotly_url, self.plotly_url2 = urls
         self.save()
 
     @property
     def portfolio_iframe(self):
         return plotly_iframe_from_url(self.plotly_url)
+
+    @property
+    def growth_iframe(self):
+        return plotly_iframe_from_url(self.plotly_url2)
 
     def GetHeldSecurities(self):
         return Holding.objects.for_user(
