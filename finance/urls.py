@@ -12,5 +12,4 @@ urlpatterns = [
     url(r'^account/(?P<pk>[\w]+)/$', views.AccountDetail.as_view(), name='accountdetail'),
     url(r'^capgains/(?P<symbol>.*)/$', views.capgains, name='capgains'),
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
-    url(r'^securities/$', views.SecurityList.as_view(), name='securitydetail'),
 ]
