@@ -8,16 +8,13 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
 from django.views.generic import DetailView, ListView
+from django.views.generic.detail import SingleObjectMixin
 
 from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
 from .services import GeneratePortfolioPlots, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 from .models import BaseAccount
-
-
-class SecurityList(ListView):
-    model = Security
 
 
 class AccountDetail(DetailView):
@@ -33,6 +30,26 @@ class AccountDetail(DetailView):
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.for_user(self.request.user)
+
+
+class SecurityDetail(SingleObjectMixin, ListView):
+    model = Security
+    paginate_by = 10
+    template_name = 'finance/security.html'
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object(queryset=Security.objects.all())
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        filename = GenerateSecurityPlot(self.object)
+        context = super().get_context_data(**kwargs)
+        context['iframe'] = plotly_iframe_from_url(filename)
+        context['symbol'] = self.object.symbol
+        return context
+
+    def get_queryset(self):
+        return self.request.user.userprofile.GetActivities().for_security(self.object)
 
 
 def GetHoldingsContext(userprofile, as_of_date=None):
