@@ -1,5 +1,6 @@
 import datetime
 import pendulum
+import copy
 from decimal import Decimal
 from django.conf import settings
 from django.db import models, transaction, connection
@@ -411,7 +412,7 @@ class Activity(models.Model):
 
 class AllocationManager(models.Manager):
     def with_rebalance_info(self, holdings, cashadd):
-        total_value = sum(h.value for h in holdings) + cashadd
+        total_value = sum(holdings).value + cashadd
 
         allocs = self.get_queryset()
         for alloc in allocs:
@@ -438,8 +439,8 @@ class Allocation(models.Model):
 
     def update_rebalance_info(self, cashadd=0):
         holdings = self.user.userprofile.GetHoldingDetails().today()
-        total_value = sum(h.value for h in holdings) + cashadd
-        self.current_amt = sum(h.value for h in holdings.for_securities(self.securities.all()))
+        total_value = sum(holdings).value + cashadd
+        self.current_amt = sum(holdings.for_securities(self.securities.all())).value
         if self.securities.filter(type=Security.Type.Cash).exists():
             self.current_amt += cashadd
 
@@ -505,12 +506,12 @@ class UserProfile(models.Model):
         deposits = self.GetActivities().between(start+datetime.timedelta(days=1), end).get_all_deposits()
         dates, amounts = (list(zip(*deposits))) if deposits else ([], [])
 
-        start_value = self.GetHoldingDetails().at_date(start).total_values()[0][1]
-        end_value = self.GetHoldingDetails().at_date(end).total_values()[0][1]
+        start_value = sum(self.GetHoldingDetails().at_date(start)).value
+        end_value = sum(self.GetHoldingDetails().at_date(end)).value
 
         all_dates = (start, *dates, end)
         all_values = (-start_value, *(-dep for dep in amounts), end_value)
-        if -1 < sum(all_values) < 1: return 0
+        if abs(sum(all_values)) < 1: return 0
         f = xirr if annualized else total_return
         return 100 * f(zip(all_dates, all_values))
 
@@ -549,7 +550,7 @@ class UserProfile(models.Model):
         allocs = self.user.allocations.with_rebalance_info(holdings, cashadd)
 
         missing = holdings.exclude(security__in=allocs.values_list('securities'))
-        total_value = sum(h.value for h in holdings) + cashadd
+        total_value = sum(holdings).value + cashadd
         for h in missing:
             h['current_pct'] = h['total_val'] / total_value
 
@@ -577,14 +578,6 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
 
     def total_values(self):
         return self.order_by('day').values_list('day').annotate(Sum('value'))
-
-    def get_total_value(self):
-        return self.aggregate(Sum('value'))['value__sum']
-
-    def group_by_security(self):
-        return self.values('security', 'day', 'price', 'exch', 'cad',
-                           ).annotate(total_val=Sum('value')
-                           ).order_by('security', 'day')
 
 
 class HoldingDetail(models.Model):
@@ -656,6 +649,18 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
             self.account_id, self.day, self.security_id, self.qty,
             self.price, self.exch, self.cad, self.value)
 
+    def __radd__(self, other):
+        if other == 0:
+            return HoldingChange.create_from_detail(self)
+        raise NotImplementedError()
+
+    def __add__(self, other):
+        return HoldingChange.create_from_detail(self) + HoldingChange.create_from_detail(other)
+
+    def __sub__(self, other):
+        return HoldingChange.create_delta(other, self)
+
+
 class HoldingChange:
     def __init__(self):
         self.account = None
@@ -668,31 +673,45 @@ class HoldingChange:
         self.percent_gain = 0
 
     @staticmethod
-    def create(previous, current):
+    def create_from_detail(detail):
+        assert isinstance(detail, HoldingDetail)
+
+        hc = HoldingChange()
+        hc.account = detail.account
+        hc.security = detail.security
+        hc.day = detail.day
+        hc.price = detail.price
+        hc.exch = detail.exch
+        hc.qty = detail.qty
+        hc.value = detail.value
+        return hc
+
+    @staticmethod
+    def create_delta(previous, current):
         assert previous.account_id == current.account_id
         assert previous.security_id == current.security_id
         assert previous.day < current.day
 
-        self = HoldingChange()
-        self.account = current.account
-        self.security = current.security
-        self.day = current.day
-        self.day_from = previous.day
-        self.price = current.price
-        self.price_delta = current.price - previous.price
-        self.percent_gain = self.price_delta / previous.price
-        self.exch = current.exch
-        self.qty = current.qty
-        self.value = current.value
-        self.value_delta = current.value - previous.value
-        return self
+        hc = HoldingChange()
+        hc.account = current.account
+        hc.security = current.security
+        hc.day = current.day
+        hc.day_from = previous.day
+        hc.price = current.price
+        hc.price_delta = current.price - previous.price
+        hc.percent_gain = hc.price_delta / previous.price
+        hc.exch = current.exch
+        hc.qty = current.qty
+        hc.value = current.value
+        hc.value_delta = current.value - previous.value
+        return hc
 
     def __str__(self):
-        return "{} {} {} ({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
+        return "{} {} {}({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
                                                self.qty, self.value, self.value_delta)
 
     def __repr__(self):
-        return "{} {} {} ({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
+        return "{} {} {}({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
                                                self.qty, self.value, self.value_delta)
 
     def __radd__(self, other):
@@ -701,6 +720,9 @@ class HoldingChange:
         raise NotImplementedError()
 
     def __add__(self, other):
+        if isinstance(other, HoldingDetail):
+            other = HoldingChange.create_from_detail(other)
+        assert isinstance(other, HoldingChange)
         assert self.day == other.day
 
         ret = HoldingChange()
@@ -714,16 +736,9 @@ class HoldingChange:
             ret.price = self.price
             ret.price_delta = self.price_delta
 
-
         ret.day = self.day
         ret.value = self.value + other.value
         ret.value_delta = self.value_delta + other.value_delta
         ret.percent_gain = ret.value_delta / (ret.value - ret.value_delta)
 
         return ret
-
-
-
-
-
-

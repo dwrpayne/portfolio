@@ -79,7 +79,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     today_query = userprofile.GetHoldingDetails().at_date(as_of_date)
     yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1))
 
-    account_data = [HoldingChange.create(y, t) for y, t in zip(yesterday_query, today_query)]
+    account_data = [t-y for y, t in zip(yesterday_query, today_query)]
     holding_data = []
     for security, holdings in groupby(account_data, lambda h: h.security):
         h = sum(holdings)
