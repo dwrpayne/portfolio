@@ -86,7 +86,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         h.account_data = [d for d in account_data if d.security == security]
         holding_data.append(h)
 
-    holding_data.sort(key=lambda r: r.total_val, reverse=True)
+    holding_data.sort(key=lambda r: r.value, reverse=True)
 
     context = {'holding_data': holding_data, 'total': sum(account_data)}
     return context

@@ -33,8 +33,8 @@
                 <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
                 <td>{{holding_detail.price | floatformat:2}}</td>
                 <td>{{holding_detail.price_delta | floatformat:2 | colorize}} {{holding_detail.percent_gain | percentage | parens | colorize}}</td>
-                <td>{{holding_detail.total_qty | floatformat:0}}</td>
-                <td>{{holding_detail.total_val | currency}}</td>
+                <td>{{holding_detail.qty | floatformat:0}}</td>
+                <td>{{holding_detail.value | currency}}</td>
                 <td>{{holding_detail.value_delta | currency | colorize}}</td>
             </tr>
                 {% for account in holding_detail.account_data %}

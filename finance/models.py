@@ -564,13 +564,13 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.filter(type=Security.Type.Cash)
 
     def week_end(self):
-        return self.filter(day__in=utils.dates.week_ends(self.earliest().day))
+        return self.order_by('day').filter(day__in=utils.dates.week_ends(self.earliest().day))
 
     def month_end(self):
-        return self.filter(day__in=utils.dates.month_ends(self.earliest().day))
+        return self.order_by('day').filter(day__in=utils.dates.month_ends(self.earliest().day))
 
     def year_end(self):
-        return self.filter(day__in=utils.dates.year_ends(self.earliest().day))
+        return self.order_by('day').filter(day__in=utils.dates.year_ends(self.earliest().day))
 
     def account_values(self):
         return self.values_list('account', 'day').annotate(Sum('value'))
@@ -583,8 +583,8 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
 
     def group_by_security(self):
         return self.values('security', 'day', 'price', 'exch', 'cad',
-                           ).annotate(total_qty=Sum('qty'), total_val=Sum('value')
-                                      ).order_by('security', 'day')
+                           ).annotate(total_val=Sum('value')
+                           ).order_by('security', 'day')
 
 
 class HoldingDetail(models.Model):
@@ -660,9 +660,7 @@ class HoldingChange:
     def __init__(self):
         self.account = None
         self.security = None
-        self.total_qty = 0
         self.qty = 0
-        self.total_val = 0
         self.value = 0
         self.value_delta = 0
         self.price = 0
@@ -684,8 +682,8 @@ class HoldingChange:
         self.price_delta = current.price - previous.price
         self.percent_gain = self.price_delta / previous.price
         self.exch = current.exch
-        self.total_qty = self.qty = current.qty
-        self.total_val = self.value = current.value
+        self.qty = current.qty
+        self.value = current.value
         self.value_delta = current.value - previous.value
         return self
 
@@ -712,7 +710,6 @@ class HoldingChange:
 
         if self.security == other.security:
             ret.security = self.security
-            ret.total_qty = self.total_qty + other.total_qty
             ret.qty = self.qty + other.qty
             ret.price = self.price
             ret.price_delta = self.price_delta
@@ -720,9 +717,8 @@ class HoldingChange:
 
         ret.day = self.day
         ret.value = self.value + other.value
-        ret.total_val = self.total_val + other.total_val
         ret.value_delta = self.value_delta + other.value_delta
-        ret.percent_gain = ret.value_delta / (ret.total_val - ret.value_delta)
+        ret.percent_gain = ret.value_delta / (ret.value - ret.value_delta)
 
         return ret
 
