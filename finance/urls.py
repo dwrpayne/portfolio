@@ -10,7 +10,7 @@ urlpatterns = [
     url(r'^snapshot/$', views.Snapshot, name='snapshot'),
     url(r'^rebalance/$', views.Rebalance, name='rebalance'),
     url(r'^account/(?P<pk>[\w]+)/$', views.AccountDetail.as_view(), name='accountdetail'),
-    url(r'^capgains/(?P<symbol>.*)/$', views.capgains, name='capgains'),
+    url(r'^capgains/(?P<pk>.*)/$', views.CapGainsReport.as_view(), name='capgains'),
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
     url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
 ]

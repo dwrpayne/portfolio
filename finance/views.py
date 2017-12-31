@@ -7,6 +7,7 @@ import pendulum
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import DetailView, ListView
 from django.views.generic.detail import SingleObjectMixin
 
@@ -17,7 +18,7 @@ from .tasks import LiveSecurityUpdateTask, SyncActivityTask
 from .models import BaseAccount, Activity, HoldingChange
 
 
-class AccountDetail(DetailView):
+class AccountDetail(LoginRequiredMixin, DetailView):
     model = BaseAccount
     template_name = 'finance/account.html'
     context_object_name = 'account'
@@ -32,7 +33,30 @@ class AccountDetail(DetailView):
         return qs.for_user(self.request.user)
 
 
-class DividendReport(ListView):
+class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
+    model = Activity
+    template_name = 'finance/capgains.html'
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object(queryset=Security.objects.all())
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['symbol'] = self.object
+
+        activities = self.get_queryset()
+        context['activities'] = activities
+        last_activity = activities[-1]
+        context['pendinggain'] = self.object.pricedetails.latest().cadprice * last_activity.totalqty - last_activity.totalacb
+
+        return context
+
+    def get_queryset(self):
+        return self.object.activities.for_user(self.request.user).taxable().without_dividends().with_capgains_data()
+
+
+class DividendReport(LoginRequiredMixin, ListView):
     model = Activity
     template_name = 'finance/dividends.html'
     context_object_name = 'activities'
@@ -184,26 +208,6 @@ def securitydetail(request, symbol):
 
     context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}
     return render(request, 'finance/security.html', context)
-
-
-@login_required
-def capgains(request, symbol):
-    activities = list(request.user.userprofile.GetActivities().for_security(symbol).taxable().without_dividends().with_capgains_data())
-    last_activity = activities[-1]
-    pendinggain = SecurityPriceDetail.objects.for_security(symbol).latest().cadprice * last_activity.totalqty - last_activity.totalacb
-
-    context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
-    return render(request, 'finance/capgains.html', context)
-
-
-@login_required
-def dividends(request):
-    activities = list(request.user.userprofile.GetActivities().taxable().dividends())
-    last_activity = activities[-1]
-    pendinggain = SecurityPriceDetail.objects.for_security(symbol).latest().cadprice * last_activity.totalqty - last_activity.totalacb
-
-    context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
-    return render(request, 'finance/capgains.html', context)
 
 
 @login_required
