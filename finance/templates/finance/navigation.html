@@ -30,7 +30,9 @@
                         <li><a href="{% url 'finance:capgains' security %}">{{security}}</a></li>
                         {% endfor %}
                     </ul>
-                </li>     
+                </li>
+                <li class="{% navactive request 'finance:dividends' %}">
+                    <a href="{% url 'finance:dividends' %}">Dividends</a></li>
                 <li class="dropdown {% navactive request 'finance:securitydetail' %}">
                     <a class="dropdown-toggle" data-toggle="dropdown" href="#">Security Details
                     <span class="caret"></span></a>

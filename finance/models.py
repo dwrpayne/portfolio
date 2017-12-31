@@ -3,7 +3,7 @@ import pendulum
 from decimal import Decimal
 from django.conf import settings
 from django.db import models, transaction, connection
-from django.db.models import Func, F, Sum
+from django.db.models import F, Sum
 from django.db.models.functions import ExtractYear
 from django.utils.functional import cached_property
 from model_utils import Choices
@@ -576,7 +576,10 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.values_list('account', 'day').annotate(Sum('value'))
 
     def total_values(self):
-        return self.values_list('day').annotate(Sum('value'))
+        return self.order_by('day').values_list('day').annotate(Sum('value'))
+
+    def get_total_value(self):
+        return self.aggregate(Sum('value'))['value__sum']
 
     def group_by_security(self):
         return self.values('security', 'day', 'price', 'exch', 'cad',
@@ -641,7 +644,7 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
         managed = False
         db_table = 'financeview_holdingdetail'
         get_latest_by = 'day'
-        ordering = ['day']
+        ordering = ['day', 'security']
 
     def __str__(self):
         return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f}'.format(
@@ -652,3 +655,79 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
         return '{} {} {} {:.2f} {:.2f} {:.4f} {:.2f} {:.2f}'.format(
             self.account_id, self.day, self.security_id, self.qty,
             self.price, self.exch, self.cad, self.value)
+
+class HoldingChange:
+    def __init__(self):
+        self.account = None
+        self.security = None
+        self.total_qty = 0
+        self.qty = 0
+        self.total_val = 0
+        self.value = 0
+        self.value_delta = 0
+        self.price = 0
+        self.price_delta = 0
+        self.percent_gain = 0
+
+    @staticmethod
+    def create(previous, current):
+        assert previous.account_id == current.account_id
+        assert previous.security_id == current.security_id
+        assert previous.day < current.day
+
+        self = HoldingChange()
+        self.account = current.account
+        self.security = current.security
+        self.day = current.day
+        self.day_from = previous.day
+        self.price = current.price
+        self.price_delta = current.price - previous.price
+        self.percent_gain = self.price_delta / previous.price
+        self.exch = current.exch
+        self.total_qty = self.qty = current.qty
+        self.total_val = self.value = current.value
+        self.value_delta = current.value - previous.value
+        return self
+
+    def __str__(self):
+        return "{} {} {} ({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
+                                               self.qty, self.value, self.value_delta)
+
+    def __repr__(self):
+        return "{} {} {} ({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
+                                               self.qty, self.value, self.value_delta)
+
+    def __radd__(self, other):
+        if other == 0:
+            return self
+        raise NotImplementedError()
+
+    def __add__(self, other):
+        assert self.day == other.day
+
+        ret = HoldingChange()
+
+        if self.account == other.account:
+            ret.account = self.account
+
+        if self.security == other.security:
+            ret.security = self.security
+            ret.total_qty = self.total_qty + other.total_qty
+            ret.qty = self.qty + other.qty
+            ret.price = self.price
+            ret.price_delta = self.price_delta
+
+
+        ret.day = self.day
+        ret.value = self.value + other.value
+        ret.total_val = self.total_val + other.total_val
+        ret.value_delta = self.value_delta + other.value_delta
+        ret.percent_gain = ret.value_delta / (ret.total_val - ret.value_delta)
+
+        return ret
+
+
+
+
+
+

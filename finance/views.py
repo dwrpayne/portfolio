@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal
+from itertools import groupby
 
 import numpy
 import pandas
@@ -14,7 +14,7 @@ from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
 from .services import GeneratePortfolioPlots, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
-from .models import BaseAccount
+from .models import BaseAccount, Activity, HoldingChange
 
 
 class AccountDetail(DetailView):
@@ -30,6 +30,27 @@ class AccountDetail(DetailView):
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.for_user(self.request.user)
+
+
+class DividendReport(ListView):
+    model = Activity
+    template_name = 'finance/dividends.html'
+    context_object_name = 'activities'
+
+    def get_context_data(self, **kwargs):
+        dividends = self.get_queryset()
+        by_year = []
+        for year in range(self.request.user.userprofile.GetInceptionDate().year,
+                          datetime.date.today().year+1):
+            by_year.append((year, sum(dividends.in_year(year).values_list('netAmount', flat=True))))
+
+        context = super().get_context_data(**kwargs)
+        context['by_year'] = by_year
+        return context
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.for_user(self.request.user).taxable().dividends()
 
 
 class SecurityDetail(SingleObjectMixin, ListView):
@@ -54,40 +75,20 @@ class SecurityDetail(SingleObjectMixin, ListView):
 
 def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
-    holdings_query = userprofile.GetHoldingDetails().between(
-        as_of_date - datetime.timedelta(days=1),
-        as_of_date
-    )
 
-    total_vals = holdings_query.total_values()
-    (_, yesterday_value), (_, today_value) = total_vals
-    total_gain = today_value - yesterday_value
+    today_query = userprofile.GetHoldingDetails().at_date(as_of_date)
+    yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1))
 
-    holdings = holdings_query.group_by_security()
+    account_data = [HoldingChange.create(y, t) for y, t in zip(yesterday_query, today_query)]
+    holding_data = []
+    for security, holdings in groupby(account_data, lambda h: h.security):
+        h = sum(holdings)
+        h.account_data = [d for d in account_data if d.security == security]
+        holding_data.append(h)
 
-    def extract_today_with_deltas(holding_list):
-        todays = []
-        for h in holding_list:
-            if not 'total_val' in h: h['total_val'] = h['value']
-        for yesterday, today in zip(holding_list[::2], holding_list[1::2]):
-            today['price_delta'] = today['price'] - yesterday['price']
-            today['percent_gain'] = today['price_delta'] / yesterday['price']
-            today['value_delta'] = today['total_val'] - yesterday['total_val']
-            today['percent'] = today['total_val'] / today_value * 100
-            todays.append(today)
-        return todays
+    holding_data.sort(key=lambda r: r.total_val, reverse=True)
 
-    holding_data = extract_today_with_deltas(holdings)
-    account_data = extract_today_with_deltas(holdings_query.
-                                             order_by('security', 'account', 'day').
-                                             values())
-    for h in holding_data:
-        h['account_data'] = [d for d in account_data if d['security_id'] == h['security']]
-
-    holding_data.sort(key=lambda r: r['total_val'], reverse=True)
-
-    total = [(total_gain, total_gain / today_value, today_value)]
-    context = {'holding_data': holding_data, 'total': total}
+    context = {'holding_data': holding_data, 'total': sum(account_data)}
     return context
 
 
@@ -193,6 +194,17 @@ def capgains(request, symbol):
 
     context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
     return render(request, 'finance/capgains.html', context)
+
+
+@login_required
+def dividends(request):
+    activities = list(request.user.userprofile.GetActivities().taxable().dividends())
+    last_activity = activities[-1]
+    pendinggain = SecurityPriceDetail.objects.for_security(symbol).latest().cadprice * last_activity.totalqty - last_activity.totalacb
+
+    context = {'activities': activities, 'symbol': symbol, 'pendinggain': pendinggain}
+    return render(request, 'finance/capgains.html', context)
+
 
 @login_required
 def Snapshot(request):

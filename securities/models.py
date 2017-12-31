@@ -124,7 +124,7 @@ class Security(models.Model):
     mutualfunds = MutualFundSecurityManager()
 
     def __str__(self):
-        return "{} {}".format(self.symbol, self.currency)
+        return "{}".format(self.symbol)
 
     def __repr(self):
         return "Security({} ({}) {})".format(self.symbol, self.currency, self.description)

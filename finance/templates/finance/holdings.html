@@ -2,19 +2,29 @@
 <div id="holdings">
     <table class="table table-striped table-hover table-sm" id="holdings-table">
         <thead>
-        <tr><th></th><th>Symbol</th><th>Price</th><th>Change</th><th>Shares</th><th>Gain</th><th>Total Value</th><th>%</th></tr>
+            <tr>
+                <th></th>
+                <th>Symbol</th>
+                <th>Price</th>
+                <th>Change</th>
+                <th>Shares</th>
+                <th>Total Value</th>
+                <th>Gain</th>
+            </tr>
         </thead>
         <tfoot>
-        {% for total_gain, percent_gain, total_value in total %}
+
             <tr>
                 <td></td>
                 <td>Total</td>
                 <td></td>
-                <td>{{total_gain | currency | colorize}} {{percent_gain | percentage | parens | colorize}}</td>
-                <td></td><td></td>
-                <td>{{total_value | currency}}</td>
+                <td>{{total.value_delta | currency | colorize}}
+                    {{total.percent_gain | percentage | parens | colorize}}</td>
+                <td></td>
+                <td>{{total.value | currency}}</td>
+                <td></td>
             </tr>
-        {% endfor %}
+
         </tfoot>
         <tbody>
             {% for holding_detail in holding_data %}
@@ -24,20 +34,18 @@
                 <td>{{holding_detail.price | floatformat:2}}</td>
                 <td>{{holding_detail.price_delta | floatformat:2 | colorize}} {{holding_detail.percent_gain | percentage | parens | colorize}}</td>
                 <td>{{holding_detail.total_qty | floatformat:0}}</td>
-                <td>{{holding_detail.value_delta | currency | colorize}}</td>
                 <td>{{holding_detail.total_val | currency}}</td>
-                <td>{{holding_detail.percent | floatformat:1}}</td>
+                <td>{{holding_detail.value_delta | currency | colorize}}</td>
             </tr>
                 {% for account in holding_detail.account_data %}
                 <tr class="collapse holdings-table-child-{{forloop.parentloop.counter}}">
                     <td></td>
-                    <td>{{account.account_id}}</td>
+                    <td>{{account.account}}</td>
                     <td>{{account.price | floatformat:2}}</td>
                     <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_gain | percentage | parens | colorize}}</td>
                     <td>{{account.qty | floatformat:0}}</td>
-                    <td>{{account.value_delta | currency | colorize}}</td>
                     <td>{{account.value | currency}}</td>
-                    <td>{{account.percent | floatformat:1}}</td>
+                    <td>{{account.value_delta | currency | colorize}}</td>
                 </tr>
                 {% endfor %}
             {% endfor %}
