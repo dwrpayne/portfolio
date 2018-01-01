@@ -10,12 +10,13 @@ from django.shortcuts import redirect, render
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import DetailView, ListView
 from django.views.generic.detail import SingleObjectMixin
+from django.views.generic.dates import DateMixin, DayMixin
 
-from securities.models import Security, SecurityPriceDetail
+from securities.models import Security
 from utils.misc import plotly_iframe_from_url
 from .services import GeneratePortfolioPlots, GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
-from .models import BaseAccount, Activity, HoldingChange
+from .models import BaseAccount, Activity
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -34,7 +35,6 @@ class AccountDetail(LoginRequiredMixin, DetailView):
 
 
 class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
-    model = Activity
     template_name = 'finance/capgains.html'
 
     def get(self, request, *args, **kwargs):
@@ -97,13 +97,48 @@ class SecurityDetail(SingleObjectMixin, ListView):
         return self.request.user.userprofile.GetActivities().for_security(self.object)
 
 
+class SnapshotDetail(DateMixin, DayMixin, ListView):
+    model = Activity
+    template_name = 'finance/snapshot.html'
+    date_field = 'tradeDate'
+    day_format = "%Y-%m-%d"
+
+    def get_context_data(self, **kwargs):
+        day = self.get_day()
+        context = super().get_context_data(**kwargs)
+        context.update(GetHoldingsContext(self.request.user.userprofile, day))
+        age_in_days = (datetime.date.today() - self.request.user.userprofile.GetInceptionDate()).days
+        context['inception_days_ago'] = age_in_days - 1
+        context['day'] = day
+        next_day = self.get_next_day(day) or ''
+        prev_day = self.get_previous_day(day) or ''
+        context['next_day'] = str(next_day)
+        context['prev_day'] = str(prev_day)
+        context['activities'] = self.request.user.userprofile.GetActivities().at_date(day)
+        return context
+
+    def get_day(self):
+        try:
+           return datetime.datetime.strptime(super().get_day(), self.get_day_format()).date()
+        except:
+           return datetime.date.today()
+
+    def get_queryset(self):
+        return self.request.user.userprofile.GetActivities().at_date(self.get_day())
+
+
 def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
 
     today_query = userprofile.GetHoldingDetails().at_date(as_of_date)
     yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1))
 
-    account_data = [t-y for y, t in zip(yesterday_query, today_query)]
+    account_data = []
+    for today in today_query:
+        yesterday = yesterday_query.filter(account=today.account, security=today.security)
+        if yesterday:
+            account_data.append(today-yesterday[0])
+
     holding_data = []
     for security, holdings in groupby(account_data, lambda h: h.security):
         h = sum(holdings)
@@ -209,17 +244,6 @@ def securitydetail(request, symbol):
     context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}
     return render(request, 'finance/security.html', context)
 
-
-@login_required
-def Snapshot(request):
-    day = request.GET.get('day', None)
-    day = pendulum.parse(day).date() if day else pendulum.Date.today()
-    context = GetHoldingsContext(request.user.userprofile, day)
-    age_in_days = (datetime.date.today() - request.user.userprofile.GetInceptionDate()).days
-    context['inception_days_ago'] = age_in_days - 1
-    context['day'] = day
-    context['activities'] = request.user.userprofile.GetActivities().at_date(day)
-    return render(request, 'finance/snapshot.html', context)
 
 @login_required
 def index(request):

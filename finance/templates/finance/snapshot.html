@@ -5,9 +5,14 @@
 {% block content %}
 <div class="row">
     <div class="col-sm-10" align="center">
-        <h2><a href="{% url 'finance:snapshot' %}?day={{ day | prev_day }}"><<<</a>
+        <h2>
+            {% if prev_day %}
+                <a href="{% url 'finance:snapshot' %}?day={{ prev_day }}"><<<</a>
+            {% endif %}
             Portfolio view as of {{ day }}
-            <a href="{% url 'finance:snapshot' %}?day={{ day | next_day }}">>>></a>
+            {% if next_day %}
+                <a href="{% url 'finance:snapshot' %}?day={{ next_day }}">>>></a>
+            {% endif %}
         </h2>
         {% include "finance/holdings.html" %}
     </div>
