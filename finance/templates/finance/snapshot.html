@@ -17,13 +17,8 @@
         {% include "finance/holdings.html" %}
     </div>
     <div class="col-sm-2">
-        <div class="form-group">
-            <form action="" id="date-submit-form" method="get">
-                <label for="datepicker">See portfolio as of</label>
-                <input type="text" class="form-control" id="datepicker" placeholder="{{ day }}" name="day">
-                <button type="submit">Submit</button>
-            </form>
-        </div>
+        <h3>Jump to date:<br/></h3>
+        <div type="text" id="datepicker" placeholder="{{ day }}"></div>
     </div>
 </div>
 <div class="row">
@@ -45,7 +40,10 @@
                 selectOtherMonths: true,
                 minDate: -{{ inception_days_ago }},
                 maxDate: 0,
-                defaultDate: "{{ day.isoformat }}"
+                defaultDate: "{{ day.isoformat }}",
+                onSelect: function(date) {
+                    window.location.href = window.location.href.split('?')[0] + '?day=' + date;
+                }
             });
         });
     </script>
