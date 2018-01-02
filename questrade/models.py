@@ -6,7 +6,7 @@ from json import dumps, loads, JSONDecodeError
 import pendulum
 import requests
 from dateutil import parser
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 
 from finance.models import Activity
