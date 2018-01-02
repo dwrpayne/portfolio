@@ -14,45 +14,12 @@ from datasource.models import DataSourceMixin
 from polymorphic.manager import PolymorphicManager
 
 
-class GrsRawActivityManager(PolymorphicManager):
-    def create_from_html(self, html, account):
-        """
-        Activities are returned in an html table, with the first few rows being headers.
-        Example activity row:
-        <TR>
-            <TD class='activities-d-lit1'>01-FEB-17</TD>
-            <TD class='activities-d-lit2'>New contribution</TD>
-            <TD class='activities-d-transamt'>123.45</TD>
-            <TD class='activities-d-netunitvalamt'>22.123456</TD>
-            <TD class='activities-d-unitnum'>5.58005</TD>
-        </TR>
-        """
-        soup = BeautifulSoup(html, 'html.parser')
-        tags = soup.find_all(class_=re.compile('activities-d-*'))
-        if not tags:
-            return 0
-
-        rows = split_before(tags, lambda tag: tag.class_ == tags[0].class_)
-        with transaction.atomic():
-            for day, desc, _, price, qty in rows:
-                # TODO: Hacking the symbol here to the only one I buy. I have the description in
-                # TODO: <TD class='activities-sh2'>Canadian Equity (Leith Wheeler)-Employer</TD>
-                # TODO: Create the security with that description and then do a lookup here.
-                self.create(
-                    account=account, day=parser.parse(day).date(),
-                    qty=Decimal(qty), price=Decimal(price),
-                    symbol='ETP', description=desc)
-        return len(rows)
-
-
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
     symbol = models.CharField(max_length=100)
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     description = models.CharField(max_length=256)
-
-    objects = GrsRawActivityManager()
 
     def __str__(self):
         return '{}: Bought {} {} at {}'.format(self.day, self.qty, self.symbol, self.price)
@@ -74,10 +41,6 @@ class GrsRawActivity(BaseRawActivity):
 
 
 class GrsAccount(BaseAccount):
-    """
-    We don't really need this class here, but GRS is a good example of a
-    simple integration and I want it to be complete
-    """
     def __str__(self):
         return '{} {} {}'.format(self.client, self.id, self.type)
 
@@ -87,6 +50,23 @@ class GrsAccount(BaseAccount):
     @property
     def activitySyncDateRange(self):
         return 360
+
+    def CreateRawActivities(self, start, end):
+        with self.client:
+            activities = self.client.GetActivities(self, start, end)
+        activities = []
+        with transaction.atomic():
+            for day, desc, _, price, qty in activities:
+                # TODO: Hacking the symbol here to the only one I buy. I have the description in
+                # TODO: <TD class='activities-sh2'>Canadian Equity (Leith Wheeler)-Employer</TD>
+                # TODO: Create the security with that description and then do a lookup here.
+                obj = GrsRawActivity.objects.create(
+                    account=self, day=parser.parse(day).date(),
+                    qty=Decimal(qty), price=Decimal(price),
+                    symbol='ETP', description=desc)
+                activities.append(obj)
+        return activities
+
 
 class GrsClient(BaseClient):
     username = models.CharField(max_length=32)
@@ -108,16 +88,26 @@ class GrsClient(BaseClient):
         self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx',
                            params={'Selected_Info': plan_data})
 
-    def RequestRates(self, symbol, start, end):
+    def GetRates(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
                                    data={'PlanFund': symbol,
                                          'StartDate': start.format('%m/%d/%y'),
                                          'EndDate': end.format('%m/%d/%y')}
                                 )
         response.raise_for_status()
-        return response
 
-    def CreateRawActivities(self, account, start, end):
+        soup = BeautifulSoup(response.text, 'html.parser')
+        table_header = soup.find('tr', 'table-header')
+        if table_header:
+            dates = (td.string for td in table_header('td')[1:])
+            values = (td.string for td in table_header.next_sibling('td')[1:])
+            rates = [(parser.parse(date).date(), Decimal(value.strip('$')))
+                     for date, value in zip(dates, values)
+                     if 'Unknown' not in value]
+            return rates
+        return []
+
+    def GetActivities(self, account, start, end):
         response = self.session.post(
             'https://ssl.grsaccess.com/english/member/activity_reports_details.aspx',
             data={
@@ -126,13 +116,31 @@ class GrsClient(BaseClient):
             }
         )
         response.raise_for_status()
-        return GrsRawActivity.objects.create_from_html(response.text, account)
+
+        """
+        Activities are returned in an html table, with the first few rows being headers.
+        Example activity row:
+        <TR>
+            <TD class='activities-d-lit1'>01-FEB-17</TD>
+            <TD class='activities-d-lit2'>New contribution</TD>
+            <TD class='activities-d-transamt'>123.45</TD>
+            <TD class='activities-d-netunitvalamt'>22.123456</TD>
+            <TD class='activities-d-unitnum'>5.58005</TD>
+        </TR>
+        """
+        soup = BeautifulSoup(response.text, 'html.parser')
+        tags = soup.find_all(class_=re.compile('activities-d-*'))
+        if not tags:
+            return []
+
+        return split_before(tags, lambda tag: tag.class_ == tags[0].class_)
 
 
 class GrsDataSource(DataSourceMixin):
     symbol = models.CharField(max_length=32)
     client = models.ForeignKey(GrsClient, on_delete=models.CASCADE)
     plan_data = models.CharField(max_length=100)
+    MAX_SYNC_DAYS = 15
 
     def __str__(self):
         return "GRS Client {} for symbol {}".format(self.client, self.symbol)
@@ -140,22 +148,8 @@ class GrsDataSource(DataSourceMixin):
     def __repr__(self):
         return "GrsDataSource<{},{}>".format(self.symbol, self.client)
 
-    @property
-    def max_sync_days(self):
-        return 15
-
     def _Retrieve(self, start, end):
         with self.client as client:
             client.PrepareRateRetrieval(self.plan_data)
-            for period in utils.dates.day_intervals(self.max_sync_days, start, end):
-                response = client.RequestRates(self.symbol, period.start, period.end)
-
-                soup = BeautifulSoup(response.text, 'html.parser')
-                table_header = soup.find('tr', 'table-header')
-                if table_header:
-                    dates = (td.string for td in table_header('td')[1:])
-                    values = (td.string for td in table_header.next_sibling('td')[1:])
-                    for date, value in zip(dates, values):
-                        if 'Unknown' not in value:
-                            yield parser.parse(date).date(), Decimal(value.strip('$'))
-        return
+            for period in utils.dates.day_intervals(self.MAX_SYNC_DAYS, start, end):
+                yield from client.GetRates(self.symbol, period.start, period.end)

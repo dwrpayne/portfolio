@@ -6,8 +6,9 @@ from json import dumps, loads, JSONDecodeError
 import pendulum
 import requests
 from dateutil import parser
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
+from polymorphic.manager import PolymorphicManager
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
@@ -23,14 +24,28 @@ class QuestradeActivityTypeManager(models.Manager):
             print('No action type mapping for "{}" "{}"'.format(type, action))
             return Activity.Type.NotImplemented
 
+
 class QuestradeActivityType(models.Model):
     q_type = models.CharField(max_length=32)
     q_action = models.CharField(max_length=32)
     activity_type = models.CharField(max_length=32)
     objects = QuestradeActivityTypeManager()
 
+
+class QuestradeRawActivityManager(PolymorphicManager):
+    def get_or_create(self, defaults=None, **kwargs):
+        obj, created = super().get_or_create(defaults, **kwargs)
+        if not created and self.model.AllowDuplicate(kwargs['jsonstr']):
+            kwargs['jsonstr'] = kwargs['jsonstr'].replace('YOUR ACCOUNT   ', 'YOUR ACCOUNT X2')
+            obj = super().create(**kwargs)
+            return obj, True
+        return obj, created
+
+
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
+
+    objects = QuestradeRawActivityManager()
 
     class Meta:
         unique_together = ('baserawactivity_ptr', 'jsonstr')
@@ -144,6 +159,18 @@ class QuestradeAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 28
 
+    def CreateRawActivities(self, start, end):
+        with self.client:
+            json = self.client.GetActivities(self.id, start, end)
+        activities = []
+        with transaction.atomic():
+            for activity_json in json:
+                jsonstr = dumps(json)
+                obj, created = QuestradeRawActivity.objects.get_or_create(jsonstr=jsonstr)
+                if created:
+                    activities.append(obj)
+        return activities
+
     def SyncBalances(self):
         with self.client as c:
             json = c.GetAccountBalances(self.id)
@@ -218,23 +245,16 @@ class QuestradeClient(BaseClient):
     def GetAccountBalances(self, id):
         return self._GetRequest('accounts/{}/balances'.format(id))
 
+    @api_response('activities')
+    def GetActivities(self, account_id, start, end):
+        start = pendulum.create(start.year, start.month, start.day)
+        end = pendulum.create(end.year, end.month, end.day)
+        json = self._GetRequest('accounts/{}/activities'.format(account_id),
+                                {'startTime': start.isoformat(), 'endTime': end.isoformat()})
+        print("Get activities from source returned: " + dumps(json))
+        return json
+
     def SyncAccounts(self):
         for account_json in self.GetAccounts():
             QuestradeAccount.objects.get_or_create(
                 type=account_json['type'], id=account_json['number'], client=self)
-
-    def CreateRawActivities(self, account, start, end):
-        start = pendulum.create(start.year, start.month, start.day)
-        end = pendulum.create(end.year, end.month, end.day)
-        try:
-            json = self._GetRequest('accounts/{}/activities'.format(account.id),
-                                    {'startTime': start.isoformat(), 'endTime': end.isoformat()})
-        except:
-            raise
-        print("Get activities from source returned: " + dumps(json))
-        count = 0
-        for activity_json in json['activities']:
-            if QuestradeRawActivity.Add(activity_json, account):
-                count += 1
-        return count
-

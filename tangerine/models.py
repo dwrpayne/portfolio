@@ -7,6 +7,7 @@ from dateutil import parser
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
 from securities.models import Security
 
+
 class TangerineRawActivity(BaseRawActivity):
     day = models.DateField()
     description = models.CharField(max_length=1000)
@@ -49,9 +50,9 @@ class TangerineRawActivity(BaseRawActivity):
             activity_type = Activity.Type.NotImplemented
 
         creation_fn(account=self.account, tradeDate=self.day, security=security,
-                                cash_id=security.currency,
-                                description=self.description, qty=self.qty,
-                                price=self.price, netAmount=net_amount, type=activity_type, raw=self)
+                    cash_id=security.currency,
+                    description=self.description, qty=self.qty,
+                    price=self.price, netAmount=net_amount, type=activity_type, raw=self)
 
 
 class TangerineAccount(BaseAccount):
@@ -72,6 +73,28 @@ class TangerineAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 2000
 
+    def CreateRawActivities(self, start, end):
+        with self.client:
+            transactions = self.client.GetActivities(self.id, start, end)
+        activities = []
+        for trans in transactions:
+            obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'],
+                                                            defaults={
+                                                                'day': parser.parse(
+                                                                    trans['transaction_date']).date(),
+                                                                'description': trans['description'],
+                                                                'type': trans['mutual_fund'][
+                                                                    'transaction_type'],
+                                                                'symbol': trans['mutual_fund'][
+                                                                    'portfolio_name'],
+                                                                'qty': trans['mutual_fund']['units'],
+                                                                'price': trans['mutual_fund'][
+                                                                    'unit_price']
+                                                            })
+            if created: activities.append(obj)
+        return activities
+
+
 class TangerineClient(BaseClient):
     username = models.CharField(max_length=32)
     password = models.CharField(max_length=100)
@@ -84,7 +107,6 @@ class TangerineClient(BaseClient):
 
     def __repr__(self):
         return 'TangerineClient<{}>'.format(self.display_name)
-
 
     @staticmethod
     def _GetRequest(url, params=None):
@@ -115,23 +137,6 @@ class TangerineClient(BaseClient):
         except requests.exceptions.HTTPError:
             print("Couldn't sync accounts - possible server failure?")
 
-    def CreateRawActivities(self, account, start, end):
+    def GetActivities(self, account_id, start, end):
         with self.client.login():
-            transactions = self.client.list_transactions([account.id], start, end)
-            count = 0
-            for trans in transactions:
-                obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'], account=account,
-                                                                          defaults={
-                                                                              'day': parser.parse(
-                                                                                  trans['transaction_date']).date(),
-                                                                              'description': trans['description'],
-                                                                              'type': trans['mutual_fund'][
-                                                                                  'transaction_type'],
-                                                                              'symbol': trans['mutual_fund'][
-                                                                                  'portfolio_name'],
-                                                                              'qty': trans['mutual_fund']['units'],
-                                                                              'price': trans['mutual_fund'][
-                                                                                  'unit_price']
-                                                                          })
-                if created: count += 1
-            return count
+            return self.client.list_transactions([account_id], start, end)

@@ -1,5 +1,6 @@
 import datetime
 import pendulum
+from itertools import chain
 from decimal import Decimal
 from django.conf import settings
 from django.db import models, transaction, connection
@@ -47,14 +48,6 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
 
     def SyncAccounts(self):
         pass
-
-    def CreateRawActivities(self, account, start, end):
-        """
-        Retrieve raw activity data from your client source for the specified account and start/end period.
-        Store it in the DB as a subclass of BaseRawActivity.
-        Return the number of new raw activities created.
-        """
-        return 0
 
 
 class BaseAccountQuerySet(PolymorphicQuerySet):
@@ -131,20 +124,15 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         pass
 
     def SyncAndRegenerate(self):
-        """
-        Syncs all raw activities for the specified account from our associated client.
-        Returns the number of new raw activities created.
-        """
         date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
 
         print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
-        with self.client as c:
-            activities = c.GetRawActivities()
-            new_count = sum(c.CreateRawActivities(self, period.start, period.end) for period in date_range)
-        # TODO: Better error handling when we can't actually sync new activities from server.
-        # Should we still regenerate here?
-        if new_count >= 0:
-            self._RegenerateActivities()
+        new_raw_activities = list(chain.from_iterable(
+            self.CreateRawActivities(period.start, period.end) for period in date_range))
+        with transaction.atomic():
+            for raw in new_raw_activities:
+                raw.CreateActivity()
+        if new_raw_activities:
             self._RegenerateHoldings()
 
     def _RegenerateActivities(self):
@@ -159,6 +147,14 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             for security, qty_delta in activity.GetHoldingEffects().items():
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
+
+    def CreateRawActivities(self, start, end):
+        """
+        Retrieve raw activity data from your client source for the specified account and start/end period.
+        Store it in the DB as a subclass of BaseRawActivity.
+        Return the newly created raw instances.
+        """
+        return []
 
     def GetValueAtDate(self, date):
         return self.holdingdetail_set.at_date(date).total_values().first()[1]
