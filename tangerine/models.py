@@ -108,14 +108,6 @@ class TangerineClient(BaseClient):
     def __repr__(self):
         return 'TangerineClient<{}>'.format(self.display_name)
 
-    @staticmethod
-    def _GetRequest(url, params=None):
-        if params is None:
-            params = []
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        return r.json()
-
     def Authorize(self):
         secrets_dict = {'username': self.username, 'password': self.password,
                         'security_questions': {

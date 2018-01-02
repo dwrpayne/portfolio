@@ -206,7 +206,6 @@ class QuestradeClient(BaseClient):
 
     def Authorize(self):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
-
         with self.authorization_lock:
             if self.needs_refresh:
                 _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
