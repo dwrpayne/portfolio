@@ -3,6 +3,7 @@ import plotly.graph_objs as go
 
 from utils.misc import find_le_index
 import datetime
+from itertools import chain
 
 
 class LineGraph:
@@ -56,12 +57,13 @@ def GeneratePortfolioPlots(userprofile):
 
     deposits = userprofile.GetActivities().get_all_deposits(running_totals=True)
     dep_dates, dep_totals = list(zip(*deposits))
-    dep_dates = dep_dates + (datetime.date.today(),)
-    dep_totals = dep_totals + (dep_totals[-1],)
+    prev_dates = [d - datetime.timedelta(days=1) for d in dep_dates[1:]] + [datetime.date.today()]
+    dep_dates = list(chain.from_iterable(zip(dep_dates, prev_dates)))
+    dep_totals = list(chain.from_iterable(zip(dep_totals, dep_totals)))
     graph.add_trace_xy('Deposits', x_values=dep_dates, y_values=dep_totals)
 
     growth = [(day, val - dep_totals[find_le_index(dep_dates, day, 0)]) for day, val in day_val_pairs]
-    graph.add_trace('Growth', growth)
+    graph.add_trace('Total Growth', growth)
 
     graph.set_titles(title='Portfolio Value Over Time')
     plot1 = graph.plot()

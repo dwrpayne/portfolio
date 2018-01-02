@@ -1,9 +1,8 @@
 import datetime
 from itertools import groupby
-
+from operator import attrgetter
 import numpy
 import pandas
-import pendulum
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
@@ -53,7 +52,7 @@ class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
         return context
 
     def get_queryset(self):
-        return self.object.activities.for_user(self.request.user).taxable().without_dividends().with_capgains_data()
+        return self.object.activities.for_user(self.request.user).without_dividends().with_capgains_data()
 
 
 class DividendReport(LoginRequiredMixin, ListView):
@@ -74,7 +73,7 @@ class DividendReport(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        return qs.for_user(self.request.user).taxable().dividends()
+        return qs.for_user(self.request.user).dividends()
 
 
 class SecurityDetail(SingleObjectMixin, ListView):
@@ -143,9 +142,9 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         h.account_data = [d for d in account_data if d.security == security]
         holding_data.append(h)
 
-    holding_data.sort(key=lambda r: r.value, reverse=True)
-
-    context = {'holding_data': holding_data, 'total': sum(account_data)}
+    context = {'holding_data': sorted(holding_data, key=attrgetter('type', 'value'), reverse=True),
+               'total': sum(account_data)
+               }
     return context
 
 

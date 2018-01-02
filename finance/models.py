@@ -486,11 +486,13 @@ class UserProfile(models.Model):
         return Holding.objects.for_user(
             self.user).current().values_list('security_id', flat=True).distinct()
 
-    def GetTaxableSecurities(self):
-        return Holding.objects.filter(
-            account__taxable=True
-        ).exclude(security__type=Security.Type.Cash
+    def GetCapGainsSecurities(self):
+        only_taxable_accounts = False
+        query = Holding.objects.exclude(security__type=Security.Type.Cash
                   ).for_user(self.user).current().values_list('security_id', flat=True).distinct()
+        if only_taxable_accounts:
+            query = query.filter(account__taxable=True)
+        return query
 
     def GetHoldingDetails(self):
         return HoldingDetail.objects.for_user(self.user)
@@ -728,6 +730,10 @@ class HoldingChange:
     def __repr__(self):
         return "{} {} {}({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
                                                self.qty, self.value, self.value_delta)
+
+    @property
+    def type(self):
+        return self.security.type
 
     def __radd__(self, other):
         if other == 0:
