@@ -12,25 +12,15 @@ from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSou
 from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
 from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 
-
-class SecurityManager(models.Manager):
-    @classmethod
-    def get_default_datasource(cls, type, symbol):
-        if type == cls.model.Type.Stock:
-            return AlphaVantageDataSource.objects.get_or_create(symbol=symbol)
-        if type == cls.model.Type.Cash:
-            return PandasDataSource.objects.create_bankofcanada(currency_code=symbol)
-        if type == cls.model.Type.MutualFund:
-            return MorningstarDataSource.objects.get_or_create(symbol=symbol)
-        return None
-
+class SecurityQuerySet(models.QuerySet):
     def create(self, **kwargs):
         kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
-        kwargs.setdefault('datasource', self.get_default_datasource(kwargs['type'], kwargs['symbol']))
+        kwargs.setdefault('datasource', self.model.get_default_datasource(kwargs['type'], kwargs['symbol']))
         if kwargs['type'] == self.model.Type.Stock:
             kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
         return super().create(**kwargs)
 
+class SecurityManager(models.Manager):
     def Sync(self, live_update):
         queryset = self.get_queryset()
         if live_update:
@@ -117,11 +107,11 @@ class Security(models.Model):
     datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
                                    default=None, on_delete=models.DO_NOTHING)
 
-    objects = SecurityManager()
-    stocks = StockSecurityManager()
-    options = OptionSecurityManager()
-    cash = CashSecurityManager()
-    mutualfunds = MutualFundSecurityManager()
+    objects = SecurityManager.from_queryset(SecurityQuerySet)()
+    stocks = StockSecurityManager.from_queryset(SecurityQuerySet)()
+    options = OptionSecurityManager.from_queryset(SecurityQuerySet)()
+    cash = CashSecurityManager.from_queryset(SecurityQuerySet)()
+    mutualfunds = MutualFundSecurityManager().from_queryset(SecurityQuerySet)()
 
     def __str__(self):
         return "{}".format(self.symbol)
@@ -154,6 +144,17 @@ class Security(models.Model):
             return 100
         if self.type == self.Type.OptionMini:
             return 10
+
+    @classmethod
+    def get_default_datasource(cls, type, symbol):
+        obj = None
+        if type == cls.Type.Stock:
+            obj, created = AlphaVantageDataSource.objects.get_or_create(symbol=symbol)
+        if type == cls.Type.Cash:
+            obj = PandasDataSource.objects.create_bankofcanada(currency_code=symbol)
+        if type == cls.Type.MutualFund:
+            obj, created = MorningstarDataSource.objects.get_or_create(symbol=symbol)
+        return obj
 
     def SetDataSource(self, datasource):
         self.datasource = datasource
