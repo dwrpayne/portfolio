@@ -2,6 +2,7 @@ import plotly
 import plotly.graph_objs as go
 
 from utils.misc import find_le_index
+import datetime
 
 
 class LineGraph:
@@ -45,6 +46,8 @@ def GeneratePortfolioPlots(userprofile):
 
     deposits = userprofile.GetActivities().get_all_deposits(running_totals=True)
     dep_dates, dep_totals = list(zip(*deposits))
+    dep_dates = dep_dates + (datetime.date.today(),)
+    dep_totals = dep_totals + (dep_totals[-1],)
     graph.add_trace_xy('Deposits', x_values=dep_dates, y_values=dep_totals)
 
     growth = [(day, val - dep_totals[find_le_index(dep_dates, day, 0)]) for day, val in day_val_pairs]
