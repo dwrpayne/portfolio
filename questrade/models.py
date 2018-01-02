@@ -60,18 +60,6 @@ class QuestradeRawActivity(BaseRawActivity):
         # TODO: This should go in the database... somehow...
         return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
 
-    @classmethod
-    def Add(cls, json, account):
-        """ Returns true if we added a new activity to the DB, false if it already existed. """
-        s = dumps(json)
-        obj, created = QuestradeRawActivity.objects.get_or_create(jsonstr=s, account=account)
-        if not created and cls.AllowDuplicate(s):
-            s = s.replace('YOUR ACCOUNT   ', 'YOUR ACCOUNT X2')
-            QuestradeRawActivity.objects.create(jsonstr=s, account=account)
-            return True
-
-        return created
-
     def GetCleanedJson(self):
         json = loads(self.jsonstr)
 
@@ -165,7 +153,7 @@ class QuestradeAccount(BaseAccount):
         activities = []
         with transaction.atomic():
             for activity_json in json:
-                jsonstr = dumps(json)
+                jsonstr = dumps(activity_json)
                 obj, created = QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=jsonstr)
                 if created:
                     activities.append(obj)
