@@ -11,7 +11,6 @@ import utils.dates
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
 from securities.models import Security
 from datasource.models import DataSourceMixin
-from polymorphic.manager import PolymorphicManager
 
 
 class GrsRawActivity(BaseRawActivity):
@@ -51,21 +50,16 @@ class GrsAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 360
 
-    def CreateRawActivities(self, start, end):
+    def CreateActivities(self, start, end):
         with self.client:
-            activities = self.client.GetActivities(self, start, end)
-        activities = []
-        with transaction.atomic():
-            for day, desc, _, price, qty in activities:
+            for day, desc, _, price, qty in self.client.GetActivities(self, start, end):
                 # TODO: Hacking the symbol here to the only one I buy. I have the description in
                 # TODO: <TD class='activities-sh2'>Canadian Equity (Leith Wheeler)-Employer</TD>
                 # TODO: Create the security with that description and then do a lookup here.
-                obj = GrsRawActivity.objects.create(
+                GrsRawActivity.objects.create(
                     account=self, day=parser.parse(day).date(),
                     qty=Decimal(qty), price=Decimal(price),
                     symbol='ETP', description=desc)
-                activities.append(obj)
-        return activities
 
 
 class GrsClient(BaseClient):

@@ -125,14 +125,14 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     def SyncAndRegenerate(self):
         date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
-
         print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
-        new_raw_activities = list(chain.from_iterable(
-            self.CreateRawActivities(period.start, period.end) for period in date_range))
-        with transaction.atomic():
-            for raw in new_raw_activities:
-                raw.CreateActivity()
-        if new_raw_activities:
+
+        activity_count = self.activities.all().count()
+
+        for period in date_range:
+            self.CreateActivities(period.start, period.end)
+
+        if self.activities.all().count() > activity_count:
             self._RegenerateHoldings()
 
     def _RegenerateActivities(self):
@@ -148,7 +148,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
                 self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
         self.holding_set.filter(qty=0).delete()
 
-    def CreateRawActivities(self, start, end):
+    def CreateActivities(self, start, end):
         """
         Retrieve raw activity data from your client source for the specified account and start/end period.
         Store it in the DB as a subclass of BaseRawActivity.
@@ -177,6 +177,7 @@ class HoldingManager(models.Manager):
 
         except Holding.MultipleObjectsReturned:
             print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, symbol, date))
+            raise
         except Holding.DoesNotExist:
             pass
 
@@ -230,8 +231,18 @@ class Holding(models.Model):
         self.save(update_fields=['enddate'])
 
 
+class BaseRawActivityManager(PolymorphicManager):
+    def create(self, **kwargs):
+        with transaction.atomic():
+            obj = super().create(**kwargs)
+            obj.CreateActivity()
+            return obj
+
+
 class BaseRawActivity(ShowFieldTypeAndContent, PolymorphicModel):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
+
+    objects = BaseRawActivityManager()
 
     def CreateActivity(self):
         pass

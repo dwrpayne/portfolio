@@ -8,10 +8,10 @@ import requests
 from dateutil import parser
 from django.db import models, transaction
 from django.utils import timezone
-from polymorphic.manager import PolymorphicManager
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
+from finance.models import BaseRawActivityManager
 from securities.models import Security
 from utils.api import api_response
 
@@ -32,7 +32,7 @@ class QuestradeActivityType(models.Model):
     objects = QuestradeActivityTypeManager()
 
 
-class QuestradeRawActivityManager(PolymorphicManager):
+class QuestradeRawActivityManager(BaseRawActivityManager):
     def get_or_create(self, defaults=None, **kwargs):
         obj, created = super().get_or_create(defaults, **kwargs)
         if not created and self.model.AllowDuplicate(kwargs['jsonstr']):
@@ -147,17 +147,10 @@ class QuestradeAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 28
 
-    def CreateRawActivities(self, start, end):
+    def CreateActivities(self, start, end):
         with self.client:
-            json = self.client.GetActivities(self.id, start, end)
-        activities = []
-        with transaction.atomic():
-            for activity_json in json:
-                jsonstr = dumps(activity_json)
-                obj, created = QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=jsonstr)
-                if created:
-                    activities.append(obj)
-        return activities
+            for json in self.client.GetActivities(self.id, start, end):
+                QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=dumps(json))
 
     def SyncBalances(self):
         with self.client as c:
