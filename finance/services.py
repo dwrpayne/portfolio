@@ -10,6 +10,9 @@ class LineGraph:
         self.traces = []
         self.filename = graph_name_unique
         self.url = None
+        self.title = ''
+        self.xaxis_title = ''
+        self.yaxis_title = ''
 
     @property
     def is_plotted(self):
@@ -21,8 +24,15 @@ class LineGraph:
     def add_trace_xy(self, name, x_values, y_values, mode='lines+markers'):
         self.traces.append(go.Scattergl(name=name, x=x_values, y=y_values, mode=mode))
 
+    def set_titles(self, title='', xaxis='', yaxis=''):
+        self.title = title
+        self.xaxis_title = xaxis
+        self.yaxis_title = yaxis
+
     def plot(self):
-        self.url = plotly.plotly.plot(self.traces, filename=self.filename, auto_open=False)
+        layout = go.Layout(title=self.title, xaxis={'title':self.xaxis_title}, yaxis={'title':self.yaxis_title})
+        fig = go.Figure(data=self.traces, layout=layout)
+        self.url = plotly.plotly.plot(fig, filename=self.filename, auto_open=False)
         return self.url
 
 
@@ -52,6 +62,8 @@ def GeneratePortfolioPlots(userprofile):
 
     growth = [(day, val - dep_totals[find_le_index(dep_dates, day, 0)]) for day, val in day_val_pairs]
     graph.add_trace('Growth', growth)
+
+    graph.set_titles(title='Portfolio Value Over Time')
     plot1 = graph.plot()
 
     graph = LineGraph('portfolio-growth-short-{}'.format(userprofile.username))
@@ -60,6 +72,7 @@ def GeneratePortfolioPlots(userprofile):
         if abs(t_val - y_val) > 1:
             daily_growth.append((t_day, t_val - y_val))
     graph.add_trace('Daily growth', daily_growth, mode='markers')
+    graph.set_titles(title='Daily Change in Value')
     plot2 = graph.plot()
 
     return plot1, plot2
