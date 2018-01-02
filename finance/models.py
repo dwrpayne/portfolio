@@ -564,7 +564,7 @@ class UserProfile(models.Model):
         missing = holdings.exclude(security__in=allocs.values_list('securities'))
         total_value = sum(holdings).value + cashadd
         for h in missing:
-            h['current_pct'] = h['total_val'] / total_value
+            h.current_pct = (h.value / total_value) if total_value else 0
 
         return allocs, missing
 
@@ -589,7 +589,7 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.order_by('day').filter(day__in=utils.dates.year_ends(self.earliest().day))
 
     def account_values(self):
-        return self.values_list('account', 'day').annotate(Sum('value'))
+        return self.values_list('account__display_name', 'day').annotate(Sum('value'))
 
     def total_values(self):
         return self.order_by('day').values_list('day').annotate(Sum('value'))

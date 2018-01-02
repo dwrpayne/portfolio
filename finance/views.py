@@ -216,9 +216,9 @@ def Rebalance(request):
     allocs, missing = request.user.userprofile.GetRebalanceInfo(cashadd)
 
     total = [sum(a.desired_pct for a in allocs),
-             sum(a.current_pct for a in allocs) + sum(s['current_pct'] for s in missing),
+             sum(a.current_pct for a in allocs) + sum(s.current_pct for s in missing),
              sum(a.desired_amt for a in allocs),
-             sum(a.current_amt for a in allocs) + sum(s['total_val'] for s in missing),
+             sum(a.current_amt for a in allocs) + sum(s.value for s in missing),
              sum(a.buysell for a in allocs),
              ]
 
