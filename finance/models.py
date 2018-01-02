@@ -1,6 +1,5 @@
 import datetime
 import pendulum
-import copy
 from decimal import Decimal
 from django.conf import settings
 from django.db import models, transaction, connection
@@ -19,6 +18,7 @@ from utils.misc import xirr, total_return
 from securities.models import Security, SecurityPriceDetail, SecurityPriceQuerySet
 from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
 from utils.misc import plotly_iframe_from_url
+from .services import GeneratePortfolioPlots
 
 
 class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
@@ -139,6 +139,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
         print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
         with self.client as c:
+            activities = c.GetRawActivities()
             new_count = sum(c.CreateRawActivities(self, period.start, period.end) for period in date_range)
         # TODO: Better error handling when we can't actually sync new activities from server.
         # Should we still regenerate here?
@@ -469,6 +470,10 @@ class UserProfile(models.Model):
     @property
     def growth_iframe(self):
         return plotly_iframe_from_url(self.plotly_url2)
+
+    def GeneratePlots(self):
+        urls = GeneratePortfolioPlots(self)
+        self.update_plotly_urls(urls)
 
     def GetHeldSecurities(self):
         return Holding.objects.for_user(

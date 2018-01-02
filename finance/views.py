@@ -166,7 +166,7 @@ def GetBalanceContext(userprofile):
 def Portfolio(request):
     userprofile = request.user.userprofile
     if not userprofile.portfolio_iframe:
-        GeneratePortfolioPlots(userprofile)
+        userprofile.GeneratePlots()
 
     if not userprofile.AreSecurityPricesUpToDate():
         LiveSecurityUpdateTask.delay()
@@ -177,8 +177,7 @@ def Portfolio(request):
             LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
-            urls = GeneratePortfolioPlots(userprofile)
-            userprofile.update_plotly_urls(urls)
+            userprofile.GeneratePlots()
 
         elif 'refresh-account' in request.GET:
             SyncActivityTask(userprofile)
