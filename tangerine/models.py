@@ -74,8 +74,8 @@ class TangerineAccount(BaseAccount):
         return 2000
 
     def CreateActivities(self, start, end):
-        with self.client:
-            for trans in self.client.GetActivities(self.id, start, end):
+        with self.client as client:
+            for trans in client.GetActivities(self.id, start, end):
                 TangerineRawActivity.objects.get_or_create(account=self, activity_id=trans['id'],
                     defaults={
                         'day': parser.parse(trans['transaction_date']).date(),

@@ -51,8 +51,8 @@ class GrsAccount(BaseAccount):
         return 360
 
     def CreateActivities(self, start, end):
-        with self.client:
-            for day, desc, _, price, qty in self.client.GetActivities(self, start, end):
+        with self.client as client:
+            for day, desc, _, price, qty in client.GetActivities(self, start, end):
                 # TODO: Hacking the symbol here to the only one I buy. I have the description in
                 # TODO: <TD class='activities-sh2'>Canadian Equity (Leith Wheeler)-Employer</TD>
                 # TODO: Create the security with that description and then do a lookup here.

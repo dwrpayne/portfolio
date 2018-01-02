@@ -148,13 +148,13 @@ class QuestradeAccount(BaseAccount):
         return 28
 
     def CreateActivities(self, start, end):
-        with self.client:
-            for json in self.client.GetActivities(self.id, start, end):
+        with self.client as client:
+            for json in client.GetActivities(self.id, start, end):
                 QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=dumps(json))
 
     def SyncBalances(self):
-        with self.client as c:
-            json = c.GetAccountBalances(self.id)
+        with self.client as client:
+            json = client.GetAccountBalances(self.id)
             self.curBalanceSynced = sum([
                 Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
                 for entry in json['perCurrencyBalances']
