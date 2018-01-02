@@ -37,7 +37,7 @@ def time_intervals(time_period, count, start, end=None):
     """
     end = end or datetime.date.today()
     period = Date.instance(end) - Date.instance(start)
-    return period.split(time_period, count)
+    return period.split(time_period, count) if count else [period]
 
 
 def day_list(start, end=None):
