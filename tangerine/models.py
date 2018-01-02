@@ -78,7 +78,7 @@ class TangerineAccount(BaseAccount):
             transactions = self.client.GetActivities(self.id, start, end)
         activities = []
         for trans in transactions:
-            obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'],
+            obj, created = TangerineRawActivity.objects.get_or_create(account=self, activity_id=trans['id'],
                                                             defaults={
                                                                 'day': parser.parse(
                                                                     trans['transaction_date']).date(),

@@ -78,7 +78,7 @@ class GrsClient(BaseClient):
     def Authorize(self):
         self.session = requests.Session()
         response = self.session.post('https://ssl.grsaccess.com/Information/login.aspx',
-                          data={'username': self.username, 'password': self.password})
+                                     data={'username': self.username, 'password': self.password})
         response.raise_for_status()
 
     def CloseSession(self):
@@ -86,26 +86,26 @@ class GrsClient(BaseClient):
 
     def PrepareRateRetrieval(self, plan_data):
         self.session.get('https://ssl.grsaccess.com/common/list_item_selection.aspx',
-                           params={'Selected_Info': plan_data})
+                         params={'Selected_Info': plan_data})
 
     def GetRates(self, symbol, start, end):
         response = self.session.post('https://ssl.grsaccess.com/english/member/NUV_Rates_Details.aspx',
-                                   data={'PlanFund': symbol,
-                                         'StartDate': start.format('%m/%d/%y'),
-                                         'EndDate': end.format('%m/%d/%y')}
-                                )
+                                     data={'PlanFund': symbol,
+                                           'StartDate': start.format('%m/%d/%y'),
+                                           'EndDate': end.format('%m/%d/%y')
+                                           })
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'html.parser')
         table_header = soup.find('tr', 'table-header')
-        if table_header:
-            dates = (td.string for td in table_header('td')[1:])
-            values = (td.string for td in table_header.next_sibling('td')[1:])
-            rates = [(parser.parse(date).date(), Decimal(value.strip('$')))
-                     for date, value in zip(dates, values)
-                     if 'Unknown' not in value]
-            return rates
-        return []
+        if not table_header:
+            return []
+        dates = (td.string for td in table_header('td')[1:])
+        values = (td.string for td in table_header.next_sibling('td')[1:])
+        rates = [(parser.parse(date).date(), Decimal(value.strip('$')))
+                 for date, value in zip(dates, values)
+                 if 'Unknown' not in value]
+        return rates
 
     def GetActivities(self, account, start, end):
         response = self.session.post(

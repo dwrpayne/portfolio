@@ -166,7 +166,7 @@ class QuestradeAccount(BaseAccount):
         with transaction.atomic():
             for activity_json in json:
                 jsonstr = dumps(json)
-                obj, created = QuestradeRawActivity.objects.get_or_create(jsonstr=jsonstr)
+                obj, created = QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=jsonstr)
                 if created:
                     activities.append(obj)
         return activities
