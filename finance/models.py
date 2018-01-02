@@ -139,7 +139,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
         print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
         with self.client as c:
-            new_count = sum(c.CreateRawActivities(self, start, end) for start, end in date_range)
+            new_count = sum(c.CreateRawActivities(self, period.start, period.end) for period in date_range)
         # TODO: Better error handling when we can't actually sync new activities from server.
         # Should we still regenerate here?
         if new_count >= 0:

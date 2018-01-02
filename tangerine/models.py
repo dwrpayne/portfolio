@@ -117,7 +117,7 @@ class TangerineClient(BaseClient):
 
     def CreateRawActivities(self, account, start, end):
         with self.client.login():
-            transactions = self.client.list_transactions([account.id], start.date(), end.date())
+            transactions = self.client.list_transactions([account.id], start, end)
             count = 0
             for trans in transactions:
                 obj, created = TangerineRawActivity.objects.get_or_create(activity_id=trans['id'], account=account,

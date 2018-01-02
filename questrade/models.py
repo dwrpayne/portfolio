@@ -224,12 +224,13 @@ class QuestradeClient(BaseClient):
                 type=account_json['type'], id=account_json['number'], client=self)
 
     def CreateRawActivities(self, account, start, end):
-        end = end.replace(hour=0, minute=0, second=0, microsecond=0)
+        start = pendulum.create(start.year, start.month, start.day)
+        end = pendulum.create(end.year, end.month, end.day)
         try:
             json = self._GetRequest('accounts/{}/activities'.format(account.id),
                                     {'startTime': start.isoformat(), 'endTime': end.isoformat()})
         except:
-            return 0
+            raise
         print("Get activities from source returned: " + dumps(json))
         count = 0
         for activity_json in json['activities']:

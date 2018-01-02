@@ -110,10 +110,8 @@ class SnapshotDetail(DateMixin, DayMixin, ListView):
         age_in_days = (datetime.date.today() - self.request.user.userprofile.GetInceptionDate()).days
         context['inception_days_ago'] = age_in_days - 1
         context['day'] = day
-        next_day = self.get_next_day(day) or ''
-        prev_day = self.get_previous_day(day) or ''
-        context['next_day'] = str(next_day)
-        context['prev_day'] = str(prev_day)
+        context['next_day'] = str(self.get_next_day(day) or '')
+        context['prev_day'] = str(self.get_previous_day(day) or '')
         context['activities'] = self.request.user.userprofile.GetActivities().at_date(day)
         return context
 
