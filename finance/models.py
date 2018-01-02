@@ -570,6 +570,9 @@ class UserProfile(models.Model):
 
 
 class HoldingDetailQuerySet(SecurityPriceQuerySet):
+    def __str__(self):
+        return '\n'.join(str(h) for h in self)
+
     def for_user(self, user):
         return self.filter(account__client__user=user)
 
