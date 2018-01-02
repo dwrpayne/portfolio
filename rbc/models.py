@@ -1,18 +1,7 @@
 import csv
 import pendulum
-from django.db import models
-from finance.models import BaseAccount, BaseClient, BaseRawActivity
-
-
-class RbcRawActivity(BaseRawActivity):
-    day = models.DateField()
-    type = models.CharField(max_length=32)
-    symbol = models.CharField(max_length=100)
-    qty = models.DecimalField(max_digits=16, decimal_places=6)
-    price = models.DecimalField(max_digits=16, decimal_places=6)
-    total_amount = models.DecimalField(max_digits=16, decimal_places=6)
-    currency = models.CharField(max_length=32)
-    description = models.CharField(max_length=1000)
+from decimal import Decimal
+from finance.models import BaseAccount, BaseClient, ManualRawActivity
 
 
 class RbcAccount(BaseAccount):
@@ -28,19 +17,36 @@ class RbcAccount(BaseAccount):
 
     def import_csv(self, csv_file):
         with open(csv_file, newline='') as f:
-            fields = ['day', 'type', 'symbol', 'qty', 'price', 'Settlement Date', 'Account', 'total_amount', 'currency', 'description']
+            fields = ['day', 'type', 'symbol', 'qty', 'price', 'SettlementDate', 'Account', 'netAmount', 'currency', 'description']
             reader = csv.DictReader(f, fieldnames=fields)
             for line in reader:
                 try:
-                    fields['day'] = pendulum.parse(fields['day'])
-                except pendulum.ParserError:
+                    line['day'] = pendulum.from_format(line['day'], '%d-%b-%y').date()
+                except:# pendulum.exceptions.ParserError:
                     continue
 
+                del line['SettlementDate']
+                del line['Account']
 
+                if line['type'] == 'Deposits & Contributions': line['type'] = 'Deposit'
+                if line['type'] == 'Dividends': line['type'] = 'Dividend'
+                if line['type'] == 'Transfers': line['type'] = 'FX'
 
+                line['qty'] = Decimal(line['qty']) if line['qty'] else 0
+                line['price'] = Decimal(line['price']) if line['price'] else 0
+                line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
+                if line['symbol'] in ['VCN', 'VFV']: line['symbol'] += '.TO'
 
+                ManualRawActivity.objects.create(account=self, **line)
 
+    def CreateActivities(self, start, end):
+        """
+        Total hack for now.
+        """
+        self.rawactivities.all().delete()
+        self.import_csv(r'C:\Users\David\Dropbox\coding\portfolio\_private\emilyrbc.csv')
+        self._RegenerateHoldings()
 
 
 class RbcClient(BaseClient):
