@@ -10,6 +10,7 @@
             {% if show_account %}
                 <th>Account</th>
             {% endif %}
+            <th>Currency</th>
             <th>Units</th>
             <th>Price</th>
             <th>Total</th>
@@ -27,6 +28,7 @@
             {% if show_account %}
                 <td>{{activity.account.display_name}}</td>
             {% endif %}
+            <td>{{activity.cash}}</td>
             <td>{{activity.qty | floatformat:2}}</td>
             <td>{{activity.price | currency}}</td>
             <td>{{activity.netAmount | currency}}</td>

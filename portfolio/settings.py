@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = ['*', '.davidpayne.net', 'http://70.71.233.189']
+ALLOWED_HOSTS = ['.davidpayne.net', 'http://70.71.233.189']
 
 INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.10', '70.71.233.189']
 
@@ -98,27 +98,10 @@ SHELL_PLUS_PRE_IMPORTS = [
 
 WSGI_APPLICATION = 'portfolio.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/1.11/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'finance',                      # Or path to database file if using sqlite3.
-        'USER': 'financeuser',                      # Not used with sqlite3.
-        'PASSWORD': 'finance',                  # Not used with sqlite3.
-        # Set to empty string for localhost. Not used with sqlite3.
-        'HOST': 'localhost',
-        # Set to empty string for default. Not used with sqlite3.
-        'PORT': '5432',
-    }
-}
-
+DATABASES = {}
 db_from_env = dj_database_url.config(conn_max_age=500)
 if db_from_env:
-    DATABASES['default'].update(db_from_env)
+    DATABASES['default'] = db_from_env
 
 
 # Password validation

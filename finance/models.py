@@ -261,6 +261,63 @@ class ManualRawActivity(BaseRawActivity):
     class Meta:
         verbose_name_plural = 'Base Raw Activities'
 
+    @classmethod
+    def CreateDeposit(cls, account, day, amount, currency='CAD'):
+        ManualRawActivity.objects.create(account=account, day=day, currency=currency,
+                                         description='', symbol='', qty=0, price=0,
+                                         netAmount=amount, type='Deposit')
+
+    @classmethod
+    def CreateFX(cls, account, day, to_currency, from_currency, cad_amt, rate):
+        if to_currency == from_currency:
+            return
+        if to_currency == 'CAD':
+            to_amt = cad_amt
+            from_amt = cad_amt / rate
+        else:
+            to_amt = cad_amt / rate
+            from_amt = cad_amt
+        ManualRawActivity.objects.create(account=account, day=day, qty=0, price=0,
+                                         description='AUTO CONV @ {}'.format(rate), symbol='',
+                                         currency=from_currency, netAmount=-from_amt, type='FX')
+        ManualRawActivity.objects.create(account=account, day=day, qty=0, price=0,
+                                         description='AUTO CONV @ {}'.format(rate), symbol='',
+                                         currency=to_currency, netAmount=to_amt, type='FX')
+
+    @classmethod
+    def CreateBuy(cls, account, day, symbol, price, qty, amount, currency, exch=1, amt_in_cad=True, description=''):
+        cls.CreateFX(account, day, currency, 'CAD', amount, exch)
+
+        ManualRawActivity.objects.create(account=account, day=day, qty=qty, price=price,
+                                         description=description, symbol=symbol, currency=currency,
+                                         netAmount=-amount/exch, type='Buy')
+
+    @classmethod
+    def CreateSell(cls, account, day, symbol, price, qty, amount, currency, exch=1, description=''):
+        if exch:
+            cls.CreateFX(account, day, 'CAD', currency, amount, exch)
+
+        ManualRawActivity.objects.create(account=account, day=day, qty=-qty, price=price,
+                                         description=description, symbol='', currency=currency,
+                                         netAmount=abs(amount/exch), type='Sell')
+
+    @classmethod
+    def CreateDividend(cls, account, day, symbol, amount, tax=0, currency='CAD', exch=1):
+        ManualRawActivity.objects.create(account=account, day=day, currency=currency,
+                                         description='', symbol=symbol, qty=0, price=0,
+                                         netAmount=amount/exch, type='Dividend')
+        if tax:
+            ManualRawActivity.objects.create(account=account, day=day, currency=currency,
+                                         description='Withholding Tax', symbol=symbol, qty=0, price=0,
+                                         netAmount=-tax/exch, type='Tax')
+        cls.CreateFX(account, day, 'CAD', currency, amount-tax, exch)
+
+    @classmethod
+    def CreateFee(cls, account, day, amount, currency='CAD', desc=''):
+        ManualRawActivity.objects.create(account=account, day=day, currency=currency,
+                                         description=desc, symbol='', qty=0, price=0,
+                                         netAmount=-abs(amount), type='Fee')
+
     def CreateActivity(self):
         security = None
         if self.symbol:
@@ -385,7 +442,7 @@ class Activity(models.Model):
     price = models.DecimalField(max_digits=16, decimal_places=6)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
     commission = models.DecimalField(max_digits=16, decimal_places=2, default=0)
-    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell',
+    Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Tax',
                    'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)
     raw = models.ForeignKey(BaseRawActivity, on_delete=models.CASCADE)

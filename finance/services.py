@@ -55,8 +55,8 @@ def GeneratePortfolioPlots(userprofile):
     day_val_pairs = userprofile.GetHoldingDetails().total_values()
     graph.add_trace('Total', day_val_pairs)
 
-    deposits = userprofile.GetActivities().get_all_deposits(running_totals=True)
-    dep_dates, dep_totals = list(zip(*deposits))
+    deposits = dict(userprofile.GetActivities().get_all_deposits(running_totals=True))
+    dep_dates, dep_totals = list(zip(*deposits.items()))
     prev_dates = [d - datetime.timedelta(days=1) for d in dep_dates[1:]] + [datetime.date.today()]
     dep_dates = list(chain.from_iterable(zip(dep_dates, prev_dates)))
     dep_totals = list(chain.from_iterable(zip(dep_totals, dep_totals)))
