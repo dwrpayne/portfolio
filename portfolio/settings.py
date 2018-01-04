@@ -23,9 +23,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*', '.davidpayne.net', 'http://70.71.233.189']
 
-INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.14', '70.71.233.189']
+INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.10', '70.71.233.189']
 
 # Application definition
 

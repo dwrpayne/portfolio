@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
-from finance.models import BaseRawActivityManager
+from finance.models import BaseRawActivityQuerySet
 from securities.models import Security
 from utils.api import api_response
 
@@ -32,7 +32,7 @@ class QuestradeActivityType(models.Model):
     objects = QuestradeActivityTypeManager()
 
 
-class QuestradeRawActivityManager(BaseRawActivityManager):
+class QuestradeRawActivityQuerySet(BaseRawActivityQuerySet):
     def get_or_create(self, defaults=None, **kwargs):
         obj, created = super().get_or_create(defaults, **kwargs)
         if not created and self.model.AllowDuplicate(kwargs['jsonstr']):
@@ -45,7 +45,7 @@ class QuestradeRawActivityManager(BaseRawActivityManager):
 class QuestradeRawActivity(BaseRawActivity):
     jsonstr = models.CharField(max_length=1000)
 
-    objects = QuestradeRawActivityManager()
+    objects = QuestradeRawActivityQuerySet.as_manager()
 
     class Meta:
         unique_together = ('baserawactivity_ptr', 'jsonstr')

@@ -231,7 +231,7 @@ class Holding(models.Model):
         self.save(update_fields=['enddate'])
 
 
-class BaseRawActivityManager(PolymorphicManager):
+class BaseRawActivityQuerySet(PolymorphicQuerySet):
     def create(self, **kwargs):
         with transaction.atomic():
             obj = super().create(**kwargs)
@@ -242,7 +242,7 @@ class BaseRawActivityManager(PolymorphicManager):
 class BaseRawActivity(ShowFieldTypeAndContent, PolymorphicModel):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='rawactivities')
 
-    objects = BaseRawActivityManager()
+    objects = BaseRawActivityQuerySet.as_manager()
 
     def CreateActivity(self):
         pass
