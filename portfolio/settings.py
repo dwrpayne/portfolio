@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = os.environ.get('SECRET_KEY')
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = ['.davidpayne.net', 'http://70.71.233.189']
+ALLOWED_HOSTS = ['.davidpayne.net']
 
 INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.10', '70.71.233.189']
 
@@ -169,6 +169,14 @@ EMAIL_PORT = 1025
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(pathname)s %(lineno)d %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        },
+    },
     'handlers': {
         'file': {
             'level': 'DEBUG',
@@ -176,10 +184,12 @@ LOGGING = {
             'filename': os.path.join(BASE_DIR, 'debug.log'),
             'maxBytes': 1024*1024*15, # 15MB
             'backupCount': 10,
+            'formatter': 'verbose'
         },
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
+            'formatter': 'simple'
         },
     },
     'loggers': {
