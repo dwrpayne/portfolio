@@ -250,11 +250,11 @@ class BaseRawActivity(ShowFieldTypeAndContent, PolymorphicModel):
 
 class ManualRawActivity(BaseRawActivity):
     day = models.DateField()
-    symbol = models.CharField(max_length=100)
-    description = models.CharField(max_length=1000)
+    symbol = models.CharField(max_length=100, blank=True, default='')
+    description = models.CharField(max_length=1000, blank=True, default='')
     currency = models.CharField(max_length=100)
-    qty = models.DecimalField(max_digits=16, decimal_places=6)
-    price = models.DecimalField(max_digits=16, decimal_places=6)
+    qty = models.DecimalField(max_digits=16, decimal_places=6, default=0)
+    price = models.DecimalField(max_digits=16, decimal_places=6, default=0)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
     type = models.CharField(max_length=100)
 

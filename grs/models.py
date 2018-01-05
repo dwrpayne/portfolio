@@ -127,7 +127,8 @@ class GrsClient(BaseClient):
         if not tags:
             return []
 
-        return split_before(tags, lambda tag: tag.class_ == tags[0].class_)
+        for activity_list in split_before(tags, lambda tag: tag.attrs['class'][0] == tags[0].attrs['class'][0]):
+            yield [a.text for a in activity_list]
 
 
 class GrsDataSource(DataSourceMixin):

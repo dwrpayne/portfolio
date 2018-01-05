@@ -102,6 +102,20 @@ DATABASES = {}
 db_from_env = dj_database_url.config(conn_max_age=500)
 if db_from_env:
     DATABASES['default'] = db_from_env
+else:
+    DATABASES = {
+        'default': {
+            # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': 'finance',  # Or path to database file if using sqlite3.
+            'USER': 'financeuser',  # Not used with sqlite3.
+            'PASSWORD': 'passwordfordjangofinance',  # Not used with sqlite3.
+            # Set to empty string for localhost. Not used with sqlite3.
+            'HOST': 'localhost',
+            # Set to empty string for default. Not used with sqlite3.
+            'PORT': '5432',
+        }
+    }
 
 
 # Password validation
@@ -146,6 +160,10 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+# Email settings
+EMAIL_HOST = 'localhost'
+EMAIL_PORT = 1025
 
 
 # Celery configuration

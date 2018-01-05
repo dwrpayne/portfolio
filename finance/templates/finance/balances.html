@@ -25,7 +25,7 @@
         {% for account in accounts %}
             <tr>
                 <td><a href="{% url 'finance:accountdetail' account.id %}">{{account.display_name}}</a></td>                
-                <td>{{account.id}}</td>
+                <td>{{account.id|truncatechars:15 }}</td>
                 <td>{{account.yesterday_balance | currencyround}}</td>
                 <td>{{account.cur_balance | currencyround}}</td>
                 <td>{{account.cur_cash_balance | currencyround}}</td>

@@ -172,15 +172,12 @@ def Portfolio(request):
         return render(request, 'finance/index.html', {'updating':True})
 
     if request.is_ajax():
-        if 'refresh-live' in request.GET:
+        if 'refresh-account' in request.GET:
+            SyncActivityTask(userprofile)
             LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
             userprofile.GeneratePlots()
-
-        elif 'refresh-account' in request.GET:
-            SyncActivityTask(userprofile)
-            LiveSecurityUpdateTask()
 
     overall_context = {**GetHoldingsContext(userprofile), **GetBalanceContext(userprofile)}
     return render(request, 'finance/portfolio.html', overall_context)

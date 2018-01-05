@@ -22,6 +22,7 @@ def SyncActivityTask(userprofile=None):
     from .models import BaseAccount
     accounts = userprofile.GetAccounts() if userprofile else BaseAccount.objects.all()
     accounts.SyncAllActivitiesAndRegenerate()
+    HoldingDetail.Refresh()
 
 @shared_task
 def DailyUpdateAll():
