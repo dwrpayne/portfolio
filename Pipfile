@@ -26,6 +26,7 @@ django-debug-toolbar = "*"
 eventlet = "*"
 pandas-datareader = {git = "https://github.com/dwrpayne/pandas-datareader.git", ref = "bankofcanada"}
 pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
+mod-wsgi = "*"
 
 
 [dev-packages]
