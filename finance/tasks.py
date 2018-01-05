@@ -19,7 +19,7 @@ def LiveSecurityUpdateTask():
 
 @shared_task
 def SyncActivityTask(userprofile=None):
-    from .models import BaseAccount
+    from .models import BaseAccount, HoldingDetail
     accounts = userprofile.GetAccounts() if userprofile else BaseAccount.objects.all()
     accounts.SyncAllActivitiesAndRegenerate()
     HoldingDetail.Refresh()
