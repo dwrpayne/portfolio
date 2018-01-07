@@ -7,7 +7,7 @@ $(document).ready(function () {
             data: 'refresh-' + $(this).attr('data-refresh-type'),
             context: this,
             success: function (data) {
-                divs = $(this).attr('data-refresh-div').split(';')
+                divs = $(this).attr('data-refresh-div').split(';');
                 for (var i = 0; i < divs.length; i++) {
                     var html = $(data).find('#' + divs[i]).html();
                     $('#' + divs[i]).html(html);
