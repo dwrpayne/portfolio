@@ -8,9 +8,33 @@ https://docs.djangoproject.com/en/1.11/howto/deployment/wsgi/
 """
 
 import os
-
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "portfolio.settings")
+os.environ["DJANGO_SETTINGS_MODULE"] = "portfolio.settings_prod"
 
 application = get_wsgi_application()
+
+class Debugger:
+
+    def __init__(self, object):
+        self.__object = object
+
+    def __call__(self, *args, **kwargs):
+        import pdb, sys
+        debugger = pdb.Pdb()
+        debugger.use_rawinput = 0
+        debugger.reset()
+        sys.settrace(debugger.trace_dispatch)
+
+        try:
+            return self.__object(*args, **kwargs)
+        finally:
+            debugger.quitting = 1
+            sys.settrace(None)
+
+#application = Debugger(application)
+
+
+
+
+
