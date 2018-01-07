@@ -138,8 +138,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/finance/'
-LOGOUT_REDIRECT_URL = '/finance/'
+LOGIN_REDIRECT_URL = '/finance/portfolio/'
+LOGOUT_REDIRECT_URL = '/finance/portfolio/'
 
 
 # Internationalization

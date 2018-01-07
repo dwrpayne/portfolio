@@ -1,10 +1,18 @@
-﻿{% block title %}<title>Login</title>{% endblock %}
+﻿{% extends "finance/base.html" %}
+{% block title %}Login{% endblock %}
 
 {% block content %}
-  <h2>Login</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Login</button>
-  </form>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Login</button>
+    </form>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="username" value="guest" /><input type="hidden" name="password" value="portfolio" />
+        <button type="submit">Continue as guest</button>
+    </form>
+    This page is pre-alpha and not ready for public consumption.<br><br>
+    If you have stumbled across it and want an account to try it out, please email me at admin@davidpayne.net and let me know how you found it!<br><br>
+
 {% endblock %}

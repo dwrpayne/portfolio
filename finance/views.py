@@ -96,7 +96,7 @@ class SecurityDetail(SingleObjectMixin, ListView):
         return self.request.user.userprofile.GetActivities().for_security(self.object)
 
 
-class SnapshotDetail(DateMixin, DayMixin, ListView):
+class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
     model = Activity
     template_name = 'finance/snapshot.html'
     date_field = 'tradeDate'
