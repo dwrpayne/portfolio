@@ -12,13 +12,15 @@ from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSou
 from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
 from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 
+
 class SecurityQuerySet(models.QuerySet):
     def create(self, **kwargs):
         kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
         kwargs.setdefault('datasource', self.model.get_default_datasource(kwargs['type'], kwargs['symbol']))
         if kwargs['type'] == self.model.Type.Stock:
-            kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
+            pass#kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
         return super().create(**kwargs)
+
 
 class SecurityManager(models.Manager):
     def Sync(self, live_update):
@@ -101,7 +103,6 @@ class Security(models.Model):
     Type = Choices('Stock', 'Option', 'OptionMini', 'Cash', 'MutualFund')
     symbol = models.CharField(max_length=32, primary_key=True)
     description = models.CharField(max_length=500, null=True, blank=True, default='')
-    metadata = JSONField()
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
     currency = models.CharField(max_length=3, default='XXX')
     datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
