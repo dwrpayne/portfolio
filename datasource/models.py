@@ -108,7 +108,6 @@ class AlphaVantageDataSource(DataSourceMixin):
         return []
 
 
-
 class MorningstarDataSource(DataSourceMixin):
     raw_url = models.CharField(max_length=1000, default='https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}')
     symbol = models.CharField(max_length=32, default=None)
