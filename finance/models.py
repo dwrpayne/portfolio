@@ -156,10 +156,13 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         return []
 
     def GetValueAtDate(self, date):
-        return self.holdingdetail_set.at_date(date).total_values().first()[1]
+        result = self.holdingdetail_set.at_date(date).total_values().first()
+        if result:
+            return result[1]
+        return 0
 
     def GetValueToday(self):
-        return self.holdingdetail_set.today().total_values().first()[1]
+        return self.GetValueAtDate(datetime.date.today())
 
 
 class HoldingManager(models.Manager):
@@ -251,7 +254,7 @@ class ManualRawActivity(BaseRawActivity):
     day = models.DateField()
     symbol = models.CharField(max_length=100, blank=True, default='')
     description = models.CharField(max_length=1000, blank=True, default='')
-    currency = models.CharField(max_length=100)
+    currency = models.CharField(max_length=100, blank=True, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6, default=0)
     price = models.DecimalField(max_digits=16, decimal_places=6, default=0)
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
@@ -363,7 +366,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         return self.filter(account__client__user=user)
 
     def deposits(self):
-        return self.filter(type__in=[Activity.Type.Deposit, Activity.Type.Transfer])
+        return self.filter(type__in=[Activity.Type.Deposit, Activity.Type.Withdrawal])
 
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)
@@ -442,7 +445,7 @@ class Activity(models.Model):
     netAmount = models.DecimalField(max_digits=16, decimal_places=2)
     commission = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Tax',
-                   'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'NotImplemented')
+                   'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'RetCapital', 'NotImplemented')
     type = models.CharField(max_length=100, choices=Type)
     raw = models.ForeignKey(BaseRawActivity, on_delete=models.CASCADE)
 
@@ -619,11 +622,14 @@ class UserProfile(models.Model):
         holdings = self.GetHoldingDetails().today()
         allocs = self.user.allocations.with_rebalance_info(holdings, cashadd)
 
-        missing = holdings.exclude(security__in=allocs.values_list('securities'))
+        from itertools import groupby
+        missing_holdings = holdings.exclude(security__in=allocs.values_list('securities'))
         total_value = sum(holdings).value + cashadd
-        for h in missing:
-            h.current_pct = (h.value / total_value) if total_value else 0
-
+        missing = []
+        for sec, group in groupby(missing_holdings, lambda h: h.security):
+            total = sum(group)
+            total.current_pct = total.value / total_value if total_value else 0
+            missing.append(total)
         return allocs, missing
 
 
