@@ -206,6 +206,12 @@ LOGGING = {
 # Hijack
 HIJACK_USE_BOOTSTRAP = True
 
+# Email
+EMAIL_HOST = 'smtp.sendgrid.net'
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'apikey'
+EMAIL_HOST_PASSWORD = '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'
+
 
 # Celery configuration
 CELERY_FORKED_BY_MULTIPROCESSING = 1
