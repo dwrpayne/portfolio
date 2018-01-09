@@ -1,0 +1,17 @@
+{% extends "finance/base.html" %}
+{% load mytags %}
+{% load static %}
+{% block title %}User Profile{% endblock title %}
+{% block content %}  
+<div align="center">
+    <h2>Give me some feedback!</h2>
+</div>
+{% if request.POST.submit %}
+    <br>Thank you so much! Any more?<br>
+{% endif %}
+<form action="{% url 'finance:feedback' %}" method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <input type="submit" value="Submit" />
+</form>
+{% endblock content %}

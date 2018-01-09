@@ -51,6 +51,8 @@
                     {% endfor %}
                 </ul>
             </li>
+            <li class="{% navactive request 'finance:feedback' %}">
+                <a href="{% url 'finance:feedback' %}">Feedback</a></li>
         </ul>
         <ul class="nav navbar-nav navbar-right">
              {% if user.is_staff %}
