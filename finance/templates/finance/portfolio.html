@@ -4,9 +4,9 @@
 {% block title %} {{request.user.username}} {% endblock title %}
 {% block content %}
     <div class="row">
-        <div class="col-sm-5">{% include "finance/holdings.html" %}</div>
+        <div class="col-sm-6">{% include "finance/holdings.html" %}</div>
         <div class="col-sm-5">{% include "finance/balances.html" %}</div>
-        <div class="col-sm-2">
+        <div class="col-sm-1">
             <br /><br /> <button type="submit" class="refresh" data-refresh-type="account" data-refresh-div="holdings;balances">Refresh Transactions</button>
             <br /><br /> <button type="submit" class="refresh" data-refresh-type="plot" data-refresh-div="history-plot;growth-plot">Refresh Graphs</button>
         </div>
