@@ -1,7 +1,6 @@
 import datetime
 from decimal import Decimal
 
-from django.contrib.postgres.fields import JSONField
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, transaction, connection
 from django.utils.functional import cached_property
@@ -217,6 +216,30 @@ class Security(models.Model):
         yesterday = 1 / rates[0]
         today = 1 / rates[1]
         return today, (today - yesterday) / yesterday
+
+class Option(Security):
+    class Meta:
+        proxy = True
+
+    @cached_property
+    def underlying(self):
+        return self.symbol[:6].strip()
+
+    @cached_property
+    def expiry(self):
+        return datetime.datetime.strptime(self.symbol[6:12], '%y%m%d')
+
+    @cached_property
+    def is_call(self):
+        return self.symbol[12].lower() == 'c'
+
+    @cached_property
+    def is_put(self):
+        return self.symbol[12].lower() == 'p'
+
+    @cached_property
+    def strike(self):
+        return float(self.symbol[13:]) / 1000
 
 
 class SecurityPriceQuerySet(models.query.QuerySet,
