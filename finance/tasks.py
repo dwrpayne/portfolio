@@ -3,7 +3,9 @@ from celery import shared_task
 @shared_task
 def SyncSecurityTask(live_update=False):
     from securities.models import Security
+    from .models import HoldingDetail
     Security.objects.Sync(live_update)
+    HoldingDetail.Refresh()
 
 @shared_task
 def SyncAccountBalanceTask():
@@ -12,9 +14,7 @@ def SyncAccountBalanceTask():
 
 @shared_task
 def LiveSecurityUpdateTask():
-    from .models import HoldingDetail
     SyncSecurityTask(live_update=True)
-    HoldingDetail.Refresh()
     SyncAccountBalanceTask()
 
 @shared_task
@@ -29,5 +29,4 @@ def DailyUpdateAll():
     from .models import HoldingDetail
     SyncActivityTask()
     SyncSecurityTask()
-    HoldingDetail.Refresh()
     SyncAccountBalanceTask()
