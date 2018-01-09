@@ -9,12 +9,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.dates import DateMixin, DayMixin
+from django.views.generic.edit import FormView
 
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url
 from .services import GenerateSecurityPlot
-from .tasks import LiveSecurityUpdateTask, SyncActivityTask
+from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask
 from .models import BaseAccount, Activity, UserProfile
+from .forms import FeedbackForm
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -32,7 +34,17 @@ class AccountDetail(LoginRequiredMixin, DetailView):
         return qs.for_user(self.request.user)
 
 
-class UserProfileView(LoginRequiredMixin, TemplateView):
+class StatusSecurity(ListView):
+    model = Security
+    template_name = 'finance/status_securities.html'
+    context_object_name = 'securities'
+    ordering = ['-type','symbol']
+
+    def get_queryset(self):
+        return super().get_queryset().filter(holdings__enddate=None).distinct()
+
+
+class UserProfileView(LoginRequiredMixin, TemplateView, FormView):
     model = UserProfile
     template_name = 'finance/userprofile.html'
     context_object_name = 'userprofile'
@@ -40,6 +52,28 @@ class UserProfileView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         self.object = self.request.user.userprofile
         return super().get(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        print(form.cleaned_data['your_name'])
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return context
+
+
+class FeedbackView(FormView):
+    template_name = 'finance/feedback.html'
+    success_url = '/finance/feedback/'
+    form_class = FeedbackForm
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.request.user.userprofile
+        return super().get(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.send_email()
+        return super().form_valid(form)
 
 
 class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
@@ -177,7 +211,7 @@ def Portfolio(request):
         userprofile.GeneratePlots()
 
     if not userprofile.AreSecurityPricesUpToDate():
-        LiveSecurityUpdateTask.delay()
+        SyncSecurityTask.delay(False)
         return render(request, 'finance/index.html', {'updating':True})
 
     if request.is_ajax():
@@ -252,7 +286,7 @@ def index(request):
     context = {}
     if not request.user.userprofile.AreSecurityPricesUpToDate():
         context['updating'] = True
-        LiveSecurityUpdateTask.delay()
+        SyncSecurityTask.delay(False)
 
     if request.user.is_authenticated:
         return render(request, 'finance/index.html', context)
