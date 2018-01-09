@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django_celery_results',
     'django_celery_beat',
-
+    'hijack',
+    'compat',
 ]
 
 MIDDLEWARE = [
@@ -201,6 +202,9 @@ LOGGING = {
         },
     },
 }
+
+# Hijack
+HIJACK_USE_BOOTSTRAP = True
 
 
 # Celery configuration

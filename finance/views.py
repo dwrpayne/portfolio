@@ -5,17 +5,16 @@ import numpy
 import pandas
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
-
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import DetailView, ListView
+from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.dates import DateMixin, DayMixin
 
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url
-from .services import GeneratePortfolioPlots, GenerateSecurityPlot
+from .services import GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask
-from .models import BaseAccount, Activity
+from .models import BaseAccount, Activity, UserProfile
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -31,6 +30,16 @@ class AccountDetail(LoginRequiredMixin, DetailView):
     def get_queryset(self):
         qs = super().get_queryset()
         return qs.for_user(self.request.user)
+
+
+class UserProfileView(LoginRequiredMixin, TemplateView):
+    model = UserProfile
+    template_name = 'finance/userprofile.html'
+    context_object_name = 'userprofile'
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.request.user.userprofile
+        return super().get(request, *args, **kwargs)
 
 
 class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):

@@ -1,5 +1,6 @@
 ﻿{# HTML5 declaration #}
 {% load static %}
+{% load hijack_tags %}
 <!DOCTYPE html>
 <html lang="en">
     {# Make modifiable head elements #}
@@ -15,6 +16,7 @@
             {% block head_css_site %}
                 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
                 <link rel="stylesheet" href="{% static "finance/style.css" %}" media="screen">
+                <link rel="stylesheet" href="{% static "hijack/hijack-styles.css" %}" type="text/css" />
                 <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
             {% endblock head_css_site %}
             {% block head_css_section %}{% endblock head_css_section %}
@@ -22,6 +24,7 @@
         {% endblock head_css %}
     </head>
     <body>
+        {% hijack_notification %}
         {# Navigation Menu #}
         <header>
             {% include "finance/navigation.html" %}

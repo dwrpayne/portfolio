@@ -13,4 +13,5 @@ urlpatterns = [
     url(r'^capgains/(?P<pk>.*)/$', views.CapGainsReport.as_view(), name='capgains'),
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
     url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
+    url(r'^user/$', views.UserProfileView.as_view(), name='userprofile'),
 ]
