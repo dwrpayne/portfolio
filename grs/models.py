@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import re
 from more_itertools import split_before
 from dateutil import parser
-from django.db import models, transaction
+from django.db import models
 import utils.dates
 
 from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
