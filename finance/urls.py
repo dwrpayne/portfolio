@@ -14,4 +14,5 @@ urlpatterns = [
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
     url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
     url(r'^user/$', views.UserProfileView.as_view(), name='userprofile'),
+    url(r'^status/security/$', views.UserProfileView.as_view(), name='status_security'),
 ]
