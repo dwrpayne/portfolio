@@ -504,11 +504,14 @@ class Allocation(models.Model):
     def list_securities(self):
         return ', '.join([s.symbol for s in self.securities.all()])
 
+    @property
+    def today_holding_set(self):
+        return self.user.userprofile.GetHoldingDetails().today().for_securities(self.securities.all())
+
     def update_rebalance_info(self, cashadd=0):
-        holdings = self.user.userprofile.GetHoldingDetails().today()
-        total_value = sum(holdings).value + cashadd
-        self.current_amt = sum(holdings.for_securities(self.securities.all())).value
-        if self.securities.filter(type=Security.Type.Cash).exists():
+        total_value = self.user.userprofile.current_portfolio_value + cashadd
+        self.current_amt = sum(self.today_holding_set).value if self.today_holding_set else 0
+        if self.securities.filter(symbol='CAD').exists():
             self.current_amt += cashadd
 
         self.current_pct = self.current_amt / total_value
@@ -536,6 +539,10 @@ class UserProfile(models.Model):
     @property
     def growth_iframe(self):
         return plotly_iframe_from_url(self.plotly_url2)
+
+    @property
+    def current_portfolio_value(self):
+        return sum(self.GetHoldingDetails().today()).value
 
     def GeneratePlots(self):
         urls = GeneratePortfolioPlots(self)
