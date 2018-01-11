@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'rbc.apps.RbcConfig',
     'securities.apps.SecuritiesConfig',
     'tangerine.apps.tangerineConfig',
+    'virtbrokers.apps.VirtbrokersConfig',
     'utils',
     'debug_toolbar',
     'polymorphic',
