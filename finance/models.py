@@ -555,7 +555,7 @@ class UserProfile(models.Model):
     def GetCapGainsSecurities(self):
         only_taxable_accounts = False
         query = Holding.objects.exclude(security__type=Security.Type.Cash
-                  ).for_user(self.user).current().values_list('security_id', flat=True).distinct()
+                  ).for_user(self.user).values_list('security_id', flat=True).distinct().order_by('security__symbol')
         if only_taxable_accounts:
             query = query.filter(account__taxable=True)
         return query
