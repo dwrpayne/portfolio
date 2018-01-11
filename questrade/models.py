@@ -8,11 +8,13 @@ import requests
 from dateutil import parser
 from django.db import models
 from django.utils import timezone
+from model_utils import Choices
 
 from finance.models import Activity
 from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
 from finance.models import BaseRawActivityQuerySet
-from securities.models import Security
+from securities.models import Security, Option
+from datasource.models import DataSourceMixin
 from utils.api import api_response
 
 
@@ -66,6 +68,7 @@ class QuestradeRawActivity(BaseRawActivity):
         # Handle Options cleanup
         if json['description'].startswith('CALL ') or json['description'].startswith('PUT '):
             callput, symbol, expiry, strike = json['description'].split()[:4]
+            symbol = symbol.strip('.')
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
             security = Security.options.CreateFromDetails(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
@@ -185,10 +188,10 @@ class QuestradeClient(BaseClient):
         # We need refresh if we are less than 10 minutes from expiry.
         return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600))
 
-    def Authorize(self):
+    def Authorize(self, force=False):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
         with self.authorization_lock:
-            if self.needs_refresh:
+            if self.needs_refresh or force:
                 _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
                 r = requests.get(_URL_LOGIN + self.refresh_token)
                 r.raise_for_status()
@@ -221,6 +224,38 @@ class QuestradeClient(BaseClient):
     def GetAccounts(self):
         return self._GetRequest('accounts')
 
+    def GetSymbolIds(self, symbols):
+        json = self._GetRequest('symbols', params={'names' : ','.join(symbols)})
+        for entry in json['symbols']:
+            yield entry['symbolId']
+
+    def GetSymbolId(self, symbol):
+        return next(self.GetSymbolIds([symbol]))
+
+    def GetOptionId(self, underlying_id, expiry, type, strike):
+        """
+        :param underlying_id: the Questrade ID of the underlying
+        :param expiry: datetime, expiry date
+        :param type: 'call' or 'put'
+        :param strike: strike price
+        :return:
+        """
+        chain_json = self._GetRequest('symbols/{}/options'.format(underlying_id))
+        for chain in chain_json['optionChain']:
+            if parser.parse(chain['expiryDate']).date() == expiry.date():
+                for root in chain['chainPerRoot']:
+                    for option in chain['chainPerRoot'][0]['chainPerStrikePrice']:
+                        if abs(option['strikePrice'] - strike) < 0.01:
+                            return option['callSymbolId'] if type.lower() == 'call' else option['putSymbolId']
+        return 0
+
+    def GetOptionPrice(self, option_id):
+        json = self.session.post('market/quotes/options', json={'optionIds' : option_id})
+        data = json['optionQuotes']
+        if data['lastTradePriceTrHrs']: return data['lastTradePriceTrHrs']
+        if data['lastTradePrice']: return data['lastTradePrice']
+        return None
+
     @api_response()
     def GetAccountBalances(self, id):
         return self._GetRequest('accounts/{}/balances'.format(id))
@@ -238,3 +273,27 @@ class QuestradeClient(BaseClient):
         for account_json in self.GetAccounts():
             QuestradeAccount.objects.get_or_create(
                 type=account_json['type'], id=account_json['number'], client=self)
+
+
+class QuestradeOptionDataSource(DataSourceMixin):
+    symbol = models.CharField(max_length=32)
+    optionid = models.IntegerField()
+    client = models.ForeignKey(QuestradeClient, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return "Questrade Client {} for option {}".format(self.client, self.symbol)
+
+    def __repr__(self):
+        return "QuestradeOptionDataSource<{},{}>".format(self.symbol, self.client)
+
+    @classmethod
+    def CreateFromOption(cls, option, client):
+        with client as c:
+            underlying_id = c.GetSymbolId(option.underlying)
+            optionid = c.GetOptionId(underlying_id, option.expiry, 'call' if option.is_call else 'put', option.strike)
+
+        return cls(symbol=option.symbol, optionid=optionid, client=client)
+
+    def _Retrieve(self, start, end):
+        with self.client as client:
+            return datetime.date.today(), client.GetOptionPrice(self.optionid)
