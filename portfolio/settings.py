@@ -11,7 +11,8 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 """
 
 import os
-import dj_database_url
+from decouple import config
+from dj_database_url import parse as db_url
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,8 +21,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.11/howto/deployment/checklist/
 
-with open(os.path.join(BASE_DIR, '_private', 'secret_key.txt')) as f:
-    SECRET_KEY = f.read()
+SECRET_KEY = config('SECRET_KEY')
+
 DEBUG = True
 
 ALLOWED_HOSTS = ['localhost']
@@ -87,38 +88,9 @@ TEMPLATES = [
     },
 ]
 
-SHELL_PLUS_PRE_IMPORTS = [
-    'datetime',
-    'pendulum',
-    'pandas',
-    'plotly',
-    ('plotly', 'graph_objs'),
-    ('collections', 'defaultdict'),
-    ('dateutil', 'parser'),
-    ('decimal', 'Decimal')
-]
-
 WSGI_APPLICATION = 'portfolio.wsgi.application'
 
-DATABASES = {}
-db_from_env = dj_database_url.config(conn_max_age=500)
-if db_from_env:
-    DATABASES['default'] = db_from_env
-else:
-    DATABASES = {
-        'default': {
-            # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': 'finance',  # Or path to database file if using sqlite3.
-            'USER': 'financeuser',  # Not used with sqlite3.
-            'PASSWORD': 'passwordfordjangofinance',  # Not used with sqlite3.
-            # Set to empty string for localhost. Not used with sqlite3.
-            'HOST': 'localhost',
-            # Set to empty string for default. Not used with sqlite3.
-            'PORT': '5432',
-        }
-    }
-
+DATABASES = {'default' : config('DATABASE_URL', cast=db_url) }
 
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
@@ -163,10 +135,6 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Email settings
-EMAIL_HOST = 'localhost'
-EMAIL_PORT = 1025
-
 # Logging
 LOGGING = {
     'version': 1,
@@ -206,11 +174,15 @@ LOGGING = {
 # Hijack
 HIJACK_USE_BOOTSTRAP = True
 
+# Plotly
+PLOTLY_USERNAME = config('PLOTLY_USERNAME')
+PLOTLY_API_KEY = config('PLOTLY_API_KEY')
+
 # Email
 EMAIL_HOST = 'smtp.sendgrid.net'
 EMAIL_PORT = 587
 EMAIL_HOST_USER = 'apikey'
-EMAIL_HOST_PASSWORD = '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'
+EMAIL_HOST_PASSWORD = config('EMAIL_SENDGRID_APIKEY')
 
 
 # Celery configuration

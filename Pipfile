@@ -28,6 +28,7 @@ pandas-datareader = {git = "https://github.com/dwrpayne/pandas-datareader.git", 
 pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
 mod-wsgi = "*"
 django-hijack = "*"
+python-decouple = "*"
 
 
 [dev-packages]
