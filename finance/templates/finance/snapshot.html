@@ -9,7 +9,7 @@
             {% if view.prev_day %}
                 <a href="{% url 'finance:snapshot' %}?day={{ view.prev_day }}"><<<</a>
             {% endif %}
-            Portfolio view as of {{ view.day }}
+            Portfolio view as of {{ view.get_day }}
             {% if view.next_day %}
                 <a href="{% url 'finance:snapshot' %}?day={{ view.next_day }}">>>></a>
             {% endif %}
@@ -18,7 +18,7 @@
     </div>
     <div class="col-sm-2">
         <h3>Jump to date:<br/></h3>
-        <div type="text" id="datepicker" placeholder="{{ view.day }}"></div>
+        <div type="text" id="datepicker" placeholder="{{ view.get_day }}"></div>
     </div>
 </div>
 <div class="row">

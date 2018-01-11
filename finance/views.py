@@ -129,24 +129,22 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
     day_format = "%Y-%m-%d"
     context_object_name = 'activities'
 
-    def day(self):
-        return self.get_day()
-
     def next_day(self):
-        return str(self.get_next_day(self.day()) or '')
+        return str(self.get_next_day(self.get_day()) or '')
 
     def prev_day(self):
-        return str(self.get_previous_day(self.day()) or '')
+        return str(self.get_previous_day(self.get_day()) or '')
 
     def inception_days_ago(self):
         return (datetime.date.today() - self.request.user.userprofile.GetInceptionDate()).days - 1
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(GetHoldingsContext(self.request.user.userprofile, self.get_day()))
         return context
 
     def get_day(self):
+        print(super().get_day())
         try:
            return datetime.datetime.strptime(super().get_day(), self.get_day_format()).date()
         except:
