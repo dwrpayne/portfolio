@@ -38,6 +38,12 @@ def percentage(amount, decimals=2):
 
 
 @register.filter()
+def prefix_plusminus(num):
+    prefix = '+' if float(num) > 0 else '-'
+    return prefix + str(num)
+
+
+@register.filter()
 def parens(s):
     return '({})'.format(s)
 
