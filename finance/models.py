@@ -743,54 +743,59 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
     def __add__(self, other):
         return HoldingChange.create_from_detail(self) + HoldingChange.create_from_detail(other)
 
+    def __rsub__(self, other):
+        return HoldingChange.create_delta(self, other)
+
     def __sub__(self, other):
         return HoldingChange.create_delta(other, self)
 
 
 class HoldingChange:
-    def __init__(self):
-        self.account = None
-        self.security = None
-        self.qty = 0
-        self.qty_delta = 0
-        self.value = 0
-        self.value_delta = 0
-        self.price = 0
-        self.price_delta = 0
-        self.percent_gain = 0
+    def __init__(self, account=None, security=None, qty=0, value=0, price=0, day=None, exch=1,
+                 qty_delta=0, value_delta=0, price_delta=0, percent_gain=0):
+        self.account = account
+        self.security = security
+        self.day = day
+        self.qty = qty
+        self.qty_delta = qty_delta
+        self.value = value
+        self.value_delta = value_delta
+        self.price = price
+        self.price_delta = price_delta
+        self.percent_gain = percent_gain
+        self.exch = exch
 
     @staticmethod
     def create_from_detail(detail):
         assert isinstance(detail, HoldingDetail)
 
-        hc = HoldingChange()
-        hc.account = detail.account
-        hc.security = detail.security
-        hc.day = detail.day
-        hc.price = detail.price
-        hc.exch = detail.exch
-        hc.qty = detail.qty
-        hc.value = detail.value
+        hc = HoldingChange(account=detail.account, security=detail.security, qty=detail.qty,
+                           value=detail.value, price=detail.price, day=detail.day, exch=detail.exch,
+                           qty_delta=detail.qty, value_delta=detail.value)
         return hc
 
     @staticmethod
     def create_delta(previous, current):
-        assert previous.account_id == current.account_id
-        assert previous.security_id == current.security_id
+        if not current:
+            current = HoldingChange(account=previous.account, security=previous.security,
+                                    price=previous.price, exch=previous.exch,
+                                    day=previous.day + datetime.timedelta(days=1))
+        if not previous:
+            previous = HoldingChange(account=current.account, security=current.security,
+                                     price=current.price, exch=current.exch,
+                                     day=current.day - datetime.timedelta(days=1))
+
+        assert previous.account == current.account
+        assert previous.security == current.security
         assert previous.day < current.day
 
-        hc = HoldingChange()
-        hc.account = current.account
-        hc.security = current.security
-        hc.day = current.day
+        hc = HoldingChange(account=current.account, security=current.security,
+                           qty=current.qty, value=current.value, price=current.price,
+                           day=current.day, exch=current.exch)
         hc.day_from = previous.day
-        hc.price = current.price
         hc.price_delta = current.price - previous.price
         hc.percent_gain = hc.price_delta / previous.price
-        hc.exch = current.exch
-        hc.qty = current.qty
         hc.qty_delta = current.qty - previous.qty
-        hc.value = current.value
         hc.value_delta = current.value - previous.value
         return hc
 
@@ -817,7 +822,7 @@ class HoldingChange:
         assert isinstance(other, HoldingChange)
         assert self.day == other.day
 
-        ret = HoldingChange()
+        ret = HoldingChange(day=self.day, value=self.value + other.value)
 
         if self.account == other.account:
             ret.account = self.account
@@ -828,8 +833,6 @@ class HoldingChange:
             ret.price = self.price
             ret.price_delta = self.price_delta
 
-        ret.day = self.day
-        ret.value = self.value + other.value
         ret.value_delta = self.value_delta + other.value_delta
         ret.percent_gain = ret.value_delta / (ret.value - ret.value_delta)
 

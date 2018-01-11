@@ -175,12 +175,22 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
     today_query = userprofile.GetHoldingDetails().at_date(as_of_date)
     yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1))
+    yesterday_list = list(yesterday_query)
 
     account_data = []
     for today in today_query:
         yesterday = yesterday_query.filter(account=today.account, security=today.security)
         if yesterday:
             account_data.append(today-yesterday[0])
+            yesterday_list.remove(yesterday[0])
+        else:
+            # We bought this security today.
+            account_data.append(today - 0)
+
+    # Check yesterday's holdings to see if there were any that we haven't processed yet (ie sold today)
+    for yesterday in yesterday_list:
+        account_data.append(0 - yesterday)
+
 
     holding_data = []
     for security, holdings in groupby(account_data, lambda h: h.security):
