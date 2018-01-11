@@ -188,7 +188,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         h.account_data = [d for d in account_data if d.security == security]
         holding_data.append(h)
 
-    holding_data = sorted(holding_data, key=attrgetter('type', 'value'), reverse=True)
+    holding_data = sorted(holding_data, key=attrgetter('security'))
     holding_data, cash_data = partition(lambda h: h.type==Security.Type.Cash, holding_data)
 
     context = {'holding_data': holding_data,
