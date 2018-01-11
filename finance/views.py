@@ -24,14 +24,11 @@ class AccountDetail(LoginRequiredMixin, DetailView):
     template_name = 'finance/account.html'
     context_object_name = 'account'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['activities'] = reversed(list(self.object.activities.all()))
-        return context
+    def activities(self):
+        return reversed(list(self.object.activities.all()))
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        return qs.for_user(self.request.user)
+        return super().get_queryset().for_user(self.request.user)
 
 
 class StatusSecurity(ListView):
@@ -40,11 +37,8 @@ class StatusSecurity(ListView):
     context_object_name = 'securities'
     ordering = ['-type','symbol']
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        synced, outdated = partition(lambda s: s.NeedsSync(), self.get_queryset())
-        context['securities_by_status'] = [outdated, synced]
-        return context
+    def securities_by_status(self):
+        return partition(lambda s: not s.NeedsSync(), self.get_queryset())
 
 
 class UserProfileView(LoginRequiredMixin, TemplateView, FormView):
@@ -60,19 +54,16 @@ class UserProfileView(LoginRequiredMixin, TemplateView, FormView):
         print(form.cleaned_data['your_name'])
         return super().form_valid(form)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        return context
-
 
 class FeedbackView(FormView):
     template_name = 'finance/feedback.html'
-    success_url = '/finance/feedback/'
+    success_url = '/finance/feedback/?success=true'
     form_class = FeedbackForm
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.request.user.userprofile
-        return super().get(request, *args, **kwargs)
+    def get_initial(self):
+        self.initial.update({'name': self.request.user.get_full_name(),
+                             'email': self.request.user.email})
+        return super().get_initial()
 
     def form_valid(self, form):
         form.send_email()
@@ -81,21 +72,18 @@ class FeedbackView(FormView):
 
 class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
     template_name = 'finance/capgains.html'
+    context_object_name = 'symbol'
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object(queryset=Security.objects.all())
         return super().get(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['symbol'] = self.object
+    def activities(self):
+        return self.get_queryset()
 
-        activities = self.get_queryset()
-        context['activities'] = activities
-        last_activity = activities[-1]
-        context['pendinggain'] = self.object.pricedetails.latest().cadprice * last_activity.totalqty - last_activity.totalacb
-
-        return context
+    def pending_gain(self):
+        last_activity = self.activities()[-1]
+        return self.object.pricedetails.latest().cadprice * last_activity.totalqty - last_activity.totalacb
 
     def get_queryset(self):
         return self.object.activities.for_user(self.request.user).without_dividends().with_capgains_data()
@@ -106,20 +94,16 @@ class DividendReport(LoginRequiredMixin, ListView):
     template_name = 'finance/dividends.html'
     context_object_name = 'activities'
 
-    def get_context_data(self, **kwargs):
+    def by_year(self):
         dividends = self.get_queryset()
-        by_year = []
+        yearly_divs = []
         for year in range(self.request.user.userprofile.GetInceptionDate().year,
                           datetime.date.today().year+1):
-            by_year.append((year, sum(dividends.in_year(year).values_list('netAmount', flat=True))))
-
-        context = super().get_context_data(**kwargs)
-        context['by_year'] = by_year
-        return context
+            yearly_divs.append((year, sum(dividends.in_year(year).values_list('netAmount', flat=True))))
+        return yearly_divs
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        return qs.for_user(self.request.user).dividends()
+        return super().get_queryset().for_user(self.request.user).dividends()
 
 
 class SecurityDetail(SingleObjectMixin, ListView):
@@ -131,12 +115,8 @@ class SecurityDetail(SingleObjectMixin, ListView):
         self.object = self.get_object(queryset=Security.objects.all())
         return super().get(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        filename = GenerateSecurityPlot(self.object)
-        context = super().get_context_data(**kwargs)
-        context['iframe'] = plotly_iframe_from_url(filename)
-        context['symbol'] = self.object.symbol
-        return context
+    def iframe(self):
+        return plotly_iframe_from_url(GenerateSecurityPlot(self.object))
 
     def get_queryset(self):
         return self.request.user.userprofile.GetActivities().for_security(self.object)
@@ -147,17 +127,23 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
     template_name = 'finance/snapshot.html'
     date_field = 'tradeDate'
     day_format = "%Y-%m-%d"
+    context_object_name = 'activities'
 
+    def day(self):
+        return self.get_day()
+
+    def next_day(self):
+        return str(self.get_next_day(self.day()) or '')
+
+    def prev_day(self):
+        return str(self.get_previous_day(self.day()) or '')
+
+    def inception_days_ago(self):
+        return (datetime.date.today() - self.request.user.userprofile.GetInceptionDate()).days - 1
+    
     def get_context_data(self, **kwargs):
-        day = self.get_day()
         context = super().get_context_data(**kwargs)
-        context.update(GetHoldingsContext(self.request.user.userprofile, day))
-        age_in_days = (datetime.date.today() - self.request.user.userprofile.GetInceptionDate()).days
-        context['inception_days_ago'] = age_in_days - 1
-        context['day'] = day
-        context['next_day'] = str(self.get_next_day(day) or '')
-        context['prev_day'] = str(self.get_previous_day(day) or '')
-        context['activities'] = self.request.user.userprofile.GetActivities().at_date(day)
+        context.update(GetHoldingsContext(self.request.user.userprofile, self.get_day()))
         return context
 
     def get_day(self):

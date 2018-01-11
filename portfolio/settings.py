@@ -27,7 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['localhost']
 
-INTERNAL_IPS = ['localhost', '192.168.0.11', '192.168.0.10', '70.71.233.189']
+INTERNAL_IPS = ['localhost', '192.168.0.10', '127.0.0.1']
 
 # Application definition
 

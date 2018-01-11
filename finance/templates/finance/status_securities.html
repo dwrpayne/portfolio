@@ -13,7 +13,7 @@
             <th>Current Price</th>
             <th>Data Source</th>
         </tr>
-        {% for status in securities_by_status %}
+        {% for status in view.securities_by_status %}
             {% for security in status %}
                 <tr>
                     <td>{{ security.symbol }}</td>

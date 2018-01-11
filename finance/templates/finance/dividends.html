@@ -1,7 +1,7 @@
 {% extends "finance/base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{symbol}} {% endblock title %}
+{% block title %} {{view.object.symbol}} {% endblock title %}
 {% block content %}  
 <div class="row" align="center">
     <h2>{{symbol}}</h2><br /><h3>All values converted to Canadian dollars.</h3>
@@ -19,7 +19,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for year, amount in by_year %}
+                {% for year, amount in view.by_year %}
                     <tr>
                         <td>{{ year }}</td>
                         <td>{{ amount }}</td>
