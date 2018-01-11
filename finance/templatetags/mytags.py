@@ -39,8 +39,9 @@ def percentage(amount, decimals=2):
 
 @register.filter()
 def prefix_plusminus(num):
-    prefix = '+' if float(num) > 0 else '-'
-    return prefix + str(num)
+    if not num or float(num) < 0:
+        return num
+    return '+' + num
 
 
 @register.filter()
