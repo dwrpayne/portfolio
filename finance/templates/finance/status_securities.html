@@ -13,25 +13,27 @@
             <th>Current Price</th>
             <th>Data Source</th>
         </tr>
-        {% for security in securities %}
-            <tr>
-                <td>{{ security.symbol }}</td>
-                <td>{{ security.type }}</td>
-                <td bgcolor="{% if security.prices.earliest.day <= security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                    {{ security.prices.earliest.day }}
-                </td>
-                <td bgcolor="{% if security.prices.earliest.day <= security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                    {{ security.earliest_price_needed }}
-                </td>
-                <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                    {{ security.latest_price_needed }}
-                </td>
-                <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                    {{ security.prices.latest.day }}
-                </td>
-                <td>{{ security.prices.latest.price }}</td>
-                <td>{{ security.datasource }}</td>
-            </tr>
+        {% for status in securities_by_status %}
+            {% for security in status %}
+                <tr>
+                    <td>{{ security.symbol }}</td>
+                    <td>{{ security.type }}</td>
+                    <td bgcolor="{% if security.prices.earliest.day <= security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
+                        {{ security.prices.earliest.day }}
+                    </td>
+                    <td bgcolor="{% if security.prices.earliest.day <= security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
+                        {{ security.earliest_price_needed }}
+                    </td>
+                    <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
+                        {{ security.latest_price_needed }}
+                    </td>
+                    <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
+                        {{ security.prices.latest.day }}
+                    </td>
+                    <td>{{ security.prices.latest.price }}</td>
+                    <td>{{ security.datasource }}</td>
+                </tr>
+            {% endfor %}
         {% endfor %}
     </table>
 {% endblock %}

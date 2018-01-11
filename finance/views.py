@@ -12,7 +12,7 @@ from django.views.generic.dates import DateMixin, DayMixin
 from django.views.generic.edit import FormView
 
 from securities.models import Security
-from utils.misc import plotly_iframe_from_url
+from utils.misc import plotly_iframe_from_url, partition
 from .services import GenerateSecurityPlot
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask
 from .models import BaseAccount, Activity, UserProfile
@@ -40,8 +40,11 @@ class StatusSecurity(ListView):
     context_object_name = 'securities'
     ordering = ['-type','symbol']
 
-    def get_queryset(self):
-        return super().get_queryset().filter(holdings__enddate=None).distinct()
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        synced, outdated = partition(lambda s: s.NeedsSync(), self.get_queryset())
+        context['securities_by_status'] = [outdated, synced]
+        return context
 
 
 class UserProfileView(LoginRequiredMixin, TemplateView, FormView):
@@ -185,9 +188,12 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         h.account_data = [d for d in account_data if d.security == security]
         holding_data.append(h)
 
-    context = {'holding_data': sorted(holding_data, key=attrgetter('type', 'value'), reverse=True),
-               'total': sum(account_data)
-               }
+    holding_data = sorted(holding_data, key=attrgetter('type', 'value'), reverse=True)
+    holding_data, cash_data = partition(lambda h: h.type==Security.Type.Cash, holding_data)
+
+    context = {'holding_data': holding_data,
+               'cash_data': cash_data,
+               'total': sum(account_data) }
     return context
 
 
@@ -273,8 +279,11 @@ def Rebalance(request):
 @login_required
 def securitydetail(request, symbol):
     security = Security.objects.get(symbol=symbol)
-    filename = GenerateSecurityPlot(security)
-    iframe = plotly_iframe_from_url(filename)
+
+    # TODO: Disable security plotly because I am hitting my free chart limit.
+    #filename = GenerateSecurityPlot(security)
+    iframe = ''#plotly_iframe_from_url(filename)
+
     activities = request.user.userprofile.GetActivities().for_security(symbol)
 
     context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}

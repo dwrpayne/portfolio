@@ -164,6 +164,9 @@ class Security(models.Model):
         if self.type == self.Type.Stock:
             self.metadata = GetYahooStockData(self.symbol)
 
+    def NeedsSync(self):
+        return self.GetShouldSyncRange(False)[0] is not None
+
     def GetShouldSyncRange(self, force_today):
         """ Returns a pair (start,end) of datetime.dates that need to be synced."""
         try:

@@ -51,5 +51,30 @@
             {% endfor %}
             
         </tbody>
+        <tbody>
+            {% for holding_detail in cash_data %}
+            <tr>
+                <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter}}" >&gt;</div></td>
+                <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td>{{holding_detail.value | currency}}</td>
+                <td>{{holding_detail.value_delta | currency | colorize}}</td>
+            </tr>
+                {% for account in holding_detail.account_data %}
+                <tr class="collapse holdings-table-child-{{forloop.parentloop.counter}}">
+                    <td></td>
+                    <td>{{account.account}}</td>
+                    <td>{{account.price | floatformat:2}}</td>
+                    <td>{{account.price_delta | floatformat:2 | colorize}} {{account.percent_gain | percentage | parens | colorize}}</td>
+                    <td>{{account.qty | floatformat:0}}</td>
+                    <td>{{account.value | currency}}</td>
+                    <td>{{account.value_delta | currency | colorize}}</td>
+                </tr>
+                {% endfor %}
+            {% endfor %}
+
+        </tbody>
     </table>
 </div>

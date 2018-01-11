@@ -54,7 +54,7 @@ class VirtBrokersAccount(BaseAccount):
     def import_csv(self, csv_file):
         with open(csv_file, newline='') as f:
             fields = ['day', 'EffectiveDate', 'AccountNumber', 'trans_id', 'sub_trans_id', 'symbol', 'description',
-                      'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency']
+                      'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency', 'rep_cd']
             reader = csv.DictReader(f, fieldnames=fields)
             for line in reader:
                 try:
@@ -67,9 +67,11 @@ class VirtBrokersAccount(BaseAccount):
                 line['trans_id'] = line['trans_id'] or line['sub_trans_id']
                 del line['sub_trans_id']
                 del line['SecurityType']
+                del line['rep_cd']
 
                 line['qty'] = Decimal(line['qty']) if line['qty'] else 0
                 line['price'] = Decimal(line['price']) if line['price'] else 0
+                line['commission'] = Decimal(line['commission']) if line['commission'] else 0
                 line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
                 VirtBrokersRawActivity.objects.create(account=self, **line)

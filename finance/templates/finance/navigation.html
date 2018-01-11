@@ -75,7 +75,7 @@
                     <li><a href="{% url 'finance:userprofile' %}">Profile</a></li>
                     <li><a href="{% url 'logout' %}">Logout</a></li>
                     {% if user.is_superuser %}
-                        {% with 'amie sean emily guest' as users %}
+                        {% with 'amie sean emily derrill guest' as users %}
                             {% for name in users.split %}
                                 <li>
                                     <form action="/hijack/username/{{ name }}/" method="post">
