@@ -126,6 +126,11 @@ class Security(models.Model):
             models.Index(fields=['currency'])
         ]
 
+    def __lt__(self, other):
+        if self.type > other.type:
+            return True
+        return self.symbol < other.symbol
+
     @cached_property
     def earliest_price_needed(self):
         if not self.activities.exists():
