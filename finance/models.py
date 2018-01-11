@@ -752,6 +752,7 @@ class HoldingChange:
         self.account = None
         self.security = None
         self.qty = 0
+        self.qty_delta = 0
         self.value = 0
         self.value_delta = 0
         self.price = 0
@@ -788,6 +789,7 @@ class HoldingChange:
         hc.percent_gain = hc.price_delta / previous.price
         hc.exch = current.exch
         hc.qty = current.qty
+        hc.qty_delta = current.qty - previous.qty
         hc.value = current.value
         hc.value_delta = current.value - previous.value
         return hc
