@@ -752,17 +752,18 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
 
 class HoldingChange:
     def __init__(self, account=None, security=None, qty=0, value=0, price=0, day=None, exch=1,
-                 qty_delta=0, value_delta=0, price_delta=0, percent_gain=0):
+                 qty_delta=0, value_delta=0):
         self.account = account
         self.security = security
         self.day = day
         self.qty = qty
         self.qty_delta = qty_delta
         self.value = value
-        self.value_delta = value_delta
+        self.value_delta = 0
+        self.value_percent_delta = 0
         self.price = price
-        self.price_delta = price_delta
-        self.percent_gain = percent_gain
+        self.price_delta = 0
+        self.price_percent_delta = 0
         self.exch = exch
 
     @staticmethod
@@ -770,8 +771,8 @@ class HoldingChange:
         assert isinstance(detail, HoldingDetail)
 
         hc = HoldingChange(account=detail.account, security=detail.security, qty=detail.qty,
-                           value=detail.value, price=detail.price, day=detail.day, exch=detail.exch,
-                           qty_delta=detail.qty, value_delta=detail.value)
+                           value=detail.value, price=detail.price, day=detail.day, exch=detail.exch
+                           )
         return hc
 
     @staticmethod
@@ -794,9 +795,10 @@ class HoldingChange:
                            day=current.day, exch=current.exch)
         hc.day_from = previous.day
         hc.price_delta = current.price - previous.price
-        hc.percent_gain = hc.price_delta / previous.price
-        hc.qty_delta = current.qty - previous.qty
+        hc.price_percent_delta = hc.price_delta / previous.price
         hc.value_delta = current.value - previous.value
+        hc.value_percent_delta = hc.value_delta / previous.value
+        hc.qty_delta = current.qty - previous.qty
         return hc
 
     def __str__(self):
@@ -832,8 +834,9 @@ class HoldingChange:
             ret.qty = self.qty + other.qty
             ret.price = self.price
             ret.price_delta = self.price_delta
+            ret.price_percent_delta = ret.price_delta / (ret.price - ret.price_delta)
 
-        ret.value_delta = self.value_delta + other.value_delta
-        ret.percent_gain = ret.value_delta / (ret.value - ret.value_delta)
+        ret.value_delta = ret.value_delta + ret.value_delta
+        ret.value_percent_delta = ret.value_delta / (ret.value - ret.value_delta)
 
         return ret

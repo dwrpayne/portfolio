@@ -157,16 +157,19 @@ class QuestradeAccount(BaseAccount):
 
     def SyncBalances(self):
         with self.client as client:
-            json = client.GetAccountBalances(self.id)
-            self.curBalanceSynced = sum([
-                Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
-                for entry in json['perCurrencyBalances']
-            ])
-            self.sodBalanceSynced = sum([
-                Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
-                for entry in json['sodPerCurrencyBalances']
-            ])
-            self.save()
+            try:
+                json = client.GetAccountBalances(self.id)
+                self.curBalanceSynced = sum([
+                    Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
+                    for entry in json['perCurrencyBalances']
+                ])
+                self.sodBalanceSynced = sum([
+                    Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
+                    for entry in json['sodPerCurrencyBalances']
+                ])
+                self.save()
+            except requests.exceptions.HTTPError:
+                pass
 
 
 class QuestradeClient(BaseClient):
