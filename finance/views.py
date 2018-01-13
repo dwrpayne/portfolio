@@ -144,7 +144,6 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
         return context
 
     def get_day(self):
-        print(super().get_day())
         try:
            return datetime.datetime.strptime(super().get_day(), self.get_day_format()).date()
         except:
