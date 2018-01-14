@@ -1,0 +1,31 @@
+{% extends "finance/base.html" %}
+{% load mytags %}
+{% block content %}
+    <div align="center"><h2>User Status</h2></div>
+    <table class="table table-striped table-hover table-sm">
+        <tr>
+            <th>Username</th>
+            <th>Full Name</th>
+            <th>Email</th>
+            <th>Join Date</th>
+            <th>Last Login</th>
+            <th>Hijack</th>
+        </tr>
+        {% for profile in userprofiles %}
+            <tr>
+                <td>{{ profile.username }}</td>
+                <td>{{ profile.user.full_name }}</td>
+                <td>{{ profile.user.email }}</td>
+                <td>{{ profile.user.date_joined }}</td>
+                <td>{{ profile.user.last_login }}</td>
+                <td>
+                    <form action="/hijack/username/{{ profile.username }}/" method="post">
+                        {% csrf_token %}
+                        <button type="submit">Hijack {{ profile.username }}</button>
+                    </form>
+                </td>
+
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock %}

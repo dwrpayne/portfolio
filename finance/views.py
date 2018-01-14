@@ -53,6 +53,13 @@ class AdminSecurity(ListView):
         return self.model.objects.all().prefetch_related('activities', 'prices').order_by('-type', 'symbol')
 
 
+class AdminUsers(ListView):
+    model = UserProfile
+    template_name = 'finance/admin/users.html'
+    context_object_name = 'userprofiles'
+    ordering = ['user__date_joined']
+
+
 class AdminAccounts(RefreshButtonHandlerMixin, ListView):
     model = BaseAccount
     template_name = 'finance/admin/accounts.html'

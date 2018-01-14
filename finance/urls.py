@@ -19,4 +19,5 @@ urlpatterns = [
     # Admin panels
     url(r'^admin/security/$', views.AdminSecurity.as_view(), name='admin_security'),
     url(r'^admin/accounts/$', views.AdminAccounts.as_view(), name='admin_accounts'),
+    url(r'^admin/users/$', views.AdminUsers.as_view(), name='admin_users'),
 ]
