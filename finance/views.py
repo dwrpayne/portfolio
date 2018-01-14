@@ -248,21 +248,6 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     return context
 
 
-
-
-def GetBalanceContext(userprofile):
-    accounts = userprofile.GetAccounts()
-    if not accounts.exists():
-        return {}
-
-    total = accounts.get_balance_totals()
-    exchange_live, exchange_delta = Security.objects.get(symbol='USD').GetTodaysChange()
-
-    context = {'accounts': accounts, 'account_total': total,
-               'exchange_live': exchange_live, 'exchange_delta': exchange_delta}
-    return context
-
-
 @login_required
 def Portfolio(request):
     userprofile = request.user.userprofile
@@ -281,8 +266,7 @@ def Portfolio(request):
         elif 'refresh-plot' in request.GET:
             userprofile.GeneratePlots()
 
-    overall_context = {**GetHoldingsContext(userprofile)}#, **GetBalanceContext(userprofile)}
-    return render(request, 'finance/portfolio.html', overall_context)
+    return render(request, 'finance/portfolio.html', GetHoldingsContext(userprofile))
 
 
 @login_required

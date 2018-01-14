@@ -754,6 +754,9 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
         return HoldingChange.create_delta(self, other)
 
     def __sub__(self, other):
+        if not other:
+            price = SecurityPriceDetail.objects.get(security_id=self.security_id, day=self.day - datetime.timedelta(days=1))
+            return HoldingChange.delta_from_price(price, self)
         return HoldingChange.create_delta(other, self)
 
 
@@ -783,6 +786,19 @@ class HoldingChange:
         return hc
 
     @staticmethod
+    def delta_from_price(price, holding):
+        hc = HoldingChange(account=holding.account, security=holding.security,
+                           qty=holding.qty, value=holding.value, price=holding.price,
+                           day=holding.day, exch=holding.exch)
+        hc.day_from = price.day
+        hc.price_delta = holding.price - holding.price
+        hc.price_percent_delta = hc.price_delta / price.price
+        hc.value_delta = holding.value
+        hc.value_percent_delta = 0
+        hc.qty_delta = holding.qty
+        return hc
+
+    @staticmethod
     def create_delta(previous, current):
         if not current:
             current = HoldingChange(account=previous.account, security=previous.security,
@@ -794,7 +810,7 @@ class HoldingChange:
                                      day=current.day - datetime.timedelta(days=1))
 
         assert previous.account == current.account
-        assert previous.security_id == current.security_id
+        assert previous.security == current.security
         assert previous.day < current.day
 
         hc = HoldingChange(account=current.account, security=current.security,

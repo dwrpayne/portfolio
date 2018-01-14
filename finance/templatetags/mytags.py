@@ -1,4 +1,6 @@
 import datetime
+from decimal import Decimal
+from re import sub
 
 from django import template
 from django.template.defaultfilters import stringfilter
@@ -10,9 +12,10 @@ register = template.Library()
 @register.filter()
 @stringfilter
 def colorize(amount):
-    if '0.00' in amount:
+    amount_num = Decimal(sub(r'[^\d.-]', '', amount))
+    if abs(amount_num) == 0:
         color = 'black'
-    elif '-' in amount:
+    elif amount_num < 0:
         color = 'red'
     else:
         color = 'green'
