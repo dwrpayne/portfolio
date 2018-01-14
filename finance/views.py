@@ -85,7 +85,7 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
         return HttpResponse()
 
 
-class UserProfileView(LoginRequiredMixin, TemplateView, FormView):
+class UserProfileView(LoginRequiredMixin, TemplateView):
     model = UserProfile
     template_name = 'finance/userprofile.html'
     context_object_name = 'userprofile'

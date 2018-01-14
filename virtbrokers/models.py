@@ -3,7 +3,7 @@ from dateutil import parser
 from decimal import Decimal
 
 from django.db import models
-from finance.models import BaseAccount, BaseClient, BaseRawActivity, Activity
+from finance.models import BaseAccount, BaseClient, BaseRawActivity, Activity, HoldingDetail
 from securities.models import Security
 
 class VirtBrokersRawActivity(BaseRawActivity):
@@ -71,16 +71,18 @@ class VirtBrokersAccount(BaseAccount):
                 line['commission'] = -Decimal(line['commission']) if line['commission'] else 0
                 line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
-                VirtBrokersRawActivity.objects.create(account=self, **line)
+                VirtBrokersRawActivity.objects.get_or_create(account=self, **line)
 
-    def ReImportActivities(self, csv_file):
+
+    def ImportActivities(self, csv_file):
         """
-        Total hack for now.
+        Kinda hacky for now.
         """
         # r'C:\Users\David\Dropbox\coding\portfolio\_private\derrill_780116252.csv'
-        self.rawactivities.delete()
         self.import_from_csv(csv_file)
         self.RegenerateActivities()
+        Security.objects.Sync(False)
+        HoldingDetail.Refresh()
 
 
 class VirtBrokersClient(BaseClient):
