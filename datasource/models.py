@@ -95,6 +95,7 @@ class AlphaVantageDataSource(DataSourceMixin):
 
     def validate_symbol(self):
         """Go through our list of possible symbol transformations to find one that has data in the last week"""
+        original_symbol = self.symbol
         possible_symbols = [self.symbol, self.symbol + '.TO',
                             self.symbol.replace('.', '-'), self.symbol.replace('.', '-') + '.TO']
 
@@ -102,7 +103,7 @@ class AlphaVantageDataSource(DataSourceMixin):
             self.symbol = symbol
             if self._Retrieve(date.today() - timedelta(days=7), date.today()):
                 return
-        self.symbol = 'NO VALID LOOKUP FOUND'
+        self.symbol = 'NO VALID LOOKUP FOR {}'.format(original_symbol)
 
     def _Retrieve(self, start, end):
         params = {'function': self.function, 'apikey': self.api_key,

@@ -180,7 +180,7 @@ class Security(models.Model):
             earliest = self.prices.earliest().day
             latest = self.prices.latest().day
         except ObjectDoesNotExist:
-            return self.earliest_price_needed, self.latest_price_needed
+            return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed
 
         if earliest >= self.earliest_price_needed:
             return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed

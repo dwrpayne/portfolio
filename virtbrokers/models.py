@@ -26,10 +26,6 @@ class VirtBrokersRawActivity(BaseRawActivity):
         if self.type == 'FXT':           self.type = Activity.Type.FX
         if self.type == 'INT':           self.type = Activity.Type.Interest
 
-        # Todo: stocks shouldn't have .TO - that is datasource level only.
-        if self.symbol in ['NDM', 'XAW']:
-            self.symbol += '.TO'
-
         security = None
         if self.symbol:
             security, _ = Security.objects.get_or_create(symbol=self.symbol,
@@ -80,7 +76,7 @@ class VirtBrokersAccount(BaseAccount):
         """
         Total hack for now.
         """
-        # r'C:\Users\David\Dropbox\coding\portfolio\_private\sean_26386387.csv'
+        # r'C:\Users\David\Dropbox\coding\portfolio\_private\derrill_780116252.csv'
         VirtBrokersRawActivity.objects.filter(account=self).delete()
         self.import_csv(csv_file)
         self.RegenerateActivities()
