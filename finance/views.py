@@ -36,7 +36,6 @@ class AdminSecurity(ListView):
     model = Security
     template_name = 'finance/admin/securities.html'
     context_object_name = 'securities'
-    ordering = ['-type','symbol']
 
     def securities_by_status(self):
         return partition(lambda s: not s.NeedsSync(), self.get_queryset())
@@ -44,11 +43,14 @@ class AdminSecurity(ListView):
     def ajax_request(self, action):
         action, symbol = action.split('-')
         if action == 'sync':
-            Security.objects.get(pk=symbol).Sync(True)
+            if symbol == 'all':
+                Security.objects.Sync(True)
+            else:
+                Security.objects.get(pk=symbol).Sync(True)
         return HttpResponse()
 
     def get_queryset(self):
-        return self.model.objects.all().prefetch_related('activities', 'prices')
+        return self.model.objects.all().prefetch_related('activities', 'prices').order_by('-type', 'symbol')
 
 
 class AdminAccounts(RefreshButtonHandlerMixin, ListView):
