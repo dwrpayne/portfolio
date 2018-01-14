@@ -87,12 +87,23 @@
                 <ul class="dropdown-menu">
                     <li><a href="{% url 'finance:userprofile' %}">Profile</a></li>
                     <li><a href="{% url 'logout' %}">Logout</a></li>
+                    {% if user.is_superuser %}
+                        {% with 'amie sean emily derrill guest' as users %}
+                            {% for name in users.split %}
+                                <li class="dropdown-item">
+                                    <form action="/hijack/username/{{ name }}/" method="post">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-link">Hijack {{ name }}</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        {% endwith %}
+                    {% endif %}
                 </ul>
             </li>
             {% else %}
                 <li><a href="{% url 'login' %}">Login</a></li>
             {% endif %}
         </ul>
-
     </div>
 </nav>
