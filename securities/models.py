@@ -106,8 +106,8 @@ class Security(models.Model):
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
     currency = models.CharField(max_length=3, default='XXX')
     datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
-                                   default=None, on_delete=models.DO_NOTHING)
-    last_sync_time = models.DateTimeField()
+                                   default=None, on_delete=models.SET_NULL)
+    last_sync_time = models.DateTimeField(null=True, blank=True, default=None)
 
     objects = SecurityManager.from_queryset(SecurityQuerySet)()
     stocks = StockSecurityManager.from_queryset(SecurityQuerySet)()
