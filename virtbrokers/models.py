@@ -48,7 +48,7 @@ class VirtBrokersAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 0
 
-    def import_csv(self, csv_file):
+    def import_from_csv(self, csv_file):
         with open(csv_file, newline='') as f:
             fields = ['day', 'EffectiveDate', 'AccountNumber', 'trans_id', 'sub_trans_id', 'symbol', 'description',
                       'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency', 'rep_cd']
@@ -78,8 +78,8 @@ class VirtBrokersAccount(BaseAccount):
         Total hack for now.
         """
         # r'C:\Users\David\Dropbox\coding\portfolio\_private\derrill_780116252.csv'
-        VirtBrokersRawActivity.objects.filter(account=self).delete()
-        self.import_csv(csv_file)
+        self.rawactivities.delete()
+        self.import_from_csv(csv_file)
         self.RegenerateActivities()
 
 

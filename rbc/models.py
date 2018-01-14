@@ -58,7 +58,7 @@ class RbcAccount(BaseAccount):
     def activitySyncDateRange(self):
         return 0
 
-    def import_csv(self, csv_file):
+    def import_from_csv(self, csv_file):
         with open(csv_file, newline='') as f:
             fields = ['day', 'type', 'symbol', 'qty', 'price', 'SettlementDate', 'Account', 'netAmount', 'currency', 'description']
             reader = csv.DictReader(f, fieldnames=fields)
@@ -82,8 +82,8 @@ class RbcAccount(BaseAccount):
         Total hack for now.
         """
         # r'C:\Users\David\Dropbox\coding\portfolio\_private\sean_26386387.csv'
-        RbcRawActivity.objects.filter(account=self).delete()
-        self.import_csv(csv_file)
+        self.rawactivities.delete()
+        self.import_from_csv(csv_file)
         self.RegenerateActivities()
         
 
