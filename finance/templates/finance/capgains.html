@@ -25,13 +25,13 @@
             </thead>
             <tbody>
             {% for activity in view.activities %}
-                <tr>
+                <tr {% if activity.capgain %}style="font-weight:bold"{% endif %}>
                     <td>{{activity.tradeDate}}</td>
                     <td>{{activity.type}}</td>
                     <td>{{activity.qty | floatformat:0}}</td>
                     <td>{{activity.cadprice | floatformat:2}}</td>
                     <td>{{activity.commission | floatformat:2}}</td>
-                    <td>{{activity.capgain | currency}}</td>
+                    <td>{% if activity.capgain %}{{activity.capgain | currency}}{% endif %}</td>
                     <td>{{activity.totalqty | floatformat:0}}</td>
                     <td>{{activity.acbchange | currency }}</td>
                     <td>{{activity.totalacb | currency}}</td>

@@ -30,7 +30,7 @@
             <tbody>
             {% for security, yearly_values in view.yearly_gains.items %}
                 <tr>
-                    <td>{{security}}</td>
+                    <td><a href="{% url 'finance:capgainssec' security %}">{{security}}</a></td>
                     {% for value in yearly_values %}
                         <td>{% if value %}{{ value | currency}}{% endif %}</td>
                     {% endfor %}
@@ -41,3 +41,4 @@
         </table>
     </div>
 </div>
+{% endblock content %}
