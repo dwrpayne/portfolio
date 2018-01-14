@@ -32,7 +32,7 @@ class AccountDetail(LoginRequiredMixin, DetailView):
         return super().get_queryset().for_user(self.request.user)
 
 
-class AdminSecurity(ListView):
+class AdminSecurity(RefreshButtonHandlerMixin, ListView):
     model = Security
     template_name = 'finance/admin/securities.html'
     context_object_name = 'securities'
@@ -44,9 +44,11 @@ class AdminSecurity(ListView):
         action, symbol = action.split('-')
         if action == 'sync':
             if symbol == 'all':
+                Security.objects.Sync(False)
+            elif symbol == 'active':
                 Security.objects.Sync(True)
             else:
-                Security.objects.get(pk=symbol).Sync(True)
+                Security.objects.get(pk=symbol).SyncRates(True)
         return HttpResponse()
 
     def get_queryset(self):

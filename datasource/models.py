@@ -15,7 +15,7 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
     """
 
     @classmethod
-    def _ProcessRateData(cls, pairs, end_date):
+    def _ProcessRateData(cls, pairs, start_date, end_date):
         """ Expects an iterator of day, price pairs"""
         dates_and_prices = list(zip(*pairs))
         if len(dates_and_prices) == 0:
@@ -25,13 +25,14 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
         series = pandas.Series(prices, index=dates, dtype='float64')
 
         series = series.sort_index()
-        index = pandas.DatetimeIndex(start=min(series.index), end=end_date, freq='D').date
-        series = series.reindex(index).ffill()
+        index = pandas.DatetimeIndex(start=start_date, end=end_date, freq='D').date
+        series = series.reindex(index).fillna(method='ffill').fillna(method='bfill')
         return series.iteritems()
 
     def GetData(self, start, end):
         print("Getting data from {} for {} to {}".format(self, start, end))
-        return self._ProcessRateData(self._Retrieve(start, end), end)
+        data = self._Retrieve(start, end)
+        return self._ProcessRateData(data, start, end)
 
     def _Retrieve(self, start, end):
         """

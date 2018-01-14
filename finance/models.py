@@ -888,6 +888,7 @@ class HoldingChange:
         if self.security == other.security:
             ret.security = self.security
             ret.qty = self.qty + other.qty
+            ret.qty_delta = self.qty_delta + other.qty_delta
             ret.price = self.price
             ret.price_delta = self.price_delta
             ret.price_percent_delta = ret.price_delta / (ret.price - ret.price_delta)

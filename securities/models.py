@@ -106,6 +106,7 @@ class Security(models.Model):
     currency = models.CharField(max_length=3, default='XXX')
     datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
                                    default=None, on_delete=models.DO_NOTHING)
+    last_sync_time = models.DateTimeField()
 
     objects = SecurityManager.from_queryset(SecurityQuerySet)()
     stocks = StockSecurityManager.from_queryset(SecurityQuerySet)()
@@ -180,11 +181,14 @@ class Security(models.Model):
         except ObjectDoesNotExist:
             return self.earliest_price_needed, self.latest_price_needed
 
-        if earliest > self.earliest_price_needed:
+        if earliest >= self.earliest_price_needed:
             return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed
 
-        if latest < self.latest_price_needed or force_today:
-            return latest - datetime.timedelta(days=7), self.latest_price_needed
+        if latest < self.latest_price_needed:
+            return latest - datetime.timedelta(days=1), self.latest_price_needed
+
+        if force_today and self.latest_price_needed == datetime.date.today():
+            return datetime.date.today() - datetime.timedelta(days=1), datetime.date.today()
 
         return None, None
 

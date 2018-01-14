@@ -24,7 +24,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = True
-DEBUG_TOOLBAR_ENABLED = True
+DEBUG_TOOLBAR_ENABLED = False
 
 ALLOWED_HOSTS = ['localhost']
 

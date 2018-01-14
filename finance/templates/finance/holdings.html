@@ -45,7 +45,9 @@
                     <td>{{account.account}}</td>
                     <td></td>
                     <td></td>
-                    <td>{{account.qty | floatformat:0}}</td>
+                    <td>{{account.qty | floatformat:0}}
+                        {% if account.qty_delta %}{{account.qty_delta | floatformat:0 | prefix_plusminus | parens}}{% endif %}
+                    </td>
                     <td>{{account.value | currency}}</td>
                     <td>{{account.value_delta | currency | colorize}}</td>
                 </tr>
