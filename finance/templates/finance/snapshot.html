@@ -18,7 +18,7 @@
     </div>
     <div class="col-sm-2">
         <h3>Jump to date:<br/></h3>
-        <div type="text" id="datepicker" placeholder="{{ view.get_day }}"></div>
+        <div type="text" id="datepicker"></div>
     </div>
 </div>
 <div class="row">
@@ -40,7 +40,7 @@
                 selectOtherMonths: true,
                 minDate: -{{ view.inception_days_ago }},
                 maxDate: 0,
-                defaultDate: "{{ view.day.isoformat }}",
+                defaultDate: "{{ view.get_day.isoformat }}",
                 onSelect: function(date) {
                     window.location.href = window.location.href.split('?')[0] + '?day=' + date;
                 }
