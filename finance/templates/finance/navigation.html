@@ -17,21 +17,27 @@
                     <li><a href="{% url 'finance:history' period='day'%}">Daily</a></li>
                 </ul>
             </li>
+
             <li class="{% navactive request 'finance:rebalance' %}">
                 <a href="{% url 'finance:rebalance' %}">Rebalance</a></li>
+
             <li class="{% navactive request 'finance:snapshot' %}">
                 <a href="{% url 'finance:snapshot' %}">Snapshot</a></li>
+
             <li class="dropdown {% navactive request 'finance:capgains' %}">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#">Capital Gains
                 <span class="caret"></span></a>
                 <ul class="dropdown-menu">
+                    <li><a href="{% url 'finance:capgains' %}">Yearly Report</a></li>
                     {% for security in request.user.userprofile.GetCapGainsSecurities %}
-                    <li><a href="{% url 'finance:capgains' security %}">{{security}}</a></li>
+                    <li><a href="{% url 'finance:capgainssec' security %}">{{security}}</a></li>
                     {% endfor %}
                 </ul>
             </li>
+
             <li class="{% navactive request 'finance:dividends' %}">
                 <a href="{% url 'finance:dividends' %}">Dividends</a></li>
+
             <li class="dropdown {% navactive request 'finance:securitydetail' %}">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#">Security Details
                 <span class="caret"></span></a>
@@ -41,6 +47,7 @@
                     {% endfor %}
                 </ul>
             </li>
+
             <li class="dropdown {% navactive request 'finance:accountdetail' %}">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#">
                     Account Details<span class="caret"></span>
@@ -51,8 +58,10 @@
                     {% endfor %}
                 </ul>
             </li>
+
             <li class="{% navactive request 'finance:feedback' %}">
                 <a href="{% url 'finance:feedback' %}">Feedback</a></li>
+
         </ul>
         <ul class="nav navbar-nav navbar-right">
              {% if user.is_staff %}

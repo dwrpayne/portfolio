@@ -112,7 +112,7 @@ class FeedbackView(FormView):
         return super().form_valid(form)
 
 
-class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
+class CapGainsSecurityReport(LoginRequiredMixin, SingleObjectMixin, ListView):
     template_name = 'finance/capgains.html'
     context_object_name = 'symbol'
 
@@ -129,6 +129,18 @@ class CapGainsReport(LoginRequiredMixin, SingleObjectMixin, ListView):
 
     def get_queryset(self):
         return self.object.activities.for_user(self.request.user).without_dividends().with_capgains_data()
+
+
+class CapGainsReport(LoginRequiredMixin, TemplateView):
+    template_name = 'finance/capgains2.html'
+
+    def get(self, request, *args, **kwargs):
+        self.years, self.yearly_gains, self.pending_gains = request.user.userprofile.GetCapgainsByYear()
+        self.total_gains = []
+        for i, year in enumerate(self.years):
+            self.total_gains.append(sum(gains[i] for gains in self.yearly_gains.values()))
+        self.total_pending = sum(self.pending_gains.values())
+        return super().get(self, request, *args, **kwargs)
 
 
 class DividendReport(LoginRequiredMixin, ListView):

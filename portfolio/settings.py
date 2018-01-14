@@ -24,6 +24,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = True
+DEBUG_TOOLBAR_ENABLED = True
 
 ALLOWED_HOSTS = ['localhost']
 
@@ -41,7 +42,6 @@ INSTALLED_APPS = [
     'tangerine.apps.tangerineConfig',
     'virtbrokers.apps.VirtbrokersConfig',
     'utils',
-    #'debug_toolbar',
     'polymorphic',
     'django_extensions',
     'django.contrib.admin',
@@ -58,8 +58,10 @@ INSTALLED_APPS = [
     'compat',
 ]
 
+if DEBUG_TOOLBAR_ENABLED:
+    INSTALLED_APPS.append('debug_toolbar')
+
 MIDDLEWARE = [
-    #'debug_toolbar.middleware.DebugToolbarMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -68,8 +70,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-
 ]
+
+if DEBUG_TOOLBAR_ENABLED:
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'portfolio.urls'
 

@@ -255,6 +255,7 @@ class SecurityPriceQuerySet(models.query.QuerySet,
                             DayMixinQuerySet):
     pass
 
+
 class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='prices')
     day = models.DateField(default=datetime.date.today)
@@ -274,6 +275,7 @@ class SecurityPrice(models.Model):
     def __str__(self):
         return "{} {} {}".format(self.security, self.day, self.price)
 
+
 class SecurityPriceDetail(models.Model):
     security = models.ForeignKey(Security, on_delete=models.DO_NOTHING, related_name='pricedetails')
     day = models.DateField()
@@ -283,7 +285,6 @@ class SecurityPriceDetail(models.Model):
     type = models.CharField(max_length=100)
 
     objects = SecurityPriceQuerySet.as_manager()
-
 
     @classmethod
     def CreateView(cls, drop_cascading=False):

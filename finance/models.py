@@ -1,6 +1,8 @@
 import datetime
 import pendulum
 from decimal import Decimal
+from itertools import groupby
+from collections import defaultdict
 from django.conf import settings
 from django.db import models, transaction, connection
 from django.db.models import F, Sum
@@ -425,6 +427,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
                 act.capgain = act.qty * (acbpershare - act.cadprice) + act.commission
                 act.acbchange = act.qty * acbpershare
             else:
+                act.capgain = 0
                 act.acbchange = act.qty * act.cadprice - act.commission
 
             act.totalqty = totalqty = totalqty + act.qty
@@ -554,7 +557,7 @@ class UserProfile(models.Model):
             self.user).current().values_list('security_id', flat=True).distinct()
 
     def GetCapGainsSecurities(self):
-        only_taxable_accounts = False
+        only_taxable_accounts = True
         query = Holding.objects.exclude(security__type=Security.Type.Cash
                   ).for_user(self.user).values_list('security_id', flat=True).distinct().order_by('security__symbol')
         if only_taxable_accounts:
@@ -570,8 +573,11 @@ class UserProfile(models.Model):
     def GetAccount(self, account_id):
         return self.GetAccounts().get(id=account_id)
 
-    def GetActivities(self):
-        return Activity.objects.for_user(self.user)
+    def GetActivities(self, only_taxable=False):
+        activities = Activity.objects.for_user(self.user)
+        if only_taxable:
+            activities = activities.taxable()
+        return activities
 
     def AreSecurityPricesUpToDate(self):
         securities = self.GetHeldSecurities()
@@ -623,6 +629,28 @@ class UserProfile(models.Model):
             print (start, end, ror)
             yield end, ror
 
+    def GetCapgainsByYear(self):
+        activities_all = self.GetActivities(only_taxable=True)
+        securities = self.GetCapGainsSecurities()
+        all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year+1))
+        yearly_data = {s : [0]*len(all_years) for s in securities}
+        year_offset = all_years[0]
+        last_acb = {}
+
+        for security in securities:
+            activities = activities_all.filter(security_id=security).without_dividends().with_capgains_data()
+            for year, yearly_activities in groupby(activities, lambda a: a.tradeDate.year):
+                for a in yearly_activities:
+                    yearly_data[a.security_id][year-year_offset] += a.capgain
+                    last_acb[a.security_id] = a.totalacb
+
+        pending_gains = {}
+        for security, value in self.GetHoldingDetails().taxable().today_security_values():
+            if security in last_acb:
+                pending_gains[security] = value - last_acb[security]
+
+        return all_years, yearly_data, pending_gains
+
     def GetInceptionDate(self):
         return self.GetActivities().earliest().tradeDate
 
@@ -630,7 +658,6 @@ class UserProfile(models.Model):
         holdings = self.GetHoldingDetails().today()
         allocs = self.user.allocations.with_rebalance_info(holdings, cashadd)
 
-        from itertools import groupby
         missing_holdings = holdings.exclude(security__in=allocs.values_list('securities'))
         total_value = sum(holdings).value + cashadd
         missing = []
@@ -647,6 +674,9 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
 
     def for_user(self, user):
         return self.filter(account__client__user=user)
+
+    def taxable(self):
+        return self.filter(account__taxable=True)
 
     def cash(self):
         return self.filter(type=Security.Type.Cash)
@@ -665,6 +695,9 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
 
     def total_values(self):
         return self.order_by('day').values_list('day').annotate(Sum('value'))
+
+    def today_security_values(self):
+        return self.today().order_by('security_id').values_list('security_id').annotate(total=Sum('value'))
 
     def today_account_values(self):
         return self.today().account_values().values_list('account__display_name', 'total')
