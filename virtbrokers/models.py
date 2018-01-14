@@ -9,7 +9,7 @@ from securities.models import Security
 class VirtBrokersRawActivity(BaseRawActivity):
     day = models.DateField()
     symbol = models.CharField(max_length=100, blank=True, default='')
-    trans_id = models.CharField(max_length=100)
+    trans_id = models.CharField(max_length=100, unique=True)
     description = models.CharField(max_length=1000, blank=True, default='')
     currency = models.CharField(max_length=100, blank=True, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6, default=0)
@@ -20,11 +20,12 @@ class VirtBrokersRawActivity(BaseRawActivity):
 
     def CreateActivity(self):
         if self.type == 'EFT':           self.type = Activity.Type.Deposit
-        if self.type == 'BUY':           self.type = Activity.Type.Buy
-        if self.type == 'SELL':          self.type = Activity.Type.Sell
-        if self.type == 'DIV':           self.type = Activity.Type.Dividend
-        if self.type == 'FXT':           self.type = Activity.Type.FX
-        if self.type == 'INT':           self.type = Activity.Type.Interest
+        elif self.type == 'BUY':         self.type = Activity.Type.Buy
+        elif self.type == 'SELL':        self.type = Activity.Type.Sell
+        elif self.type == 'DIV':         self.type = Activity.Type.Dividend
+        elif self.type == 'FXT':         self.type = Activity.Type.FX
+        elif self.type == 'INT':         self.type = Activity.Type.Interest
+        else:                            assert False, 'Unmapped activity type in Virtual Brokers'
 
         security = None
         if self.symbol:
@@ -60,14 +61,14 @@ class VirtBrokersAccount(BaseAccount):
 
                 del line['EffectiveDate']
                 del line['AccountNumber']
-                line['trans_id'] = line['trans_id'] or line['sub_trans_id']
+                line['trans_id'] = line['trans_id'] or 'sub-'+line['sub_trans_id']
                 del line['sub_trans_id']
                 del line['SecurityType']
                 del line['rep_cd']
 
                 line['qty'] = Decimal(line['qty']) if line['qty'] else 0
                 line['price'] = Decimal(line['price']) if line['price'] else 0
-                line['commission'] = Decimal(line['commission']) if line['commission'] else 0
+                line['commission'] = -Decimal(line['commission']) if line['commission'] else 0
                 line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
                 VirtBrokersRawActivity.objects.create(account=self, **line)

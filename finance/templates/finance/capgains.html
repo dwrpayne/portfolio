@@ -44,7 +44,7 @@
                     <td>{{activity.type}}</td>
                     <td>{{activity.qty | floatformat:0}}</td>
                     <td>{{activity.cadprice | floatformat:2}}</td>
-                    <td>{{activity.commission | floatformat:2}}</td>
+                    <td>{{activity.commission | currency}}</td>
                     <td>{% if activity.capgain %}{{activity.capgain | currency}}{% endif %}</td>
                     <td>{{activity.totalqty | floatformat:0}}</td>
                     <td>{{activity.acbchange | currency }}</td>
