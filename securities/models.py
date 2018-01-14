@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models, transaction, connection
+from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import Choices
 
@@ -220,6 +221,8 @@ class Security(models.Model):
         with transaction.atomic():
             for day, price in data:
                 self.prices.update_or_create(day=day, defaults={'price': price})
+            self.last_sync_time = timezone.now()
+            self.save(update_fields=['last_sync_time'])
 
     def GetTodaysChange(self):
         rates = self.prices.filter(

@@ -19,6 +19,7 @@
             <th>Latest In Use</th>
             <th>Latest Data</th>
             <th>Sync Now</th>
+            <th>Last Sync Time</th>
             <th>Current Price</th>
             <th>Data Source</th>
         </tr>
@@ -40,6 +41,7 @@
                         {{ security.prices.latest.day }}
                     </td>
                     <td><button type="submit" class="refresh" data-refresh-type="sync-{{ security.symbol }}">Sync</button></td>
+                    <td>{{ security.last_sync_time}}</td>
                     <td>{{ security.prices.latest.price | currency}}</td>
                     <td>{{ security.datasource }}</td>
                 </tr>

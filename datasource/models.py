@@ -1,5 +1,5 @@
 from django.db import models
-import datetime
+from datetime import date, timedelta
 import requests
 import pandas
 from decimal import Decimal
@@ -81,6 +81,7 @@ class PandasDataSource(DataSourceMixin):
             df = 1/df
         return pandas.Series(df[self.column], df.index).iteritems()
 
+
 class AlphaVantageDataSource(DataSourceMixin):
     api_key = models.CharField(max_length=32, default='P38D2XH1GFHST85V')
     function = models.CharField(max_length=32, default='TIME_SERIES_DAILY')
@@ -92,10 +93,21 @@ class AlphaVantageDataSource(DataSourceMixin):
     def __repr__(self):
         return "AlphaVantageDataSource<{}>".format(self.symbol)
 
+    def validate_symbol(self):
+        """Go through our list of possible symbol transformations to find one that has data in the last week"""
+        possible_symbols = [self.symbol, self.symbol + '.TO',
+                            self.symbol.replace('.', '-'), self.symbol.replace('.', '-') + '.TO']
+
+        for symbol in possible_symbols:
+            self.symbol = symbol
+            if self._Retrieve(date.today() - timedelta(days=7), date.today()):
+                return
+        self.symbol = 'NO VALID LOOKUP FOUND'
+
     def _Retrieve(self, start, end):
         params = {'function': self.function, 'apikey': self.api_key,
                   'symbol': self.symbol}
-        if (datetime.date.today() - start).days >= 100:
+        if (date.today() - start).days >= 100:
             params['outputsize'] = 'full'
 
         r = requests.get('https://www.alphavantage.co/query', params=params)
