@@ -892,7 +892,7 @@ class HoldingChange:
             ret.price_delta = self.price_delta
             ret.price_percent_delta = ret.price_delta / (ret.price - ret.price_delta)
 
-        ret.value_delta = ret.value_delta + ret.value_delta
+        ret.value_delta = self.value_delta + other.value_delta
         ret.value_percent_delta = ret.value_delta / (ret.value - ret.value_delta)
 
         return ret
