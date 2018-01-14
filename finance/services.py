@@ -5,6 +5,23 @@ from utils.misc import find_le_index
 import datetime
 from itertools import chain
 
+from django.http import JsonResponse
+
+class RefreshButtonHandlerMixin:
+    """
+    Mixin to add support for my custom refresh button.
+    """
+    def get(self, request, *args, **kwargs):
+        if request.is_ajax():
+            key = next(key for key in request.GET if key.startswith('refresh-'))
+            _, action = key.split('-',1)
+            return self.ajax_request(action)
+        return super().get(request, *args, **kwargs)
+
+    def ajax_request(self, action):
+        pass
+
+
 
 class LineGraph:
     def __init__(self, graph_name_unique):

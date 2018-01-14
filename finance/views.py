@@ -6,6 +6,7 @@ import pandas
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.dates import DateMixin, DayMixin
@@ -13,9 +14,9 @@ from django.views.generic.edit import FormView
 
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
-from .services import GenerateSecurityPlot
+from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask
-from .models import BaseAccount, Activity, UserProfile
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail
 from .forms import FeedbackForm
 
 
@@ -31,14 +32,46 @@ class AccountDetail(LoginRequiredMixin, DetailView):
         return super().get_queryset().for_user(self.request.user)
 
 
-class StatusSecurity(ListView):
+class AdminSecurity(ListView):
     model = Security
-    template_name = 'finance/status_securities.html'
+    template_name = 'finance/admin/securities.html'
     context_object_name = 'securities'
     ordering = ['-type','symbol']
 
     def securities_by_status(self):
         return partition(lambda s: not s.NeedsSync(), self.get_queryset())
+
+    def ajax_request(self, action):
+        action, symbol = action.split('-')
+        if action == 'sync':
+            Security.objects.get(pk=symbol).Sync(True)
+        return HttpResponse()
+
+    def get_queryset(self):
+        return self.model.objects.all().prefetch_related('activities', 'prices')
+
+
+class AdminAccounts(RefreshButtonHandlerMixin, ListView):
+    model = BaseAccount
+    template_name = 'finance/admin/accounts.html'
+    context_object_name = 'accounts'
+    ordering = ['client__user__username']
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(client__user__username='guest')
+
+    def ajax_request(self, action):
+        action, account_id = action.split('-')
+        if action == 'sync':
+            BaseAccount.objects.get(pk=account_id).SyncAndRegenerate()
+        elif action == 'activities':
+            BaseAccount.objects.get(pk=account_id).RegenerateActivities()
+        elif action == 'holdings':
+            BaseAccount.objects.get(pk=account_id).RegenerateHoldings()
+        else:
+            raise Http404('Account function does not exist!')
+        HoldingDetail.Refresh()
+        return HttpResponse()
 
 
 class UserProfileView(LoginRequiredMixin, TemplateView, FormView):
@@ -156,16 +189,15 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
 def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
 
-    today_query = userprofile.GetHoldingDetails().at_date(as_of_date)
-    yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1))
+    today_query = userprofile.GetHoldingDetails().at_date(as_of_date).select_related('security', 'account')
+    yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1)).select_related('security', 'account')
     yesterday_list = list(yesterday_query)
-
     account_data = []
     for today in today_query:
-        yesterday = yesterday_query.filter(account=today.account, security=today.security)
-        if yesterday:
-            account_data.append(today-yesterday[0])
-            yesterday_list.remove(yesterday[0])
+        yesterday_matches = [y for y in yesterday_query if y.account == today.account and y.security == today.security]
+        if yesterday_matches:
+            account_data.append(today-yesterday_matches[0])
+            yesterday_list.remove(yesterday_matches[0])
         else:
             # We bought this security today.
             account_data.append(today - 0)
@@ -182,12 +214,40 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         holding_data.append(h)
 
     holding_data = sorted(holding_data, key=attrgetter('security'))
-    holding_data, cash_data = partition(lambda h: h.type==Security.Type.Cash, holding_data)
+    holding_data, cash_data = partition(lambda h: h.security_type==Security.Type.Cash, holding_data)
 
     context = {'holding_data': holding_data,
                'cash_data': cash_data,
                'total': sum(account_data) }
+
+    today_balances = dict(today_query.today_account_values())
+    yesterday_balances = dict(yesterday_query.yesterday_account_values())
+    today_cash_balances = dict(today_query.cash().today_account_values())
+
+    accounts = {
+        acc: {
+            'id' : BaseAccount.objects.get(display_name=acc).id,
+            'cur_balance' : today_balance,
+            'yesterday_balance' : yesterday_balances.get(acc, 0),
+            'cur_cash_balance' : today_cash_balances.get(acc, 0),
+            'today_balance_change' : today_balance - yesterday_balances.get(acc, 0)
+        }
+        for acc, today_balance in today_balances.items()
+    }
+    context['accounts'] = accounts
+    from collections import defaultdict
+    total = defaultdict(int)
+    for acc, d in accounts.items():
+        for key in ['cur_balance', 'yesterday_balance', 'cur_cash_balance', 'today_balance_change']:
+            total[key] += d[key]
+    context['account_total'] = total
+
+    exchange_live, exchange_delta = Security.objects.get(symbol='USD').GetTodaysChange()
+    context.update({'exchange_live': exchange_live, 'exchange_delta': exchange_delta})
+
     return context
+
+
 
 
 def GetBalanceContext(userprofile):
@@ -221,7 +281,7 @@ def Portfolio(request):
         elif 'refresh-plot' in request.GET:
             userprofile.GeneratePlots()
 
-    overall_context = {**GetHoldingsContext(userprofile), **GetBalanceContext(userprofile)}
+    overall_context = {**GetHoldingsContext(userprofile)}#, **GetBalanceContext(userprofile)}
     return render(request, 'finance/portfolio.html', overall_context)
 
 

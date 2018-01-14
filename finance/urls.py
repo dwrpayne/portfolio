@@ -15,5 +15,8 @@ urlpatterns = [
     url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
     url(r'^user/$', views.UserProfileView.as_view(), name='userprofile'),
     url(r'^feedback/$', views.FeedbackView.as_view(), name='feedback'),
-    url(r'^status/security/$', views.StatusSecurity.as_view(), name='status_security'),
+
+    # Admin panels
+    url(r'^admin/security/$', views.AdminSecurity.as_view(), name='admin_security'),
+    url(r'^admin/accounts/$', views.AdminAccounts.as_view(), name='admin_accounts'),
 ]

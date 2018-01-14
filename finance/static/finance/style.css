@@ -9,3 +9,7 @@
     grid-template-areas: "navbar" "content" "footer";
 
 }
+
+button[type=submit]:disabled {
+	background: #000000;
+}

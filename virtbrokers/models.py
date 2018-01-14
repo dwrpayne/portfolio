@@ -83,8 +83,7 @@ class VirtBrokersAccount(BaseAccount):
         # r'C:\Users\David\Dropbox\coding\portfolio\_private\sean_26386387.csv'
         VirtBrokersRawActivity.objects.filter(account=self).delete()
         self.import_csv(csv_file)
-        self._RegenerateActivities()
-        self._RegenerateHoldings()
+        self.RegenerateActivities()
 
 
 class VirtBrokersClient(BaseClient):

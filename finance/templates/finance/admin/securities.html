@@ -10,6 +10,7 @@
             <th>Earliest In Use</th>
             <th>Latest In Use</th>
             <th>Latest Data</th>
+            <th>Sync Now</th>
             <th>Current Price</th>
             <th>Data Source</th>
         </tr>
@@ -30,6 +31,7 @@
                     <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
                         {{ security.prices.latest.day }}
                     </td>
+                    <td><button type="submit" class="refresh" data-refresh-type="sync-{{ symbol }}">Sync</button></td>
                     <td>{{ security.prices.latest.price }}</td>
                     <td>{{ security.datasource }}</td>
                 </tr>

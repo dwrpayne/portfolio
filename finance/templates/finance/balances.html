@@ -22,14 +22,14 @@
             </tr>
         </tfoot>
         <tbody>
-        {% for account in accounts %}
+        {% for account_name, balances in accounts.items %}
             <tr>
-                <td><a href="{% url 'finance:accountdetail' account.id %}">{{account.display_name}}</a></td>                
-                <td>{{account.id|truncatechars:15 }}</td>
-                <td>{{account.yesterday_balance | currencyround}}</td>
-                <td>{{account.cur_balance | currencyround}}</td>
-                <td>{{account.cur_cash_balance | currencyround}}</td>
-                <td>{{account.today_balance_change | currency | colorize}}</td>
+                <td><a href="{% url 'finance:accountdetail' balances.id %}">{{account_name}}</a></td>
+                <td>{{balances.id|truncatechars:15 }}</td>
+                <td>{{balances.yesterday_balance | currencyround}}</td>
+                <td>{{balances.cur_balance | currencyround}}</td>
+                <td>{{balances.cur_cash_balance | currencyround}}</td>
+                <td>{{balances.today_balance_change | currency | colorize}}</td>
             </tr>
         {% endfor %}
         </tbody>

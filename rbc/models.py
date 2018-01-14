@@ -84,9 +84,8 @@ class RbcAccount(BaseAccount):
         # r'C:\Users\David\Dropbox\coding\portfolio\_private\sean_26386387.csv'
         RbcRawActivity.objects.filter(account=self).delete()
         self.import_csv(csv_file)
-        self._RegenerateActivities()
-        self._RegenerateHoldings()
-
+        self.RegenerateActivities()
+        
 
 class RbcClient(BaseClient):
     def __repr__(self):

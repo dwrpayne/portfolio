@@ -58,10 +58,11 @@
              {% if user.is_staff %}
                 <li class="dropdown {% navactive request 'finance:status' %}">
                     <a class="dropdown-toggle" data-toggle="dropdown" href="#">
-                        Site Status<span class="caret"></span>
+                        Admin Panel<span class="caret"></span>
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a href="{% url 'finance:status_security' %}">Security Status</a></li>
+                        <li><a href="{% url 'finance:admin_security' %}">Security Sync Status</a></li>
+                        <li><a href="{% url 'finance:admin_accounts' %}">Account Status</a></li>
                     </ul>
                 </li>
             {% endif %}

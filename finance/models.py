@@ -83,7 +83,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         return "BaseAccount({},{},{})".format(self.client, self.id, self.type)
 
     def __str__(self):
-        return "{} {} {}".format(self.client, self.id, self.type)
+        return self.display_name
 
     def save(self, *args, **kwargs):
         self.display_name = "{} {}".format(self.client, self.type)
@@ -132,15 +132,16 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             self.CreateActivities(period.start, period.end)
 
         if self.activities.all().count() > activity_count:
-            self._RegenerateHoldings()
+            self.RegenerateHoldings()
 
-    def _RegenerateActivities(self):
+    def RegenerateActivities(self):
         self.activities.all().delete()
         with transaction.atomic():
             for raw in self.rawactivities.all():
                 raw.CreateActivity()
+        self.RegenerateHoldings()
 
-    def _RegenerateHoldings(self):
+    def RegenerateHoldings(self):
         self.holding_set.all().delete()
         for activity in self.activities.all():
             for security, qty_delta in activity.GetHoldingEffects().items():
@@ -660,10 +661,16 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.order_by('day').filter(day__in=utils.dates.year_ends(self.earliest().day))
 
     def account_values(self):
-        return self.values_list('account__display_name', 'day').annotate(Sum('value'))
+        return self.order_by('day').values_list('account__display_name', 'day').annotate(total=Sum('value'))
 
     def total_values(self):
         return self.order_by('day').values_list('day').annotate(Sum('value'))
+
+    def today_account_values(self):
+        return self.today().account_values().values_list('account__display_name', 'total')
+
+    def yesterday_account_values(self):
+        return self.yesterday().account_values().values_list('account__display_name', 'total')
 
 
 class HoldingDetail(models.Model):
@@ -787,7 +794,7 @@ class HoldingChange:
                                      day=current.day - datetime.timedelta(days=1))
 
         assert previous.account == current.account
-        assert previous.security == current.security
+        assert previous.security_id == current.security_id
         assert previous.day < current.day
 
         hc = HoldingChange(account=current.account, security=current.security,
@@ -810,7 +817,7 @@ class HoldingChange:
                                                self.qty, self.value, self.value_delta)
 
     @property
-    def type(self):
+    def security_type(self):
         return self.security.type
 
     def __radd__(self, other):
