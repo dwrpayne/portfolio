@@ -23,6 +23,20 @@
                     <th>ACB / Share</th>
                 </tr>
             </thead>
+            <tfoot>
+                <tr>
+                    <td>{% now "DATE_FORMAT"%}</td>
+                    <td>Total</td>
+                    <td></td>
+                    <td>{{ view.total.price | floatformat:2 }}</td>
+                    <td></td>
+                    <td>Pending: {{ view.total.pending_gain | currency}}</td>
+                    <td>{{ view.total.qty | floatformat:0 }}</td>
+                    <td></td>
+                    <td>{{ view.total.acb | currency }}</td>
+                    <td>{{ view.total.acb_per_share | currency }}</td>
+                </tr>
+            </tfoot>
             <tbody>
             {% for activity in view.activities %}
                 <tr {% if activity.capgain %}style="font-weight:bold"{% endif %}>

@@ -120,12 +120,12 @@ class CapGainsSecurityReport(LoginRequiredMixin, SingleObjectMixin, ListView):
         self.object = self.get_object(queryset=Security.objects.all())
         return super().get(request, *args, **kwargs)
 
-    def pending_gain(self):
-        last_activity = self.activities[-1]
-        return self.object.pricedetails.latest().cadprice * last_activity.totalqty - last_activity.totalacb
-
     def get_queryset(self):
         self.activities = self.request.user.userprofile.GetActivities(only_taxable=True).for_security(self.object).without_dividends().with_capgains_data()
+        last = self.activities[-1]
+        self.total = {'price' : self.object.pricedetails.latest().cadprice, 'qty' : last.totalqty,
+                 'acb' : last.totalacb, 'acb_per_share' : last.acbpershare,
+                 'pending_gain' : self.object.pricedetails.latest().cadprice * last.totalqty - last.totalacb}
         return self.activities
 
 
