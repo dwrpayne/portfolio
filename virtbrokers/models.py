@@ -46,42 +46,30 @@ class VirtBrokersAccount(BaseAccount):
     def __repr__(self):
         return 'VirtBrokersAccount<{},{},{}>'.format(self.client, self.id, self.type)
 
-    def ImportActivities(self, csv_file):
-        """
-        Kinda hacky for now.
-        """
-        # r'C:\Users\David\Dropbox\coding\portfolio\_private\derrill_780116252.csv'
-        self.import_from_csv(csv_file)
-        self.RegenerateActivities()
-        Security.objects.Sync(False)
-        HoldingDetail.Refresh()
-
     def import_from_csv(self, csv_file):
-            f = csv_file
-            f.open('r')
-        #with open(csv_file, newline='') as f:
-            fields = ['day', 'EffectiveDate', 'AccountNumber', 'trans_id', 'sub_trans_id', 'symbol', 'description',
-                      'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency', 'rep_cd']
-            reader = csv.DictReader(f, fieldnames=fields)
-            for line in reader:
-                try:
-                    line['day'] = parser.parse(line['day']).date()
-                except:
-                    continue
+        csv_file.open('r')
+        fields = ['day', 'EffectiveDate', 'AccountNumber', 'trans_id', 'sub_trans_id', 'symbol', 'description',
+                  'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency', 'rep_cd']
+        reader = csv.DictReader(csv_file, fieldnames=fields)
+        for line in reader:
+            try:
+                line['day'] = parser.parse(line['day']).date()
+            except:
+                continue
 
-                del line['EffectiveDate']
-                del line['AccountNumber']
-                line['trans_id'] = line['trans_id'] or 'sub-'+line['sub_trans_id']
-                del line['sub_trans_id']
-                del line['SecurityType']
-                del line['rep_cd']
+            del line['EffectiveDate']
+            del line['AccountNumber']
+            line['trans_id'] = line['trans_id'] or 'sub-'+line['sub_trans_id']
+            del line['sub_trans_id']
+            del line['SecurityType']
+            del line['rep_cd']
 
-                line['qty'] = Decimal(line['qty']) if line['qty'] else 0
-                line['price'] = Decimal(line['price']) if line['price'] else 0
-                line['commission'] = -Decimal(line['commission']) if line['commission'] else 0
-                line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
+            line['qty'] = Decimal(line['qty']) if line['qty'] else 0
+            line['price'] = Decimal(line['price']) if line['price'] else 0
+            line['commission'] = -Decimal(line['commission']) if line['commission'] else 0
+            line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
-                VirtBrokersRawActivity.objects.get_or_create(account=self, **line)
+            VirtBrokersRawActivity.objects.get_or_create(account=self, **line)
 
 
 class VirtBrokersClient(BaseClient):

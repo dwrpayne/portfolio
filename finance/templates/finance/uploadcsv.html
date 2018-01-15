@@ -5,8 +5,6 @@
     <form action="{% url 'finance:uploadcsv' %}" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <legend>Upload Transaction History</legend>
-        Please choose a file containing transaction history as downloaded from your brokerage's website.
-        <br><br><br>
         Currently supported brokerages:<br><ul>
         <li>Virtual Brokers</li>
         </ul><br>
@@ -14,7 +12,6 @@
         <li>RBC</li>
         </ul>
         <br><br>
-
         {{ form.as_p }}
         <input type="submit" id="submit" class="large button expand" value="Submit File">
     </form>

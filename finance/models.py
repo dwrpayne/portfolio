@@ -392,6 +392,19 @@ class ActivityManager(models.Manager):
         kwargs['netAmount'] *= -1
         self.create(**kwargs)
 
+    def create_fx(self, to_currency, to_amount, from_currency, from_amount, **kwargs):
+        from_args = kwargs
+        from_args['cash_id'] = from_currency
+        from_args['netAmount'] = from_amount
+        from_args['type'] = Activity.Type.FX
+        self.create(**from_args)
+
+        to = kwargs
+        to['cash_id'] = to_currency
+        to['netAmount'] = to_amount
+        to['type'] = Activity.Type.FX
+        self.create(**to)
+
 
 class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQuerySet):
     day_field = 'tradeDate'
@@ -490,7 +503,7 @@ class Activity(models.Model):
     objects = ActivityManager.from_queryset(ActivityQuerySet)()
 
     class Meta:
-        unique_together = ('raw', 'type')
+        unique_together = ('raw', 'type', 'cash')
         verbose_name_plural = 'Activities'
         get_latest_by = 'tradeDate'
         ordering = ['tradeDate']

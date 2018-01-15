@@ -2,6 +2,7 @@ from django import forms
 from django.core.mail import send_mail
 from .models import AccountCsv
 
+
 class FeedbackForm(forms.Form):
     name = forms.CharField(widget=forms.HiddenInput(), max_length=100)
     email = forms.CharField(widget=forms.HiddenInput(), max_length=100)
@@ -30,8 +31,9 @@ class AccountCsvForm(forms.ModelForm):
     class Meta:
         model = AccountCsv
         fields = ['csvfile', 'account']
-        labels = {'csvfile' : 'Please choose a file containing transaction history.\n'
+        labels = {'csvfile' : 'Please choose a file containing transaction history as downloaded from your brokerage.\n'
                               'The supported format is CSV.',
+                  'account' : 'Select the account this file relates to, or leave blank to auto-detect:'
                   }
 
     def __init__(self, *args, **kwargs):
