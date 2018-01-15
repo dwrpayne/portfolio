@@ -186,7 +186,7 @@ class Security(models.Model):
             return self.earliest_price_needed - datetime.timedelta(days=7), self.latest_price_needed
 
         if latest < self.latest_price_needed:
-            return latest - datetime.timedelta(days=1), self.latest_price_needed
+            return latest - datetime.timedelta(days=7), self.latest_price_needed
 
         if force_today and self.latest_price_needed == datetime.date.today():
             return datetime.date.today() - datetime.timedelta(days=1), datetime.date.today()
