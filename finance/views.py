@@ -17,7 +17,7 @@ from utils.misc import plotly_iframe_from_url, partition
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail
-from .forms import FeedbackForm
+from .forms import FeedbackForm, AccountCsvForm
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -30,6 +30,18 @@ class AccountDetail(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().for_user(self.request.user)
+
+
+class AccountCsvUpload(LoginRequiredMixin, FormView):
+    form_class = AccountCsvForm
+    success_url = '/finance/uploadcsv/'
+    template_name = 'finance/uploadcsv.html'
+
+    def form_valid(self, form):
+        accountcsv = form.save(commit=False)
+        accountcsv.user = self.request.user
+        accountcsv.save()
+        return super().form_valid(form)
 
 
 class AdminSecurity(RefreshButtonHandlerMixin, ListView):

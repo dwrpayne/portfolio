@@ -1,5 +1,6 @@
 from django import forms
 from django.core.mail import send_mail
+from .models import AccountCsv
 
 class FeedbackForm(forms.Form):
     name = forms.CharField(widget=forms.HiddenInput(), max_length=100)
@@ -25,4 +26,7 @@ class FeedbackForm(forms.Form):
                   recipient_list=[user_email])
 
 
-
+class AccountCsvForm(forms.ModelForm):
+    class Meta:
+        model = AccountCsv
+        exclude = ['user']

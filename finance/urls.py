@@ -15,6 +15,7 @@ urlpatterns = [
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
     url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
     url(r'^user/$', views.UserProfileView.as_view(), name='userprofile'),
+    url(r'^uploadcsv/$', views.AccountCsvUpload.as_view(), name='uploadcsv'),
     url(r'^feedback/$', views.FeedbackView.as_view(), name='feedback'),
 
     # Admin panels

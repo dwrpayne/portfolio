@@ -1,0 +1,24 @@
+{% extends "finance/base.html" %}
+{% block title %} Upload Account Data {% endblock title %}
+
+{% block content %}
+{{ form.non_field_errors }}
+
+<form action="{% url 'finance:uploadcsv' %}" method="post" enctype="multipart/form-data">
+  <fieldset>
+    <legend>Add file</legend>
+
+    <div class="large-12 columns">
+      <div class="row" id="file_container">
+        {{ form.csvfile.errors }}
+        {{ form.csvfile }}
+      </div>
+    </div>
+
+  </fieldset>
+  <input type="submit" id="submit" class="large button expand" value="Submit File">
+  {% csrf_token %}
+</form>
+
+
+{% endblock %}

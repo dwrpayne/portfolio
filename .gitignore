@@ -108,3 +108,4 @@ ENV/
 _private/
 celerybeat*
 *.sqlite3
+upload/
