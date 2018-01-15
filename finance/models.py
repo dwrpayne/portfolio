@@ -78,6 +78,8 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
 
+    activitySyncDateRange = 30
+
     class Meta:
         ordering = ['id']
 
@@ -110,10 +112,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def today_balance_change(self):
         return self.cur_balance - self.yesterday_balance
 
-    @property
-    def activitySyncDateRange(self):
-        return 30
-
     @cached_property
     def sync_from_date(self):
         last_activity = self.activities.newest_date()
@@ -124,14 +122,32 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def SyncBalances(self):
         pass
 
-    def SyncAndRegenerate(self):
-        date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
-        print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
-
+    def import_activities(self, csv_file):
         activity_count = self.activities.all().count()
 
-        for period in date_range:
-            self.CreateActivities(period.start, period.end)
+        self.import_from_csv(csv_file)
+        if self.activities.all().count() > activity_count:
+            self.RegenerateHoldings()
+
+        Security.objects.Sync(False)
+        HoldingDetail.Refresh()
+
+    def import_from_csv(self, csv_file):
+        """
+        Override this to enable transaction uploading from csv.
+        Subclasses are expected to parse the csv and create the necessary BaseRawActivity subclasses.
+        """
+        pass
+
+    def SyncAndRegenerate(self):
+        if self.activitySyncDateRange:
+            date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
+            print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
+
+            activity_count = self.activities.all().count()
+
+            for period in date_range:
+                self.CreateActivities(period.start, period.end)
 
         if self.activities.all().count() > activity_count:
             self.RegenerateHoldings()

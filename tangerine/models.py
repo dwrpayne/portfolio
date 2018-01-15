@@ -59,6 +59,8 @@ class TangerineAccount(BaseAccount):
     internal_display_name = models.CharField(max_length=100)
     account_balance = models.DecimalField(max_digits=16, decimal_places=6)
 
+    activitySyncDateRange = 2000
+
     def __str__(self):
         return self.internal_display_name
 
@@ -68,10 +70,6 @@ class TangerineAccount(BaseAccount):
     @property
     def cur_balance(self):
         return self.account_balance
-
-    @property
-    def activitySyncDateRange(self):
-        return 2000
 
     def CreateActivities(self, start, end):
         with self.client as client:

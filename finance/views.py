@@ -15,7 +15,7 @@ from django.views.generic.edit import FormView
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
-from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask
+from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail
 from .forms import FeedbackForm, AccountCsvForm
 
@@ -47,6 +47,7 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
         accountcsv.user = self.request.user
         accountcsv.find_matching_account()
         accountcsv.save()
+        HandleCsvUpload.delay(accountcsv.id)
         return super().form_valid(form)
 
 

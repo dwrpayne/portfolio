@@ -38,18 +38,28 @@ class VirtBrokersRawActivity(BaseRawActivity):
                                 commission=self.commission, type=self.type, raw=self)
 
 class VirtBrokersAccount(BaseAccount):
+    activitySyncDateRange = 0
+
     def __str__(self):
         return '{} {} {}'.format(self.client, self.id, self.type)
 
     def __repr__(self):
         return 'VirtBrokersAccount<{},{},{}>'.format(self.client, self.id, self.type)
 
-    @property
-    def activitySyncDateRange(self):
-        return 0
+    def ImportActivities(self, csv_file):
+        """
+        Kinda hacky for now.
+        """
+        # r'C:\Users\David\Dropbox\coding\portfolio\_private\derrill_780116252.csv'
+        self.import_from_csv(csv_file)
+        self.RegenerateActivities()
+        Security.objects.Sync(False)
+        HoldingDetail.Refresh()
 
     def import_from_csv(self, csv_file):
-        with open(csv_file, newline='') as f:
+            f = csv_file
+            f.open('r')
+        #with open(csv_file, newline='') as f:
             fields = ['day', 'EffectiveDate', 'AccountNumber', 'trans_id', 'sub_trans_id', 'symbol', 'description',
                       'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency', 'rep_cd']
             reader = csv.DictReader(f, fieldnames=fields)
@@ -72,17 +82,6 @@ class VirtBrokersAccount(BaseAccount):
                 line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
                 VirtBrokersRawActivity.objects.get_or_create(account=self, **line)
-
-
-    def ImportActivities(self, csv_file):
-        """
-        Kinda hacky for now.
-        """
-        # r'C:\Users\David\Dropbox\coding\portfolio\_private\derrill_780116252.csv'
-        self.import_from_csv(csv_file)
-        self.RegenerateActivities()
-        Security.objects.Sync(False)
-        HoldingDetail.Refresh()
 
 
 class VirtBrokersClient(BaseClient):

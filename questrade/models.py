@@ -132,6 +132,8 @@ class QuestradeAccount(BaseAccount):
     curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
     sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
 
+    activitySyncDateRange = 28
+
     def __str__(self):
         return "{} {} {}".format(self.client, self.id, self.type)
 
@@ -145,10 +147,6 @@ class QuestradeAccount(BaseAccount):
     @property
     def yesterday_balance(self):
         return self.sodBalanceSynced
-
-    @property
-    def activitySyncDateRange(self):
-        return 28
 
     def CreateActivities(self, start, end):
         with self.client as client:

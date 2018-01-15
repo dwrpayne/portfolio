@@ -115,8 +115,9 @@ class AlphaVantageDataSource(DataSourceMixin):
         if r.ok:
             json = r.json()
             if 'Time Series (Daily)' in json:
-                return [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in
+                data = [(parser.parse(day).date(), Decimal(vals['4. close'])) for day, vals in
                         json['Time Series (Daily)'].items() if str(start) <= day <= str(end)]
+                return data
         else:
             print('Failed to get data, response: {}'.format(r.content))
         return []

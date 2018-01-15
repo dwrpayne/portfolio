@@ -47,16 +47,24 @@ class RbcRawActivity(BaseRawActivity):
                                 price=self.price, netAmount=self.netAmount,
                                 commission=commission, type=self.type, raw=self)
 
+
 class RbcAccount(BaseAccount):
+    activitySyncDateRange = 0
+
     def __str__(self):
         return '{} {} {}'.format(self.client, self.id, self.type)
 
     def __repr__(self):
         return 'RbcAccount<{},{},{}>'.format(self.client, self.id, self.type)
 
-    @property
-    def activitySyncDateRange(self):
-        return 0
+    def ImportActivities(self, csv_file):
+        """
+        Total hack for now.
+        """
+        # r'C:\Users\David\Dropbox\coding\portfolio\_private\sean_26386387.csv'
+        self.rawactivities.delete()
+        self.import_from_csv(csv_file)
+        self.RegenerateActivities()
 
     def import_from_csv(self, csv_file):
         with open(csv_file, newline='') as f:
@@ -77,15 +85,6 @@ class RbcAccount(BaseAccount):
 
                 RbcRawActivity.objects.create(account=self, **line)
 
-    def ReImportActivities(self, csv_file):
-        """
-        Total hack for now.
-        """
-        # r'C:\Users\David\Dropbox\coding\portfolio\_private\sean_26386387.csv'
-        self.rawactivities.delete()
-        self.import_from_csv(csv_file)
-        self.RegenerateActivities()
-        
 
 class RbcClient(BaseClient):
     def __repr__(self):

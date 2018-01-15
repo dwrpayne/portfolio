@@ -40,15 +40,13 @@ class GrsRawActivity(BaseRawActivity):
 
 
 class GrsAccount(BaseAccount):
+    activitySyncDateRange = 360
+
     def __str__(self):
         return '{} {} {}'.format(self.client, self.id, self.type)
 
     def __repr__(self):
         return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
-
-    @property
-    def activitySyncDateRange(self):
-        return 360
 
     def CreateActivities(self, start, end):
         with self.client as client:
