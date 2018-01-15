@@ -29,4 +29,12 @@ class FeedbackForm(forms.Form):
 class AccountCsvForm(forms.ModelForm):
     class Meta:
         model = AccountCsv
-        exclude = ['user']
+        fields = ['csvfile', 'account']
+        labels = {'csvfile' : 'Please choose a file containing transaction history.\n'
+                              'The supported format is CSV.',
+                  }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user')
+        super().__init__(*args, **kwargs)
+        self.fields['account'].queryset = self.fields['account'].queryset.for_user(user)

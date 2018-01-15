@@ -51,14 +51,6 @@ class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
         pass
 
 
-class AccountCsv(models.Model):
-    def upload_path(self, filename):
-        return 'accountcsv/{}/{}_{}'.format(self.user.username, datetime.date.today().isoformat(), filename)
-
-    csvfile = models.FileField(upload_to=upload_path)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-
-
 class BaseAccountQuerySet(PolymorphicQuerySet):
     def for_user(self, user):
         return self.filter(client__user=user) if user else self
@@ -174,6 +166,23 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     def GetValueToday(self):
         return self.GetValueAtDate(datetime.date.today())
+
+
+class AccountCsv(models.Model):
+    def upload_path(self, filename):
+        return 'accountcsv/{}/{}/{}.{}'.format(self.user.username,
+                                               self.account.id,
+                                               datetime.date.today().isoformat(),
+                                               filename.rsplit('.')[-1])
+
+    csvfile = models.FileField(upload_to=upload_path)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    account = models.ForeignKey(BaseAccount, blank=True)
+
+    def find_matching_account(self):
+        if not self.account:
+            # TODO: Fix the account lookup
+            self.account = self.user.userprofile.GetAccounts()[0]
 
 
 class HoldingManager(models.Manager):

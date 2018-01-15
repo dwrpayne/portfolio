@@ -37,9 +37,15 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
     success_url = '/finance/uploadcsv/'
     template_name = 'finance/uploadcsv.html'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         accountcsv = form.save(commit=False)
         accountcsv.user = self.request.user
+        accountcsv.find_matching_account()
         accountcsv.save()
         return super().form_valid(form)
 
