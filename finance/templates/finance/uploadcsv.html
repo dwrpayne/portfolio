@@ -2,25 +2,20 @@
 {% block title %} Upload Account Data {% endblock title %}
 
 {% block content %}
-{{ form.non_field_errors }}
+    <form action="{% url 'finance:uploadcsv' %}" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <legend>Upload Transaction History</legend>
+        Please choose a file containing transaction history as downloaded from your brokerage's website.
+        <br><br><br>
+        Currently supported brokerages:<br><ul>
+        <li>Virtual Brokers</li>
+        </ul><br>
+        Upcoming support for:<br><ul>
+        <li>RBC</li>
+        </ul>
+        <br><br>
 
-<form action="{% url 'finance:uploadcsv' %}" method="post" enctype="multipart/form-data">
-  <fieldset>
-    <legend>Add file</legend>
-
-    <div class="large-12 columns">
-      <div class="row" id="file_container">
-        {{ form.csvfile.errors }}
-        {{ form.csvfile }}
-          {{ form.user }}
-          {{ form.account }}
-      </div>
-    </div>
-
-  </fieldset>
-  <input type="submit" id="submit" class="large button expand" value="Submit File">
-  {% csrf_token %}
-</form>
-
-
+        {{ form.as_p }}
+        <input type="submit" id="submit" class="large button expand" value="Submit File">
+    </form>
 {% endblock %}

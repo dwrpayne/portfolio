@@ -196,9 +196,10 @@ class AccountCsv(models.Model):
     account = models.ForeignKey(BaseAccount, blank=True)
 
     def find_matching_account(self):
-        if not self.account:
-            # TODO: Fix the account lookup
-            self.account = self.user.userprofile.GetAccounts()[0]
+        if not hasattr(self, 'account'):
+            data = str(self.csvfile.read())
+            self.account = sorted(self.user.userprofile.GetAccounts(),
+                key=lambda a: data.count(a.id))[-1]
 
 
 class HoldingManager(models.Manager):

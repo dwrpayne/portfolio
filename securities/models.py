@@ -18,7 +18,7 @@ class SecurityQuerySet(models.QuerySet):
         kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
         kwargs.setdefault('datasource', self.model.get_default_datasource(kwargs['type'], kwargs['symbol']))
         if kwargs['type'] == self.model.Type.Stock:
-            pass#kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
+            pass  # kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
         return super().create(**kwargs)
 
 
@@ -29,7 +29,7 @@ class SecurityManager(models.Manager):
             queryset = queryset.filter(holdings__enddate__isnull=True).distinct()
         for security in queryset:
             security.SyncRates(live_update)
-            if live_update and security.type==self.model.Type.Cash and not security.symbol == 'CAD':
+            if live_update and security.type == self.model.Type.Cash and not security.symbol == 'CAD':
                 security.live_price = GetLiveAlphaVantageExchangeRate(security.symbol)
 
 
@@ -68,9 +68,9 @@ class OptionSecurityManager(SecurityManager):
         for option in self.get_queryset():
             start, *_, end = option.activities.values_list('tradeDate', 'price')
             datasource, created = InterpolatedDataSource.objects.get_or_create(start_day=start[0],
-                                                                      start_val=start[1],
-                                                                      end_day=end[0],
-                                                                      end_val=end[1])
+                                                                               start_val=start[1],
+                                                                               end_day=end[0],
+                                                                               end_val=end[1])
             option.SetDataSource(datasource)
 
     def CreateFromDetails(self, callput, symbol, expiry, strike, currency_str):
@@ -232,6 +232,7 @@ class Security(models.Model):
         today = 1 / rates[1]
         return today, (today - yesterday) / yesterday
 
+
 class Option(Security):
     class Meta:
         proxy = True
@@ -297,7 +298,8 @@ class SecurityPriceDetail(models.Model):
     def CreateView(cls, drop_cascading=False):
         cursor = connection.cursor()
         try:
-            cursor.execute("DROP MATERIALIZED VIEW IF EXISTS securities_cadview {};".format("CASCADE" if drop_cascading else ""))
+            cursor.execute(
+                "DROP MATERIALIZED VIEW IF EXISTS securities_cadview {};".format("CASCADE" if drop_cascading else ""))
             cursor.execute("""
 CREATE MATERIALIZED VIEW public.securities_cadview
 AS
