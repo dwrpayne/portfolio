@@ -30,9 +30,13 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
         return series.iteritems()
 
     def GetData(self, start, end):
+        # Start a week earlier to ensure we get enough data to fill in the beginning of the range
+        # in the case the range starts on a weekend or holiday
+        start = start - timedelta(days=7)
         print("Getting data from {} for {} to {}".format(self, start, end))
         data = self._Retrieve(start, end)
-        return self._ProcessRateData(data, start, end)
+        processed = list(self._ProcessRateData(data, start, end))
+        return processed
 
     def _Retrieve(self, start, end):
         """
