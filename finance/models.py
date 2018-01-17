@@ -1,8 +1,8 @@
 import datetime
-import pendulum
 from decimal import Decimal
 from itertools import groupby
-from collections import defaultdict
+
+import pendulum
 from django.conf import settings
 from django.db import models, transaction, connection
 from django.db.models import F, Sum
@@ -15,45 +15,17 @@ from polymorphic.query import PolymorphicQuerySet
 from polymorphic.showfields import ShowFieldTypeAndContent
 
 import utils.dates
-from utils.db import RunningSum
-from utils.misc import xirr, total_return
 from securities.models import Security, SecurityPriceDetail, SecurityPriceQuerySet
 from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
+from utils.db import RunningSum
 from utils.misc import plotly_iframe_from_url
+from utils.misc import xirr, total_return
 from .services import GeneratePortfolioPlots
-
-
-class BaseClient(ShowFieldTypeAndContent, PolymorphicModel):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL,
-                             on_delete=models.CASCADE, related_name='clients')
-    display_name = models.CharField(max_length=100, null=True)
-
-    def __str__(self):
-        return "{}".format(self.display_name)
-
-    def __repr__(self):
-        return 'BaseClient<{}>'.format(self.display_name)
-
-    def __enter__(self):
-        self.Authorize()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.CloseSession()
-
-    def Authorize(self):
-        pass
-
-    def CloseSession(self):
-        pass
-
-    def SyncAccounts(self):
-        pass
 
 
 class BaseAccountQuerySet(PolymorphicQuerySet):
     def for_user(self, user):
-        return self.filter(client__user=user) if user else self
+        return self.filter(user=user) if user else self
 
     def get_balance_totals(self):
         properties = ['cur_balance', 'cur_cash_balance', 'yesterday_balance', 'today_balance_change']
@@ -69,7 +41,8 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
 
 
 class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
-    client = models.ForeignKey(BaseClient, on_delete=models.CASCADE, related_name='accounts')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
+                             on_delete=models.CASCADE, related_name='accounts_for_user')
     type = models.CharField(max_length=100)
     id = models.CharField(max_length=100, primary_key=True)
     taxable = models.BooleanField(default=True)
@@ -84,13 +57,13 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         ordering = ['id']
 
     def __repr__(self):
-        return "BaseAccount({},{},{})".format(self.client, self.id, self.type)
+        return "BaseAccount({},{},{})".format(self.user, self.id, self.type)
 
     def __str__(self):
         return self.display_name
 
     def save(self, *args, **kwargs):
-        self.display_name = "{} {}".format(self.client, self.type)
+        self.display_name = "{} {}".format(self.user, self.type)
         super().save(*args, **kwargs)
 
     @cached_property
@@ -140,11 +113,11 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         pass
 
     def SyncAndRegenerate(self):
+        activity_count = self.activities.all().count()
+
         if self.activitySyncDateRange:
             date_range = utils.dates.day_intervals(self.activitySyncDateRange, self.sync_from_date)
             print('Syncing all activities for {} in {} chunks.'.format(self, len(date_range)))
-
-            activity_count = self.activities.all().count()
 
             for period in date_range:
                 self.CreateActivities(period.start, period.end)
@@ -168,7 +141,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 
     def CreateActivities(self, start, end):
         """
-        Retrieve raw activity data from your client source for the specified account and start/end period.
+        Retrieve raw activity data for the specified account and start/end period.
         Store it in the DB as a subclass of BaseRawActivity.
         Return the newly created raw instances.
         """
@@ -232,7 +205,7 @@ class HoldingQuerySet(models.query.QuerySet):
         return self.filter(enddate=None)
 
     def for_user(self, user):
-        return self.filter(account__client__user=user)
+        return self.filter(account__user=user)
 
 
 class Holding(models.Model):
@@ -413,7 +386,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         return self.filter(account__taxable=True)
 
     def for_user(self, user):
-        return self.filter(account__client__user=user)
+        return self.filter(account__user=user)
 
     def deposits(self):
         return self.filter(type__in=[Activity.Type.Deposit, Activity.Type.Withdrawal])
@@ -660,10 +633,6 @@ class UserProfile(models.Model):
             yield day, self.RateOfReturn(inception, day)
 
     def PeriodicRatesOfReturn(self, period_type='months'):
-        """
-        :param time_period: Can be 'months', 'years'.
-        :return:
-        """
         inception = pendulum.Date.instance(self.GetInceptionDate())
         period = pendulum.today().date() - inception.add(days=3)
         period_type_singular = period_type.rstrip('s')
@@ -720,7 +689,7 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return '\n'.join(str(h) for h in self)
 
     def for_user(self, user):
-        return self.filter(account__client__user=user)
+        return self.filter(account__user=user)
 
     def taxable(self):
         return self.filter(account__taxable=True)
@@ -841,13 +810,13 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
 
 
 class HoldingChange:
-    def __init__(self, account=None, security=None, qty=0, value=0, price=0, day=None, exch=1,
-                 qty_delta=0, value_delta=0):
+    def __init__(self, account=None, security=None, qty=Decimal(0), value=Decimal(0),
+                 price=Decimal(0), day=None, exch=Decimal(1)):
         self.account = account
         self.security = security
         self.day = day
         self.qty = qty
-        self.qty_delta = qty_delta
+        self.qty_delta = 0
         self.value = value
         self.value_delta = 0
         self.value_percent_delta = 0
@@ -905,11 +874,13 @@ class HoldingChange:
         return hc
 
     def __str__(self):
-        return "{} {} {}({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
+        return "{} {} {}({}) {} {} {}".format(self.security, self.price,
+                                              self.price_delta, self.value_percent_delta,
                                                self.qty, self.value, self.value_delta)
 
     def __repr__(self):
-        return "{} {} {}({}) {} {} {}".format(self.security, self.price, self.price_delta, self.percent_gain,
+        return "{} {} {}({}) {} {} {}".format(self.security, self.price,
+                                              self.price_delta, self.value_percent_delta,
                                                self.qty, self.value, self.value_delta)
 
     @property

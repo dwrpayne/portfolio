@@ -53,7 +53,7 @@ def secant_method(tol, f, x0):
     """
 
     x1 = x0 * 1.1
-    while (abs(x1 - x0) / abs(x1) > tol):
+    while abs(x1 - x0) / abs(x1) > tol:
         x0, x1 = x1, x1 - f(x1) * (x1 - x0) / (f(x1) - f(x0))
     return x1
 

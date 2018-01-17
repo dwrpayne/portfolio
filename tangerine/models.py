@@ -4,7 +4,7 @@ import requests
 import tangerine.tangerinelib
 from dateutil import parser
 
-from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
+from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
 
 
@@ -37,6 +37,7 @@ class TangerineRawActivity(BaseRawActivity):
 
         creation_fn = Activity.objects.create
 
+        net_amount = 0
         if self.type in ['Purchase', 'Transfer In']:
             activity_type = Activity.Type.Buy
             creation_fn = Activity.objects.create_with_deposit
@@ -45,7 +46,6 @@ class TangerineRawActivity(BaseRawActivity):
             # Tangerine uses this to indicate a DRIP - aka deposit of shares
             # We'll consider it a Buy, with no cash effect and no associated deposit
             activity_type = Activity.Type.Buy
-            net_amount = 0
         else:
             activity_type = Activity.Type.NotImplemented
 
@@ -55,7 +55,51 @@ class TangerineRawActivity(BaseRawActivity):
                     price=self.price, netAmount=net_amount, type=activity_type, raw=self)
 
 
+class TangerineClient(models.Model):
+    username = models.CharField(max_length=32)
+    password = models.CharField(max_length=100)
+    securityq1 = models.CharField(max_length=1000)
+    securitya1 = models.CharField(max_length=100)
+    securityq2 = models.CharField(max_length=1000)
+    securitya2 = models.CharField(max_length=100)
+    securityq3 = models.CharField(max_length=1000)
+    securitya3 = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.username
+
+    def __repr__(self):
+        return 'TangerineClient<{}>'.format(self.username)
+
+    def __enter__(self):
+        secrets_dict = {'username': self.username, 'password': self.password,
+                        'security_questions': {
+                            self.securityq1: self.securitya1,
+                            self.securityq2: self.securitya2,
+                            self.securityq3: self.securitya3}}
+
+        secrets = tangerine.tangerinelib.DictionaryBasedSecretProvider(secrets_dict)
+        self.client = tangerine.tangerinelib.TangerineClient(secrets)
+        return self
+
+    def SyncAccounts(self):
+        try:
+            with self.client.login():
+                accounts = self.client.list_accounts()
+                for a in accounts:
+                    TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={
+                        'type': a['description'], 'internal_display_name': a['display_name'],
+                        'account_balance': a['account_balance']})
+        except requests.exceptions.HTTPError:
+            print("Couldn't sync accounts - possible server failure?")
+
+    def GetActivities(self, account_id, start, end):
+        with self.client.login():
+            return self.client.list_transactions([account_id], start, end)
+
+
 class TangerineAccount(BaseAccount):
+    client = models.ForeignKey(TangerineClient, on_delete=models.DO_NOTHING, null=True, blank=True)
     internal_display_name = models.CharField(max_length=100)
     account_balance = models.DecimalField(max_digits=16, decimal_places=6)
 
@@ -84,41 +128,3 @@ class TangerineAccount(BaseAccount):
                         'price': trans['mutual_fund']['unit_price']
                     })
 
-
-class TangerineClient(BaseClient):
-    username = models.CharField(max_length=32)
-    password = models.CharField(max_length=100)
-    securityq1 = models.CharField(max_length=1000)
-    securitya1 = models.CharField(max_length=100)
-    securityq2 = models.CharField(max_length=1000)
-    securitya2 = models.CharField(max_length=100)
-    securityq3 = models.CharField(max_length=1000)
-    securitya3 = models.CharField(max_length=100)
-
-    def __repr__(self):
-        return 'TangerineClient<{}>'.format(self.display_name)
-
-    def Authorize(self):
-        secrets_dict = {'username': self.username, 'password': self.password,
-                        'security_questions': {
-                            self.securityq1: self.securitya1,
-                            self.securityq2: self.securitya2,
-                            self.securityq3: self.securitya3}}
-
-        secrets = tangerine.tangerinelib.DictionaryBasedSecretProvider(secrets_dict)
-        self.client = tangerine.tangerinelib.TangerineClient(secrets)
-
-    def SyncAccounts(self):
-        try:
-            with self.client.login():
-                accounts = self.client.list_accounts()
-                for a in accounts:
-                    TangerineAccount.objects.get_or_create(client=self, id=a['number'], defaults={
-                        'type': a['description'], 'internal_display_name': a['display_name'],
-                        'account_balance': a['account_balance']})
-        except requests.exceptions.HTTPError:
-            print("Couldn't sync accounts - possible server failure?")
-
-    def GetActivities(self, account_id, start, end):
-        with self.client.login():
-            return self.client.list_transactions([account_id], start, end)

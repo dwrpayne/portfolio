@@ -14,7 +14,7 @@
         </tr>
         {% for account in accounts %}
             <tr>
-                <td>{{ account.client.user.username }}</td>
+                <td>{{ account.user.username }}</td>
                 <td>{{ account.display_name }}</td>
                 <td>{{ account.creation_date }}</td>
                 <td>{{ account.activities.newest_date }}</td>

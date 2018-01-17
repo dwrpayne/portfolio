@@ -85,10 +85,10 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
     model = BaseAccount
     template_name = 'finance/admin/accounts.html'
     context_object_name = 'accounts'
-    ordering = ['client__user__username']
+    ordering = ['user__username']
 
     def get_queryset(self):
-        return super().get_queryset().exclude(client__user__username='guest')
+        return super().get_queryset().exclude(user__username='guest')
 
     def ajax_request(self, action):
         action, account_id = action.split('-')
@@ -104,7 +104,7 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
         return HttpResponse()
 
 
-class UserProfileView(LoginRequiredMixin, TemplateView):
+class UserProfileView(LoginRequiredMixin, FormView):
     model = UserProfile
     template_name = 'finance/userprofile.html'
     context_object_name = 'userprofile'

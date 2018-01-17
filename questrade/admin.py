@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import QuestradeClient, QuestradeAccount, QuestradeRawActivity, QuestradeActivityType
+from .models import QuestradeAccount, QuestradeRawActivity, QuestradeActivityType
 
 
 class QuestradeActivityTypeAdmin(admin.ModelAdmin):
@@ -18,7 +18,7 @@ admin.site.register(QuestradeRawActivity, QuestradeRawActivityAdmin)
 
 
 class AccountAdmin(admin.ModelAdmin):
-    list_display = ['client', 'type', 'id']
+    list_display = ['user', 'type', 'id']
 
 
 admin.site.register(QuestradeAccount, AccountAdmin)
@@ -27,5 +27,5 @@ admin.site.register(QuestradeAccount, AccountAdmin)
 class ClientAdmin(admin.ModelAdmin):
     list_display = ['username']
 
-
-admin.site.register(QuestradeClient, ClientAdmin)
+#
+# admin.site.register(QuestradeClient, ClientAdmin)

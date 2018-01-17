@@ -3,7 +3,7 @@ from dateutil import parser
 from decimal import Decimal
 
 from django.db import models
-from finance.models import BaseAccount, BaseClient, BaseRawActivity, Activity, HoldingDetail
+from finance.models import BaseAccount, BaseRawActivity, Activity, HoldingDetail
 from securities.models import Security
 
 class VirtBrokersRawActivity(BaseRawActivity):
@@ -70,8 +70,3 @@ class VirtBrokersAccount(BaseAccount):
             line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
             VirtBrokersRawActivity.objects.get_or_create(account=self, **line)
-
-
-class VirtBrokersClient(BaseClient):
-    def __repr__(self):
-        return 'VirtBrokersClient<{}>'.format(self.display_name)

@@ -1,13 +1,12 @@
 from django.contrib import admin
 
-from .models import VirtBrokersClient, VirtBrokersAccount, VirtBrokersRawActivity
+from .models import VirtBrokersAccount, VirtBrokersRawActivity
 
-admin.site.register(VirtBrokersClient)
 
 admin.site.register(VirtBrokersRawActivity)
 
 class VirtBrokersAccountAdmin(admin.ModelAdmin):
-    list_display = ['client', 'type', 'id']
+    list_display = ['user', 'type', 'id']
 
 admin.site.register(VirtBrokersAccount, VirtBrokersAccountAdmin)
 

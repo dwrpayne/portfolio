@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import BaseAccount, BaseClient, ManualRawActivity
+from .models import BaseAccount, ManualRawActivity
 from .models import Activity, Holding, Allocation
 from .models import UserProfile
 
@@ -45,7 +45,6 @@ class HoldingAdmin(admin.ModelAdmin):
 admin.site.register(Holding, HoldingAdmin)
 
 admin.site.register(BaseAccount)
-admin.site.register(BaseClient)
 
 
 class AllocationAdmin(admin.ModelAdmin):

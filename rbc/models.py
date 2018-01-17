@@ -3,7 +3,7 @@ from dateutil import parser
 from decimal import Decimal
 
 from django.db import models
-from finance.models import BaseAccount, BaseClient, BaseRawActivity, Activity
+from finance.models import BaseAccount, BaseRawActivity, Activity
 from securities.models import Security
 
 class RbcRawActivity(BaseRawActivity):
@@ -94,8 +94,3 @@ class RbcAccount(BaseAccount):
             line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
 
             RbcRawActivity.objects.get_or_create(account=self, **line)
-
-
-class RbcClient(BaseClient):
-    def __repr__(self):
-        return 'RbcClient<{}>'.format(self.display_name)

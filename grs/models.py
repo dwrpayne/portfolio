@@ -8,7 +8,7 @@ from dateutil import parser
 from django.db import models
 import utils.dates
 
-from finance.models import Activity, BaseAccount, BaseClient, BaseRawActivity
+from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
 from datasource.models import DataSourceMixin
 
@@ -39,41 +39,24 @@ class GrsRawActivity(BaseRawActivity):
                                 price=self.price, netAmount=-total_cost, type=Activity.Type.Buy)
 
 
-class GrsAccount(BaseAccount):
-    activitySyncDateRange = 360
-
-    def __str__(self):
-        return '{} {} {}'.format(self.client, self.id, self.type)
-
-    def __repr__(self):
-        return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
-
-    def CreateActivities(self, start, end):
-        with self.client as client:
-            for day, desc, _, price, qty in client.GetActivities(self, start, end):
-                # TODO: Hacking the symbol here to the only one I buy. I have the description in
-                # TODO: <TD class='activities-sh2'>Canadian Equity (Leith Wheeler)-Employer</TD>
-                # TODO: Create the security with that description and then do a lookup here.
-                GrsRawActivity.objects.create(
-                    account=self, day=parser.parse(day).date(),
-                    qty=Decimal(qty), price=Decimal(price),
-                    symbol='ETP', description=desc)
-
-
-class GrsClient(BaseClient):
+class GrsClient(models.Model):
     username = models.CharField(max_length=32)
     password = models.CharField(max_length=100)
 
-    def __repr__(self):
-        return 'GrsClient<{}>'.format(self.display_name)
+    def __str__(self):
+        return self.username
 
-    def Authorize(self):
+    def __repr__(self):
+        return 'GrsClient<{}>'.format(self.username)
+
+    def __enter__(self):
         self.session = requests.Session()
         response = self.session.post('https://ssl.grsaccess.com/Information/login.aspx',
                                      data={'username': self.username, 'password': self.password})
         response.raise_for_status()
+        return self
 
-    def CloseSession(self):
+    def __exit__(self, type, value, traceback):
         self.session.close()
 
     def PrepareRateRetrieval(self, plan_data):
@@ -127,6 +110,28 @@ class GrsClient(BaseClient):
 
         for activity_list in split_before(tags, lambda tag: tag.attrs['class'][0] == tags[0].attrs['class'][0]):
             yield [a.text for a in activity_list]
+
+
+class GrsAccount(BaseAccount):
+    client = models.ForeignKey(GrsClient, on_delete=models.DO_NOTHING, null=True, blank=True)
+    activitySyncDateRange = 360
+
+    def __str__(self):
+        return '{} {} {}'.format(self.client, self.id, self.type)
+
+    def __repr__(self):
+        return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
+
+    def CreateActivities(self, start, end):
+        with self.client as client:
+            for day, desc, _, price, qty in client.GetActivities(self, start, end):
+                # TODO: Hacking the symbol here to the only one I buy. I have the description in
+                # TODO: <TD class='activities-sh2'>Canadian Equity (Leith Wheeler)-Employer</TD>
+                # TODO: Create the security with that description and then do a lookup here.
+                GrsRawActivity.objects.create(
+                    account=self, day=parser.parse(day).date(),
+                    qty=Decimal(qty), price=Decimal(price),
+                    symbol='ETP', description=desc)
 
 
 class GrsDataSource(DataSourceMixin):

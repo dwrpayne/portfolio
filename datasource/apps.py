@@ -6,5 +6,5 @@ class DatasourceConfig(AppConfig):
 
 
     def ready(self):
-        from . import signals
+        pass
 

@@ -8,13 +8,12 @@ import requests
 from dateutil import parser
 from django.db import models
 from django.utils import timezone
-from model_utils import Choices
 
+from datasource.models import DataSourceMixin
 from finance.models import Activity
-from finance.models import BaseRawActivity, BaseAccount, BaseClient, ManualRawActivity
+from finance.models import BaseRawActivity, BaseAccount, ManualRawActivity
 from finance.models import BaseRawActivityQuerySet
 from securities.models import Security, Option
-from datasource.models import DataSourceMixin
 from utils.api import api_response
 
 
@@ -128,49 +127,7 @@ class QuestradeRawActivity(BaseRawActivity):
         Activity.objects.create(**create_args)
 
 
-class QuestradeAccount(BaseAccount):
-    curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
-    sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
-
-    activitySyncDateRange = 28
-
-    def __str__(self):
-        return "{} {} {}".format(self.client, self.id, self.type)
-
-    def __repr__(self):
-        return 'QuestradeAccount<{},{},{}>'.format(self.client, self.id, self.type)
-
-    @property
-    def cur_balance(self):
-        return self.curBalanceSynced
-
-    @property
-    def yesterday_balance(self):
-        return self.sodBalanceSynced
-
-    def CreateActivities(self, start, end):
-        with self.client as client:
-            for json in client.GetActivities(self.id, start, end):
-                QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=dumps(json))
-
-    def SyncBalances(self):
-        with self.client as client:
-            try:
-                json = client.GetAccountBalances(self.id)
-                self.curBalanceSynced = sum([
-                    Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
-                    for entry in json['perCurrencyBalances']
-                ])
-                self.sodBalanceSynced = sum([
-                    Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
-                    for entry in json['sodPerCurrencyBalances']
-                ])
-                self.save()
-            except requests.exceptions.HTTPError:
-                pass
-
-
-class QuestradeClient(BaseClient):
+class QuestradeClient(models.Model):
     username = models.CharField(max_length=32)
     refresh_token = models.CharField(max_length=100)
     access_token = models.CharField(max_length=100, null=True, blank=True)
@@ -178,8 +135,18 @@ class QuestradeClient(BaseClient):
     token_expiry = models.DateTimeField(null=True, blank=True)
     authorization_lock = threading.Lock()
 
+    def __str__(self):
+        return self.username
+
     def __repr__(self):
-        return "QuestradeClient<{}>".format(self.display_name)
+        return "QuestradeClient<{}>".format(self.username)
+
+    def __enter__(self):
+        self.Authorize()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.session.close()
 
     @property
     def needs_refresh(self):
@@ -210,9 +177,6 @@ class QuestradeClient(BaseClient):
 
         self.session = requests.Session()
         self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
-
-    def CloseSession(self):
-        self.session.close()
 
     def _GetRequest(self, url, params=None):
         if params is None:
@@ -251,7 +215,9 @@ class QuestradeClient(BaseClient):
         return 0
 
     def GetOptionPrice(self, option_id):
-        json = self.session.post('market/quotes/options', json={'optionIds' : option_id})
+        response = self.session.post(self.api_server + 'market/quotes/options', json={'filters':[option_id]})
+        response.raise_for_status()
+        json = response.json()
         data = json['optionQuotes']
         if data['lastTradePriceTrHrs']: return data['lastTradePriceTrHrs']
         if data['lastTradePrice']: return data['lastTradePrice']
@@ -298,3 +264,47 @@ class QuestradeOptionDataSource(DataSourceMixin):
     def _Retrieve(self, start, end):
         with self.client as client:
             return datetime.date.today(), client.GetOptionPrice(self.optionid)
+
+
+class QuestradeAccount(BaseAccount):
+    client = models.ForeignKey(QuestradeClient, on_delete=models.DO_NOTHING, null=True, blank=True)
+    curBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
+    sodBalanceSynced = models.DecimalField(max_digits=19, decimal_places=4, default=0)
+
+    activitySyncDateRange = 28
+
+    def __str__(self):
+        return "{} {} {}".format(self.client, self.id, self.type)
+
+    def __repr__(self):
+        return 'QuestradeAccount<{},{},{}>'.format(self.client, self.id, self.type)
+
+    @property
+    def cur_balance(self):
+        return self.curBalanceSynced
+
+    @property
+    def yesterday_balance(self):
+        return self.sodBalanceSynced
+
+    def CreateActivities(self, start, end):
+        with self.client as client:
+            for json in client.GetActivities(self.id, start, end):
+                QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=dumps(json))
+
+    def SyncBalances(self):
+        with self.client as client:
+            try:
+                json = client.GetAccountBalances(self.id)
+                self.curBalanceSynced = sum([
+                    Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
+                    for entry in json['perCurrencyBalances']
+                ])
+                self.sodBalanceSynced = sum([
+                    Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
+                    for entry in json['sodPerCurrencyBalances']
+                ])
+                self.save()
+            except requests.exceptions.HTTPError:
+                pass
+

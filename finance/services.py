@@ -1,11 +1,11 @@
+import datetime
+from itertools import chain
+
 import plotly
 import plotly.graph_objs as go
 
 from utils.misc import find_le_index
-import datetime
-from itertools import chain
 
-from django.http import JsonResponse
 
 class RefreshButtonHandlerMixin:
     """
