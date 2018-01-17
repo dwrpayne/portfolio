@@ -59,7 +59,7 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
     def securities_by_status(self):
         return partition(lambda s: not s.NeedsSync(), self.get_queryset())
 
-    def ajax_request(self, action):
+    def ajax_request(self, request, action):
         action, symbol = action.split('-')
         if action == 'sync':
             if symbol == 'all':
@@ -67,7 +67,9 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
             elif symbol == 'active':
                 Security.objects.Sync(True)
             else:
-                Security.objects.get(pk=symbol).SyncRates(True)
+                security = Security.objects.get(pk=symbol)
+                security.SyncRates(True)
+                return render(request, 'finance/admin/securityrow.html', {'security' : security})
         return HttpResponse()
 
     def get_queryset(self):
@@ -90,7 +92,7 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
     def get_queryset(self):
         return super().get_queryset().exclude(user__username='guest')
 
-    def ajax_request(self, action):
+    def ajax_request(self, request, action):
         action, account_id = action.split('-')
         if action == 'sync':
             BaseAccount.objects.get(pk=account_id).SyncAndRegenerate()

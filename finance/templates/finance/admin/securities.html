@@ -1,5 +1,6 @@
 {% extends "finance/base.html" %}
 {% load mytags %}
+{% load static %}
 {% block content %}
     <div class="row">
         <div class="col-sm-10" align="center">
@@ -11,7 +12,7 @@
         </div>
     </div>
     <table class="table table-striped table-hover table-sm">
-        <tr>
+        <thead>
             <th>Security</th>
             <th>Type</th>
             <th>Earliest Data</th>
@@ -22,30 +23,13 @@
             <th>Last Sync Time</th>
             <th>Current Price</th>
             <th>Data Source</th>
-        </tr>
-        {% for status in view.securities_by_status %}
-            {% for security in status %}
-                <tr>
-                    <td>{{ security.symbol }}</td>
-                    <td>{{ security.type }}</td>
-                    <td bgcolor="{% if security.prices.earliest.day < security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                        {{ security.prices.earliest.day }}
-                    </td>
-                    <td bgcolor="{% if security.prices.earliest.day < security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                        {{ security.earliest_price_needed }}
-                    </td>
-                    <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                        {{ security.latest_price_needed }}
-                    </td>
-                    <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-                        {{ security.prices.latest.day }}
-                    </td>
-                    <td><button type="submit" class="refresh" data-refresh-type="sync-{{ security.symbol }}">Sync</button></td>
-                    <td>{{ security.last_sync_time}}</td>
-                    <td>{{ security.prices.latest.price | currency}}</td>
-                    <td>{{ security.datasource }}</td>
-                </tr>
+        </thead>
+        <tbody>
+            {% for status in view.securities_by_status %}
+                {% for security in status %}
+                    {% include "finance/admin/securityrow.html" %}
+                {% endfor %}
             {% endfor %}
-        {% endfor %}
+        </tbody>
     </table>
 {% endblock %}

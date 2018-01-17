@@ -82,6 +82,9 @@ class TangerineClient(models.Model):
         self.client = tangerine.tangerinelib.TangerineClient(secrets)
         return self
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
     def SyncAccounts(self):
         try:
             with self.client.login():

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import TangerineRawActivity, TangerineAccount
+from .models import TangerineClient, TangerineRawActivity, TangerineAccount
 
 
 class TangerineRawActivityAdmin(admin.ModelAdmin):
@@ -20,5 +20,4 @@ admin.site.register(TangerineAccount, TangerineAccountAdmin)
 class TangerineClientAdmin(admin.ModelAdmin):
     list_display = ['username']
 
-#
-# admin.site.register(TangerineClient, TangerineClientAdmin)
+admin.site.register(TangerineClient, TangerineClientAdmin)

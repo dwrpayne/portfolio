@@ -11,7 +11,7 @@ $(document).ready(function () {
                 if (divs) {
                     divs = divs.split(';')
                     for (var i = 0; i < divs.length; i++) {
-                        var html = $(data).find('#' + divs[i]).html();
+                        var html = $(data).closest('#' + divs[i]).html();
                         $('#' + divs[i]).html(html);
                     }
                 }

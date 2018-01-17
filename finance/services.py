@@ -15,12 +15,11 @@ class RefreshButtonHandlerMixin:
         if request.is_ajax():
             key = next(key for key in request.GET if key.startswith('refresh-'))
             _, action = key.split('-',1)
-            return self.ajax_request(action)
+            return self.ajax_request(request, action)
         return super().get(request, *args, **kwargs)
 
-    def ajax_request(self, action):
+    def ajax_request(self, request, action):
         pass
-
 
 
 class LineGraph:

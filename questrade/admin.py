@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import QuestradeAccount, QuestradeRawActivity, QuestradeActivityType
+from .models import QuestradeClient, QuestradeAccount, QuestradeRawActivity, QuestradeActivityType
 
 
 class QuestradeActivityTypeAdmin(admin.ModelAdmin):
@@ -25,7 +25,6 @@ admin.site.register(QuestradeAccount, AccountAdmin)
 
 
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ['username']
+    list_display = ['username', 'token_expiry']
 
-#
-# admin.site.register(QuestradeClient, ClientAdmin)
+admin.site.register(QuestradeClient, ClientAdmin)

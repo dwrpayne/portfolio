@@ -1,8 +1,9 @@
 from django.contrib import admin
 
-from .models import GrsRawActivity, GrsAccount, GrsDataSource
-#
-# admin.site.register(GrsClient)
+from .models import GrsClient, GrsRawActivity, GrsAccount, GrsDataSource
+
+
+admin.site.register(GrsClient)
 
 
 class GrsRawActivityAdmin(admin.ModelAdmin):

@@ -11,5 +11,10 @@
 }
 
 button[type=submit]:disabled {
-	background: #000000;
+    background-image:url(/static/img/syncing.gif);
+    background-repeat: no-repeat;
+    display: block;
+    text-indent: -99999px;
+    width: 34px;
+    height: 34px;
 }
