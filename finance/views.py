@@ -267,14 +267,14 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     today_cash_balances = dict(today_query.cash().today_account_values())
 
     accounts = {
-        acc: {
-            'id' : BaseAccount.objects.get(display_name=acc).id,
+        BaseAccount.objects.get(pk=id).display_name: {
+            'id' : id,
             'cur_balance' : today_balance,
-            'yesterday_balance' : yesterday_balances.get(acc, 0),
-            'cur_cash_balance' : today_cash_balances.get(acc, 0),
-            'today_balance_change' : today_balance - yesterday_balances.get(acc, 0)
+            'yesterday_balance' : yesterday_balances.get(id, 0),
+            'cur_cash_balance' : today_cash_balances.get(id, 0),
+            'today_balance_change' : today_balance - yesterday_balances.get(id, 0)
         }
-        for acc, today_balance in today_balances.items()
+        for id, today_balance in today_balances.items()
     }
     context['accounts'] = accounts
     from collections import defaultdict

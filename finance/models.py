@@ -62,10 +62,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def __str__(self):
         return self.display_name
 
-    def save(self, *args, **kwargs):
-        self.display_name = "{} {}".format(self.user, self.type)
-        super().save(*args, **kwargs)
-
     @cached_property
     def cur_cash_balance(self):
         query = self.holdingdetail_set.cash().today().total_values()
@@ -707,7 +703,7 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.order_by('day').filter(day__in=utils.dates.year_ends(self.earliest().day))
 
     def account_values(self):
-        return self.order_by('day').values_list('account__display_name', 'day').annotate(total=Sum('value'))
+        return self.order_by('day').values_list('account', 'day').annotate(total=Sum('value'))
 
     def total_values(self):
         return self.order_by('day').values_list('day').annotate(Sum('value'))
@@ -716,10 +712,10 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.today().order_by('security_id').values_list('security_id').annotate(total=Sum('value'))
 
     def today_account_values(self):
-        return self.today().account_values().values_list('account__display_name', 'total')
+        return self.today().account_values().values_list('account', 'total')
 
     def yesterday_account_values(self):
-        return self.yesterday().account_values().values_list('account__display_name', 'total')
+        return self.yesterday().account_values().values_list('account', 'total')
 
 
 class HoldingDetail(models.Model):
