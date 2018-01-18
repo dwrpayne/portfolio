@@ -100,21 +100,44 @@ class UserProfileView(LoginRequiredMixin, UpdateView):
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        created_user = form.save(commit=False)
-        formset = ProfileInlineFormset(data=self.request.POST, instance=self.request.user)
-        if formset.is_valid():
-            created_user.save()
-            formset.save()
-            return HttpResponseRedirect(self.request.path)
+        if 'profile' in self.request.POST:
+            created_user = form.save(commit=False)
+            formset = ProfileInlineFormset(data=self.request.POST, instance=self.request.user)
+            if formset.is_valid():
+                created_user.save()
+                formset.save()
+                # TODO: Messages here!
+                return HttpResponseRedirect(self.request.path)
+        elif 'password' in self.request.POST:
+            if form.is_valid():
+                form.save()
+                # TODO: Messages here!
+                return HttpResponseRedirect(self.request.path)
+        # TODO: Messages here!
+        return HttpResponseRedirect(self.request.path)
 
 
 class UserPasswordPost(LoginRequiredMixin, UpdateView):
+    model = get_user_model()
     form_class = PasswordChangeForm
+    template_name = 'finance/userprofile.html'
+
+    def get(self, request, *args, **kwargs):
+        self.object = None
+        return super().get(self, request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        kwargs = self.get_form_kwargs()
+        kwargs.pop('instance')
+        return PasswordChangeForm(self.request.user, **kwargs)
 
     def post(self, request, *args, **kwargs):
         if not request.user.id == int(kwargs.get('pk', -1)):
             raise PermissionDenied
         return super().post(request, *args, **kwargs)
+
+        return render(request, 'finance/admin/securityrow.html', {'security': security})
+        return HttpResponseRedirect('/finance/user/{}'.format(kwargs.get('pk')))
 
 
 

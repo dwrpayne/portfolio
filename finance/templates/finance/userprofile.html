@@ -1,4 +1,4 @@
-{% extends "templates/base.html" %}
+{% extends "base.html" %}
 {% load mytags %}
 {% load static %}
 {% block title %}User Profile{% endblock title %}
@@ -12,16 +12,16 @@
                 {{ form.as_p }}
                 {{ formset.management_form }}
                 {{ formset.as_p }}
-                <button type="submit" class="btn-floating btn-large">Submit</button>
+                <button type="submit" name="profile" class="btn-floating btn-large">Submit</button>
             </form>
         </div>
-        <div class="col-sm-6">
+  <!--      <div class="col-sm-6">
             <h2>Change your password</h2>
-            <form action="{{ user.id }}/password" method="POST" class="padding">
-                {% csrf_token %}
-                {{ pass_form.as_p }}
-                <button type="submit" class="btn-floating btn-large">Submit</button>
+            <form method="POST" class="padding">
+                {#% csrf_token %#}
+                {#  #}{ pass_form.as_p }}
+                <button type="submit" name="password" class="btn-floating btn-large">Submit</button>
             </form>
-        </div>
+        </div>--->
     </div>
 {% endblock content %}
