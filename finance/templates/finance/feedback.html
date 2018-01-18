@@ -4,10 +4,7 @@
 {% block title %}User Profile{% endblock title %}
 {% block content %}  
 <div align="center">
-    <h2>Give me some feedback!</h2>
-    {% if request.GET.success %}
-        <br>Thank you for your input! Please feel free to send me some more. :)<br><br><br>
-    {% endif %}
+    <h2>Please let me know what you think! Any and all feedback is appreciated - both positive and negative.</h2>
     <form action="{% url 'finance:feedback' %}" method="post">
         {% csrf_token %}
         {{ form.as_p }}

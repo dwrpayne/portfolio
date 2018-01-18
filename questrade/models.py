@@ -85,6 +85,7 @@ class QuestradeRawActivity(BaseRawActivity):
             elif 'AMERICAN CAPITAL AGENCY CORP' in json['description']:    json['symbol'] = 'AGNC'
             elif 'MSCI JAPAN INDEX FD' in json['description']:             json['symbol'] = 'EWJ'
             elif 'VANGUARD EMERGING' in json['description']:               json['symbol'] = 'VWO'
+            elif 'EMERGING MKTS' in json['description']:                   json['symbol'] = 'VWO'
             elif 'VANGUARD MID-CAP GROWTH' in json['description']:         json['symbol'] = 'VOT'
             elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol'] = 'XBB.TO'
             elif 'ELECTRONIC ARTS INC' in json['description']:             json['symbol'] = 'EA'

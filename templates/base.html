@@ -30,11 +30,13 @@
             {% include "navigation.html" %}
         </header>
         {# The Document Body #}
-        <div id="site-wrapper" class="container-fluid">
+        <main>
+            <div id="site-wrapper" class="container-fluid">
+            {% include 'messages.html' %}
             {% block content %}
-                if you see this, something is wrong!
-            {% endblock content %}
-        </div>
+            {% endblock %}
+          </div>
+        </main>
         {# The Footer #}
         <div class="footer">
             <div class="container">

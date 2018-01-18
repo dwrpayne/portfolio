@@ -8,21 +8,20 @@
             <li class="{% navactive request 'finance:portfolio' %}">
                 <a href="{% url 'finance:portfolio' %}">Portfolio</a></li>
 
-            <li class="dropdown {% navactive request 'finance:history' %}">
+            <li class="dropdown {% navactive request 'finance:history' %}
+                        dropdown {% navactive request 'finance:snapshot' %}">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#">History
                 <span class="caret"></span></a>
                 <ul class="dropdown-menu">
-                    <li><a href="{% url 'finance:history' period='year'%}">Yearly</a></li>
-                    <li><a href="{% url 'finance:history' period='month'%}">Monthly</a></li>
-                    <li><a href="{% url 'finance:history' period='day'%}">Daily</a></li>
+                    <li><a href="{% url 'finance:history' period='year'%}">Year-end Values</a></li>
+                    <li><a href="{% url 'finance:history' period='month'%}">Month-end Values</a></li>
+                    <li><a href="{% url 'finance:history' period='day'%}">Daily Values</a></li>
+                    <li><a href="{% url 'finance:snapshot' %}">Portfolio Glimpse</a></li>
                 </ul>
             </li>
 
             <li class="{% navactive request 'finance:rebalance' %}">
                 <a href="{% url 'finance:rebalance' %}">Rebalance</a></li>
-
-            <li class="{% navactive request 'finance:snapshot' %}">
-                <a href="{% url 'finance:snapshot' %}">Snapshot</a></li>
 
             <li class="dropdown {% navactive request 'finance:capgains' %}">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#">Capital Gains

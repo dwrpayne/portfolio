@@ -1,4 +1,6 @@
 import datetime
+from collections import defaultdict
+import os
 from itertools import groupby
 from operator import attrgetter
 
@@ -8,6 +10,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse
@@ -49,11 +52,18 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
         kwargs['user'] = self.request.user
         return kwargs
 
+    def form_invalid(self, form):
+        messages.error(self.request,
+                       'An error occurred and your file did not successfully upload. \n'
+                       'Please let the staff know using the Feedback link at top.')
+
     def form_valid(self, form):
         accountcsv = form.save(commit=False)
         accountcsv.user = self.request.user
-        accountcsv.find_matching_account()
+        matched_account = accountcsv.find_matching_account()
         accountcsv.save()
+        messages.success(self.request,
+                         'Your file was successfully uploaded and will be processed shortly.'.format(os.path.basename(accountcsv.csvfile.name)))
         HandleCsvUpload.delay(accountcsv.id)
         return super().form_valid(form)
 
@@ -106,12 +116,13 @@ class UserProfileView(LoginRequiredMixin, UpdateView):
             if formset.is_valid():
                 created_user.save()
                 formset.save()
-                # TODO: Messages here!
+                messages.success(self.request, 'Your profile was successfully updated!')
                 return HttpResponseRedirect(self.request.path)
+
         elif 'password' in self.request.POST:
             if form.is_valid():
                 form.save()
-                # TODO: Messages here!
+                messages.success(self.request, 'Your password was successfully updated!')
                 return HttpResponseRedirect(self.request.path)
         # TODO: Messages here!
         return HttpResponseRedirect(self.request.path)
@@ -183,6 +194,7 @@ class FeedbackView(FormView):
 
     def form_valid(self, form):
         form.send_email()
+        messages.success(self.request, "Thank you for your input! It is greatly appreciated.")
         return super().form_valid(form)
 
 
@@ -220,13 +232,23 @@ class DividendReport(LoginRequiredMixin, ListView):
     template_name = 'finance/dividends.html'
     context_object_name = 'activities'
 
-    def by_year(self):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         dividends = self.get_queryset()
-        yearly_divs = []
-        for year in range(self.request.user.userprofile.GetInceptionDate().year,
-                          datetime.date.today().year+1):
-            yearly_divs.append((year, sum(dividends.in_year(year).values_list('netAmount', flat=True))))
-        return yearly_divs
+        years = sorted(list(dt.year for dt in dividends.dates('tradeDate', 'year')))
+        securities = dividends.security_list()
+
+        security_year_amounts = {s : [0]*len(years) for s in securities}
+        for sec, divs in groupby(dividends.order_by('security_id', 'tradeDate'), lambda d: d.security_id):
+            for d in divs:
+                security_year_amounts[sec][d.tradeDate.year-years[0]] += d.netAmount
+            security_year_amounts[sec].append(sum(security_year_amounts[sec]))
+
+        context['security_year_amounts'] = sorted(security_year_amounts.items())
+        context['years'] = years
+        context['yearly_totals'] = [sum(yearly_vals[i-years[0]] for yearly_vals in security_year_amounts.values()) for i in years]
+        context['total'] = sum(context['yearly_totals'])
+        return context
 
     def get_queryset(self):
         return super().get_queryset().for_user(self.request.user).dividends()

@@ -1,6 +1,7 @@
 import datetime
 from decimal import Decimal
 from itertools import groupby
+from django.core.exceptions import ValidationError
 
 import pendulum
 from django.conf import settings
@@ -46,7 +47,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     type = models.CharField(max_length=100)
     id = models.CharField(max_length=100, primary_key=True)
     taxable = models.BooleanField(default=True)
-    display_name = models.CharField(max_length=100, editable=False, default='')
+    display_name = models.CharField(max_length=100, default='')
     creation_date = models.DateField(default='2009-01-01')
 
     objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
@@ -165,10 +166,15 @@ class AccountCsv(models.Model):
     account = models.ForeignKey(BaseAccount, blank=True)
 
     def find_matching_account(self):
+        """
+        :return: The account if it was automatched, None otherwise.
+        """
         if not hasattr(self, 'account'):
             data = str(self.csvfile.read())
             self.account = sorted(self.user.userprofile.GetAccounts(),
                 key=lambda a: data.count(a.id))[-1]
+            return self.account
+        return None
 
 
 class HoldingManager(models.Manager):
@@ -384,6 +390,9 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
     def for_user(self, user):
         return self.filter(account__user=user)
 
+    def security_list(self):
+        return self.order_by().values_list('security_id', flat=True).distinct()
+
     def deposits(self):
         return self.filter(type__in=[Activity.Type.Deposit, Activity.Type.Withdrawal])
 
@@ -482,8 +491,15 @@ class Activity(models.Model):
                                                      self.type, self.description)
 
     def __repr__(self):
-        return "Activity({},{},{},{},{},{},{},{})".format(self.tradeDate, self.security, self.cash, self.qty,
+        return "Activity({},{},{},{},{},{},{},{})".format(self.tradeDate, self.security_id, self.cash_id, self.qty,
                                                           self.price, self.netAmount, self.type, self.description)
+
+    def clean(self):
+        if self.security is None:
+            if not self.type in [self.Type.Deposit, self.Type.Fee, self.Type.FX,
+                                 self.Type.Interest, self.Type.Withdrawal]:
+                raise ValidationError
+
 
     def GetHoldingEffects(self):
         """

@@ -71,10 +71,10 @@ class RbcAccount(BaseAccount):
     activitySyncDateRange = 0
 
     def __str__(self):
-        return '{} {} {}'.format(self.client, self.id, self.type)
+        self.display_name
 
     def __repr__(self):
-        return 'RbcAccount<{},{},{}>'.format(self.client, self.id, self.type)
+        return 'RbcAccount<{},{},{}>'.format(self.display_name, self.id, self.type)
 
     def import_from_csv(self, csv_file):
         csv_file.open('r')
