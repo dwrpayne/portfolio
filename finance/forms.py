@@ -45,4 +45,4 @@ class AccountCsvForm(forms.ModelForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['user__first_name', 'user__last_name', 'user__email']
+        fields = '__all__'
