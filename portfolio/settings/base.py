@@ -23,16 +23,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SECRET_KEY = config('SECRET_KEY')
 
-DEBUG = True
-DEBUG_TOOLBAR_ENABLED = False
-
 ALLOWED_HOSTS = ['localhost']
 
 INTERNAL_IPS = ['localhost', '192.168.0.10', '127.0.0.1']
 
 # Application definition
-
-INSTALLED_APPS = [
+PROJECT_APPS = [
     'datasource.apps.DatasourceConfig',
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
@@ -42,6 +38,9 @@ INSTALLED_APPS = [
     'tangerine.apps.tangerineConfig',
     'virtbrokers.apps.VirtbrokersConfig',
     'utils',
+]
+
+PREREQ_APPS = [
     'polymorphic',
     'django_extensions',
     'django.contrib.admin',
@@ -58,8 +57,7 @@ INSTALLED_APPS = [
     'compat',
 ]
 
-if DEBUG_TOOLBAR_ENABLED:
-    INSTALLED_APPS.append('debug_toolbar')
+INSTALLED_APPS = PROJECT_APPS + PREREQ_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -71,9 +69,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
-if DEBUG_TOOLBAR_ENABLED:
-    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 ROOT_URLCONF = 'portfolio.urls'
 
@@ -138,10 +133,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, '../staticfiles')
 
 MEDIA_URL = '/upload/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'upload')
+MEDIA_ROOT = os.path.join(BASE_DIR, '../upload')
 
 # Logging
 LOGGING = {
@@ -159,7 +154,7 @@ LOGGING = {
         'file': {
             'level': 'DEBUG',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'filename': os.path.join(BASE_DIR, '../../debug.log'),
             'maxBytes': 1024*1024*15, # 15MB
             'backupCount': 10,
             'formatter': 'verbose'
@@ -173,7 +168,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': 'INFO',
             'propagate': True,
         },
     },

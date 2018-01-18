@@ -1,4 +1,4 @@
-from .settings import *
+from .base import *
 
 DEBUG = False
 ALLOWED_HOSTS = ['.davidpayne.net', 'localhost']
