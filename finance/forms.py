@@ -1,6 +1,6 @@
 from django import forms
 from django.core.mail import send_mail
-from .models import AccountCsv
+from .models import AccountCsv, UserProfile
 
 
 class FeedbackForm(forms.Form):
@@ -40,3 +40,9 @@ class AccountCsvForm(forms.ModelForm):
         user = kwargs.pop('user')
         super().__init__(*args, **kwargs)
         self.fields['account'].queryset = self.fields['account'].queryset.for_user(user)
+
+
+class UserProfileForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['user__first_name', 'user__last_name', 'user__email']

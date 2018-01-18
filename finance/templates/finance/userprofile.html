@@ -3,7 +3,14 @@
 {% load static %}
 {% block title %}User Profile{% endblock title %}
 {% block content %}  
-<div align="center">
-    <h2>User Profile {{ userprofile.username }}</h2>
-</div>
+    <div align="center">
+        <h2>User Profile {{ userprofile.username }}</h2>
+    </div>
+    <div>
+        <form action="" method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <input type="submit" value="Update" />
+        </form>
+    </div>
 {% endblock content %}

@@ -10,14 +10,14 @@ from django.http import Http404, HttpResponse
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.dates import DateMixin, DayMixin
-from django.views.generic.edit import FormView
+from django.views.generic.edit import FormView, UpdateView
 
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail
-from .forms import FeedbackForm, AccountCsvForm
+from .forms import FeedbackForm, AccountCsvForm, UserProfileForm
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -106,14 +106,13 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
         return HttpResponse()
 
 
-class UserProfileView(LoginRequiredMixin, FormView):
-    model = UserProfile
+class UserProfileView(LoginRequiredMixin, UpdateView):
+    form = UserProfileForm
     template_name = 'finance/userprofile.html'
     context_object_name = 'userprofile'
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.request.user.userprofile
-        return super().get(request, *args, **kwargs)
+    def get_object(self, queryset=None):
+        return self.request.user.userprofile
 
     def form_valid(self, form):
         print(form.cleaned_data['your_name'])
