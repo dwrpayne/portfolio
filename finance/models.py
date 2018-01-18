@@ -497,14 +497,22 @@ class Activity(models.Model):
         return effects
 
 
-class AllocationManager(models.Manager):
-    def with_rebalance_info(self, holdings, cashadd):
-        total_value = sum(holdings).value + cashadd
+class AllocationQuerySet(models.QuerySet):
+    def with_current_info(self):
+        return self.filter(securities__holdingdetails__account__user=F('user'),
+                    securities__holdingdetails__day=datetime.date.today()).annotate(
+                    current_amt=Sum('securities__holdingdetails__value'))
 
-        allocs = self.get_queryset()
+    def with_rebalance_info(self, total_value, cashadd):
+        allocs = self.with_current_info()
+
         for alloc in allocs:
-            alloc.update_rebalance_info(cashadd)
+            if alloc.securities.filter(symbol='CAD').exists():
+                alloc.current_amt += cashadd
 
+            alloc.current_pct = alloc.current_amt / total_value
+            alloc.desired_amt = alloc.desired_pct * total_value
+            alloc.buysell = alloc.desired_amt - alloc.current_amt
         return allocs
 
 
@@ -513,30 +521,20 @@ class Allocation(models.Model):
                              on_delete=models.CASCADE, related_name='allocations')
     securities = models.ManyToManyField(Security)
     desired_pct = models.DecimalField(max_digits=6, decimal_places=4)
-    objects = AllocationManager()
+
+    objects = AllocationQuerySet.as_manager()
 
     def __str__(self):
-        return "{} - {} - {}".format(self.user, self.desired_pct, self.list_securities())
+        return "{} - {} - {}".format(self.user, self.desired_pct, self.list_securities)
 
     def __repr__(self):
-        return "Allocation<{},{},{}>".format(self.user, self.desired_pct, self.list_securities())
-
-    def list_securities(self):
-        return ', '.join([s.symbol for s in self.securities.all()])
+        return "Allocation<{},{},{}>".format(self.user, self.desired_pct, self.list_securities)
 
     @property
-    def today_holding_set(self):
-        return self.user.userprofile.GetHoldingDetails().today().for_securities(self.securities.all())
-
-    def update_rebalance_info(self, cashadd=0):
-        total_value = self.user.userprofile.current_portfolio_value + cashadd
-        self.current_amt = sum(self.today_holding_set).value if self.today_holding_set else 0
-        if self.securities.filter(symbol='CAD').exists():
-            self.current_amt += cashadd
-
-        self.current_pct = self.current_amt / total_value
-        self.desired_amt = self.desired_pct * total_value
-        self.buysell = self.desired_amt - self.current_amt
+    def list_securities(self):
+        if any(s.symbol == 'CAD' for s in self.securities.all()):
+            return 'Cash'
+        return ', '.join([s.symbol for s in self.securities.all()])
 
 
 class UserProfile(models.Model):
@@ -668,15 +666,16 @@ class UserProfile(models.Model):
 
     def GetRebalanceInfo(self, cashadd=0):
         holdings = self.GetHoldingDetails().today()
-        allocs = self.user.allocations.with_rebalance_info(holdings, cashadd)
+        total_value = sum(holdings).value + cashadd
+        allocs = self.user.allocations.with_rebalance_info(total_value, cashadd)
 
         missing_holdings = holdings.exclude(security__in=allocs.values_list('securities'))
-        total_value = sum(holdings).value + cashadd
         missing = []
         for sec, group in groupby(missing_holdings, lambda h: h.security):
-            total = sum(group)
-            total.current_pct = total.value / total_value if total_value else 0
-            missing.append(total)
+            value = sum(group).value
+            missing.append({'security': sec,
+                            'value': value,
+                            'current_pct': value / total_value if total_value else 0})
         return allocs, missing
 
 
@@ -720,7 +719,7 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
 
 class HoldingDetail(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.DO_NOTHING)
-    security = models.ForeignKey(Security, on_delete=models.DO_NOTHING)
+    security = models.ForeignKey(Security, on_delete=models.DO_NOTHING, related_name='holdingdetails')
     day = models.DateField()
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)

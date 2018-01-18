@@ -16,7 +16,7 @@ from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation
 from .forms import FeedbackForm, AccountCsvForm, UserProfileForm
 
 
@@ -227,6 +227,25 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
         return self.request.user.userprofile.GetActivities().at_date(self.get_day())
 
 
+class RebalanceView(LoginRequiredMixin, ListView):
+    model = Allocation
+    template_name = 'finance/rebalance.html'
+    context_object_name = 'allocations'
+
+    def get_context_data(self, **kwargs):
+        cashadd = kwargs.get('cashadd', 0)
+        allocs, missing = self.request.user.userprofile.GetRebalanceInfo(cashadd)
+
+        total = [sum(getattr(a, 'desired_pct', 0) for a in allocs),
+                 sum(getattr(a, 'current_pct', 0) for a in allocs),
+                 sum(getattr(a, 'desired_amt', 0) for a in allocs),
+                 sum(getattr(a, 'current_amt', 0) for a in allocs),
+                 sum(getattr(a, 'buysell', 0) for a in allocs)]
+
+        context = {'allocs': allocs, 'missing': missing, 'total': total}
+        return context
+
+
 def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
 
@@ -331,27 +350,6 @@ def History(request, period):
     }
 
     return render(request, 'finance/history.html', context)
-
-
-@login_required
-def Rebalance(request):
-    cashadd = int(request.GET.get('cashadd', 0))
-    allocs, missing = request.user.userprofile.GetRebalanceInfo(cashadd)
-
-    total = [sum(a.desired_pct for a in allocs),
-             sum(a.current_pct for a in allocs) + sum(s.current_pct for s in missing),
-             sum(a.desired_amt for a in allocs),
-             sum(a.current_amt for a in allocs) + sum(s.value for s in missing),
-             sum(a.buysell for a in allocs),
-             ]
-
-    context = {
-        'allocs': allocs,
-        'missing': missing,
-        'total': total
-    }
-
-    return render(request, 'finance/rebalance.html', context)
 
 
 @login_required
