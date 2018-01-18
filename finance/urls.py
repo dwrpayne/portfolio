@@ -13,10 +13,12 @@ urlpatterns = [
     url(r'^capgains/(?P<pk>.*)/$', views.CapGainsSecurityReport.as_view(), name='capgainssec'),
     url(r'^capgains/$', views.CapGainsReport.as_view(), name='capgains'),
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
-    url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
-    url(r'^user/(?P<pk>\d+)$', views.UserProfileView.as_view(), name='userprofile'),
     url(r'^uploadcsv/$', views.AccountCsvUpload.as_view(), name='uploadcsv'),
     url(r'^feedback/$', views.FeedbackView.as_view(), name='feedback'),
+    url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
+
+    url(r'^user/(?P<pk>\d+)$', views.UserProfileView.as_view(), name='userprofile'),
+    url(r'^user/(?P<pk>\d+)/password$', views.UserPasswordPost.as_view(), name='passwordchange'),
 
     # Admin panels
     url(r'^admin/security/$', views.AdminSecurity.as_view(), name='admin_security'),

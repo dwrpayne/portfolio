@@ -16,13 +16,16 @@ Including another URLconf
 from django.conf import settings
 from django.conf.urls import url, include
 from django.contrib import admin
+from django.contrib.auth import views
 
 urlpatterns = [
-    url('^', include('django.contrib.auth.urls')),
+    url(r'^', include('django.contrib.auth.urls')),
     url(r'^admin/', admin.site.urls),
     url(r'^finance/', include('finance.urls', namespace='finance')),
     url(r'^hijack/', include('hijack.urls', namespace='hijack')),
 ]
+
+
 
 if settings.DEBUG:
     import debug_toolbar

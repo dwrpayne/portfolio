@@ -6,10 +6,10 @@ import numpy
 import pandas
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.forms import modelformset_factory
-from django.forms.models import inlineformset_factory
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
@@ -20,7 +20,7 @@ from django.views.generic.edit import FormView, UpdateView
 
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
-from .forms import FeedbackForm, AccountCsvForm
+from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
@@ -81,6 +81,41 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
 
     def get_queryset(self):
         return self.model.objects.all().prefetch_related('activities', 'prices').order_by('-type', 'symbol')
+
+
+class UserProfileView(LoginRequiredMixin, UpdateView):
+    model = get_user_model()
+    template_name = 'finance/userprofile.html'
+    form_class = UserForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['formset'] = ProfileInlineFormset(data=self.request.POST or None, instance=self.request.user)
+        context['pass_form'] = PasswordChangeForm(self.request.user, data=self.request.POST or None)
+        return context
+
+    def get(self, request, *args, **kwargs):
+        if not request.user.id == int(kwargs.get('pk', -1)):
+            raise PermissionDenied
+        return super().get(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        created_user = form.save(commit=False)
+        formset = ProfileInlineFormset(data=self.request.POST, instance=self.request.user)
+        if formset.is_valid():
+            created_user.save()
+            formset.save()
+            return HttpResponseRedirect(self.request.path)
+
+
+class UserPasswordPost(LoginRequiredMixin, UpdateView):
+    form_class = PasswordChangeForm
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.id == int(kwargs.get('pk', -1)):
+            raise PermissionDenied
+        return super().post(request, *args, **kwargs)
+
 
 
 class AdminUsers(ListView):
@@ -374,36 +409,3 @@ def index(request):
     else:
         return redirect('/login/')
 
-
-
-
-class UserProfileView(LoginRequiredMixin, UpdateView):
-    model = get_user_model()
-    template_name = 'finance/userprofile.html'
-    form_class = UserForm
-    ProfileInlineFormset = inlineformset_factory(get_user_model(), UserProfile, fields=(
-        'phone', 'country'))
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['formset'] = self.ProfileInlineFormset(instance=self.request.user)
-        return context
-
-    def get(self, request, *args, **kwargs):
-        print (self.__dict__)
-        if not request.user.id == int(kwargs.get('pk', -1)):
-            raise PermissionDenied
-        return super().get(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        user_form = UserForm(data=request.POST, files=request.FILES, instance=request.user)
-        formset = self.ProfileInlineFormset(data=request.POST, files=request.FILES, instance=request.user)
-
-        if user_form.is_valid():
-            created_user = user_form.save(commit=False)
-            formset = self.ProfileInlineFormset(data=request.POST, files=request.FILES, instance=created_user)
-
-            if formset.is_valid():
-                created_user.save()
-                formset.save()
-                return HttpResponseRedirect('/finance/user/{}'.format(self.request.user.id))

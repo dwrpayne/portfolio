@@ -1,7 +1,8 @@
 from django import forms
 from django.core.mail import send_mail
-from .models import AccountCsv
+from .models import AccountCsv, UserProfile
 from django.contrib.auth import get_user_model
+from django.forms.models import inlineformset_factory
 
 class FeedbackForm(forms.Form):
     name = forms.CharField(widget=forms.HiddenInput(), max_length=100)
@@ -31,6 +32,10 @@ class UserForm(forms.ModelForm):
     class Meta:
         model = get_user_model()
         fields = ['first_name', 'last_name', 'email']
+
+
+ProfileInlineFormset = inlineformset_factory(get_user_model(), UserProfile, fields=(
+    'phone', 'country'), can_delete=False)
 
 
 class AccountCsvForm(forms.ModelForm):
