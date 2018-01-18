@@ -541,6 +541,8 @@ class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
     plotly_url2 = models.CharField(max_length=500, null=True, blank=True)
+    phone = models.CharField(max_length=32, null=True, blank=True)
+    country = models.CharField(max_length=32, null=True, blank=True)
 
     @property
     def username(self):
@@ -562,7 +564,7 @@ class UserProfile(models.Model):
     def current_portfolio_value(self):
         return sum(self.GetHoldingDetails().today()).value
 
-    def GeneratePlots(self):
+    def generate_plots(self):
         urls = GeneratePortfolioPlots(self)
         self.update_plotly_urls(urls)
 

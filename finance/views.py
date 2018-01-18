@@ -1,23 +1,30 @@
 import datetime
 from itertools import groupby
 from operator import attrgetter
+
 import numpy
 import pandas
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
+from django.forms import modelformset_factory
+from django.forms.models import inlineformset_factory
 from django.http import Http404, HttpResponse
+from django.shortcuts import redirect
+from django.shortcuts import render, HttpResponseRedirect
 from django.views.generic import DetailView, ListView, TemplateView
-from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.dates import DateMixin, DayMixin
+from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import FormView, UpdateView
 
 from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
+from .forms import FeedbackForm, AccountCsvForm
+from .forms import UserForm
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation
-from .forms import FeedbackForm, AccountCsvForm, UserProfileForm
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -104,19 +111,6 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
             raise Http404('Account function does not exist!')
         HoldingDetail.Refresh()
         return HttpResponse()
-
-
-class UserProfileView(LoginRequiredMixin, UpdateView):
-    form = UserProfileForm
-    template_name = 'finance/userprofile.html'
-    context_object_name = 'userprofile'
-
-    def get_object(self, queryset=None):
-        return self.request.user.userprofile
-
-    def form_valid(self, form):
-        print(form.cleaned_data['your_name'])
-        return super().form_valid(form)
 
 
 class FeedbackView(FormView):
@@ -227,10 +221,9 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
         return self.request.user.userprofile.GetActivities().at_date(self.get_day())
 
 
-class RebalanceView(LoginRequiredMixin, ListView):
-    model = Allocation
+class RebalanceView(LoginRequiredMixin, FormView):
     template_name = 'finance/rebalance.html'
-    context_object_name = 'allocations'
+    form_class = modelformset_factory(Allocation, fields=['securities', 'desired_pct'])
 
     def get_context_data(self, **kwargs):
         cashadd = kwargs.get('cashadd', 0)
@@ -242,8 +235,11 @@ class RebalanceView(LoginRequiredMixin, ListView):
                  sum(getattr(a, 'current_amt', 0) for a in allocs),
                  sum(getattr(a, 'buysell', 0) for a in allocs)]
 
-        context = {'allocs': allocs, 'missing': missing, 'total': total}
+        context = super().get_context_data(**kwargs)
+        context.update( {'allocs': allocs, 'missing': missing, 'total': total} )
         return context
+
+    # TODO: Create formset_factory with extra param right here!
 
 
 def GetHoldingsContext(userprofile, as_of_date=None):
@@ -312,7 +308,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 def Portfolio(request):
     userprofile = request.user.userprofile
     if not userprofile.portfolio_iframe:
-        userprofile.GeneratePlots()
+        userprofile.generate_plots()
 
     if not userprofile.AreSecurityPricesUpToDate():
         SyncSecurityTask.delay(False)
@@ -324,7 +320,7 @@ def Portfolio(request):
             LiveSecurityUpdateTask()
 
         elif 'refresh-plot' in request.GET:
-            userprofile.GeneratePlots()
+            userprofile.generate_plots()
 
     return render(request, 'finance/portfolio.html', GetHoldingsContext(userprofile))
 
@@ -377,3 +373,37 @@ def index(request):
         return render(request, 'finance/index.html', context)
     else:
         return redirect('/login/')
+
+
+
+
+class UserProfileView(LoginRequiredMixin, UpdateView):
+    model = get_user_model()
+    template_name = 'finance/userprofile.html'
+    form_class = UserForm
+    ProfileInlineFormset = inlineformset_factory(get_user_model(), UserProfile, fields=(
+        'phone', 'country'))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['formset'] = self.ProfileInlineFormset(instance=self.request.user)
+        return context
+
+    def get(self, request, *args, **kwargs):
+        print (self.__dict__)
+        if not request.user.id == int(kwargs.get('pk', -1)):
+            raise PermissionDenied
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        user_form = UserForm(data=request.POST, files=request.FILES, instance=request.user)
+        formset = self.ProfileInlineFormset(data=request.POST, files=request.FILES, instance=request.user)
+
+        if user_form.is_valid():
+            created_user = user_form.save(commit=False)
+            formset = self.ProfileInlineFormset(data=request.POST, files=request.FILES, instance=created_user)
+
+            if formset.is_valid():
+                created_user.save()
+                formset.save()
+                return HttpResponseRedirect('/finance/user/{}'.format(self.request.user.id))

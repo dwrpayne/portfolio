@@ -14,7 +14,8 @@ urlpatterns = [
     url(r'^capgains/$', views.CapGainsReport.as_view(), name='capgains'),
     url(r'^security/(?P<symbol>.*)/$', views.securitydetail, name='securitydetail'),
     url(r'^dividends/$', views.DividendReport.as_view(), name='dividends'),
-    url(r'^user/$', views.UserProfileView.as_view(), name='userprofile'),
+    url(r'^user/(?P<pk>\d+)$', views.edit_user, name='userprofile'),
+    url(r'^user2/(?P<pk>\d+)$', views.UserProfileView.as_view(), name='userprofile2'),
     url(r'^uploadcsv/$', views.AccountCsvUpload.as_view(), name='uploadcsv'),
     url(r'^feedback/$', views.FeedbackView.as_view(), name='feedback'),
 

@@ -2,15 +2,19 @@
 {% load mytags %}
 {% load static %}
 {% block title %}User Profile{% endblock title %}
-{% block content %}  
-    <div align="center">
-        <h2>User Profile {{ userprofile.username }}</h2>
-    </div>
-    <div>
-        <form action="" method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <input type="submit" value="Update" />
-        </form>
+{% block content %}
+    <div class="col s12 m8 offset-m2">
+        <div class="card">
+            <div class="card-content">
+                <h2 class="flow-text">Update your information</h2>
+                <form method="POST" class="padding">
+                    {% csrf_token %} {{ form.as_p }}
+                    <div class="divider"></div>
+                    {{ formset.management_form }}
+                    {{ formset.as_p }}
+                    <button type="submit" class="btn-floating btn-large">Submit</button>
+                </form>
+            </div>
+        </div>
     </div>
 {% endblock content %}
