@@ -40,6 +40,7 @@ PROJECT_APPS = [
 ]
 
 PREREQ_APPS = [
+    'compat',
     'polymorphic',
     'django_extensions',
     'django.contrib.admin',
@@ -47,20 +48,17 @@ PREREQ_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.humanize',
     'django.contrib.sessions',
-    'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
     'django.contrib.messages',
     'django_celery_results',
     'django_celery_beat',
     'hijack',
-    'compat',
 ]
 
 INSTALLED_APPS = PROJECT_APPS + PREREQ_APPS
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -137,6 +135,9 @@ STATIC_ROOT = os.path.join(BASE_DIR, '../staticfiles')
 MEDIA_URL = '/upload/'
 MEDIA_ROOT = os.path.join(BASE_DIR, '../upload')
 
+# Encryption
+FERNET_KEYS = [config('FERNET_KEY')]
+
 # Logging
 LOGGING = {
     'version': 1,
@@ -188,7 +189,7 @@ MESSAGE_TAGS = {
 HIJACK_USE_BOOTSTRAP = True
 
 # Plotly
-PLOTLY_USERNAME = config('PLOTLY_USERNAME')
+PLOTLY_USERNAME = 'cecilpl'
 PLOTLY_API_KEY = config('PLOTLY_API_KEY')
 
 # Email

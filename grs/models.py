@@ -11,7 +11,7 @@ import utils.dates
 from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
 from datasource.models import DataSourceMixin
-
+from fernet_fields import EncryptedTextField
 
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()
@@ -41,7 +41,7 @@ class GrsRawActivity(BaseRawActivity):
 
 class GrsClient(models.Model):
     username = models.CharField(max_length=32)
-    password = models.CharField(max_length=100)
+    password = EncryptedTextField()
 
     def __str__(self):
         return self.username

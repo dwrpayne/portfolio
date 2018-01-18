@@ -15,7 +15,6 @@ plotly = "*"
 pandas = "*"
 django-polymorphic = "*"
 django-extensions = "*"
-whitenoise = "*"
 django-celery-results = "*"
 django-celery-beat = "*"
 "psycopg2" = "*"
@@ -29,6 +28,8 @@ pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
 mod-wsgi = "*"
 django-hijack = "*"
 python-decouple = "*"
+pydot = "*"
+django-fernet-fields = "*"
 
 
 [dev-packages]

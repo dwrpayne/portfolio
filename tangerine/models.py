@@ -6,6 +6,7 @@ from dateutil import parser
 
 from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
+from fernet_fields import EncryptedTextField
 
 
 class TangerineRawActivity(BaseRawActivity):
@@ -57,13 +58,13 @@ class TangerineRawActivity(BaseRawActivity):
 
 class TangerineClient(models.Model):
     username = models.CharField(max_length=32)
-    password = models.CharField(max_length=100)
+    password = EncryptedTextField()
     securityq1 = models.CharField(max_length=1000)
-    securitya1 = models.CharField(max_length=100)
+    securitya1 = EncryptedTextField()
     securityq2 = models.CharField(max_length=1000)
-    securitya2 = models.CharField(max_length=100)
+    securitya2 = EncryptedTextField()
     securityq3 = models.CharField(max_length=1000)
-    securitya3 = models.CharField(max_length=100)
+    securitya3 = EncryptedTextField()
 
     def __str__(self):
         return self.username
