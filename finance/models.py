@@ -511,6 +511,41 @@ class Activity(models.Model):
         return effects
 
 
+from itertools import groupby
+class CostBasisManager(models.Manager):
+    def create_from_activities(self, activity_query):
+        for security, activities in groupby(activity_query.with_cadprices().order_by('security', 'tradeDate'),
+                                            lambda a: a.security_id):
+            with transaction.atomic():
+                totalqty = Decimal(0)
+                totalacb = Decimal(0)
+                acbpershare = Decimal(0)
+                for act in activities:
+                    costbasis = CostBasis(activity=act)
+                    if act.qty < 0:
+                        costbasis.capital_gain = act.qty * (acbpershare - act.cadprice) + act.commission
+                        costbasis.acb_change = act.qty * acbpershare
+                    else:
+                        costbasis.capital_gain = 0
+                        costbasis.acb_change = act.qty * act.cadprice - act.commission
+
+                    costbasis.qty_total = totalqty = totalqty + act.qty
+                    costbasis.acb_total = totalacb = max(0, totalacb + costbasis.acb_change)
+                    costbasis.acb_per_share = acbpershare = totalacb / totalqty if totalqty else 0
+                    costbasis.save()
+
+
+class CostBasis(models.Model):
+    activity = models.OneToOneField(Activity, null=True, blank=True)
+    acb_total = models.DecimalField(max_digits=16, decimal_places=6)
+    acb_change = models.DecimalField(max_digits=16, decimal_places=6)
+    acb_per_share = models.DecimalField(max_digits=16, decimal_places=6)
+    qty_total = models.DecimalField(max_digits=16, decimal_places=6)
+    capital_gain = models.DecimalField(max_digits=16, decimal_places=6)
+
+    objects = CostBasisManager()
+
+
 class AllocationQuerySet(models.QuerySet):
     def with_current_info(self):
         return self.filter(securities__holdingdetails__account__user=F('user'),
