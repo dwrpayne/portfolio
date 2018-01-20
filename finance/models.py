@@ -428,35 +428,8 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         """
         return self.filter(
             tradeDate=F('security__pricedetails__day')).annotate(
-            cadprice=Sum(F('security__pricedetails__cadprice'))
+            cad_price=Sum(F('security__pricedetails__cadprice'))
         )
-
-    def with_capgains_data(self):
-        """
-        Annotations as follows.
-        capgain: The capital gain (or loss) for this activity specifically.
-        acbchange: The change in total ACB from the previous activity.
-        totalacb: The total ACB of this security after this activity.
-        totalqty: The total quantity of shares held after this activity.
-        acbpershare: The average per-share ACB after this activity.
-        :return: A list of activities, each annotated with the above additional attributes.
-        """
-        totalqty = Decimal(0)
-        totalacb = Decimal(0)
-        acbpershare = Decimal(0)
-        activities = list(self.with_cadprices())
-        for act in activities:
-            if act.qty < 0:
-                act.capgain = act.qty * (acbpershare - act.cadprice) + act.commission
-                act.acbchange = act.qty * acbpershare
-            else:
-                act.capgain = 0
-                act.acbchange = act.qty * act.cadprice - act.commission
-
-            act.totalqty = totalqty = totalqty + act.qty
-            act.totalacb = totalacb = max(0, totalacb + act.acbchange)
-            act.acbpershare = acbpershare = totalacb / totalqty if totalqty else 0
-        return activities
 
 
 class Activity(models.Model):
@@ -535,19 +508,20 @@ class CostBasisManager(models.Manager):
                 for act in activities:
                     costbasis = CostBasis(activity=act)
                     if act.qty < 0:
-                        costbasis.capital_gain = act.qty * (acb_per_share - act.cadprice) + act.commission
+                        costbasis.capital_gain = act.qty * (acb_per_share - act.cad_price) + act.commission
                         costbasis.acb_change = act.qty * acb_per_share
                     else:
                         costbasis.capital_gain = 0
-                        costbasis.acb_change = act.qty * act.cadprice - act.commission
+                        costbasis.acb_change = act.qty * act.cad_price - act.commission
 
+                    costbasis.cad_price_per_share = act.cad_price
                     costbasis.qty_total = qty_total = qty_total + act.qty
                     costbasis.acb_total = acb_total = max(0, acb_total + costbasis.acb_change)
                     costbasis.acb_per_share = acb_per_share = acb_total / qty_total if qty_total else 0
                     costbasis.save()
 
     def create(self, activity, **kwargs):
-        latest_costbasis = self.for_security(activity.security).latest('activity__tradeDate')
+        latest_costbasis = self.for_user(activity.account.user).for_security(activity.security).latest('activity__tradeDate')
         if activity.qty < 0:
             capital_gain = activity.qty * (latest_costbasis.acbpershare - activity.cad_price) + activity.commission
             acb_change = activity.qty * latest_costbasis.acbpershare
@@ -560,18 +534,20 @@ class CostBasisManager(models.Manager):
         acb_per_share = acb_total / qty_total if qty_total else 0
 
         super().create(activity=activity, acb_total=acb_total, acb_change=acb_change,
-                       acb_per_share=acb_per_share, qty_total=qty_total, capital_gain=capital_gain)
+                       acb_per_share=acb_per_share, qty_total=qty_total,
+                       capital_gain=capital_gain, cad_price_per_share=activity.cad_price)
 
 
 class CostBasis(models.Model):
     activity = models.OneToOneField(Activity, null=True, blank=True)
+    cad_price_per_share = models.DecimalField(max_digits=16, decimal_places=6)
     acb_total = models.DecimalField(max_digits=16, decimal_places=6)
     acb_change = models.DecimalField(max_digits=16, decimal_places=6)
     acb_per_share = models.DecimalField(max_digits=16, decimal_places=6)
     qty_total = models.DecimalField(max_digits=16, decimal_places=6)
     capital_gain = models.DecimalField(max_digits=16, decimal_places=6)
 
-    objects = CostBasisQuerySet.as_manager()
+    objects = CostBasisManager.from_queryset(CostBasisQuerySet)()
 
     class Meta:
         ordering = ['activity__tradeDate']
@@ -726,43 +702,18 @@ class UserProfile(models.Model):
 
     def GetCapgainsByYear(self):
         costbases = CostBasis.objects.for_user(self.user)
-        securities = self.GetCapGainsSecurities()
         all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year + 1))
-        yearly_data = {s: [0] * len(all_years) for s in securities}
+        yearly_data = {s: [0] * len(all_years) for s in costbases.values_list('activity__security_id', flat=True).distinct()}
         year_offset = all_years[0]
         last_acb = {}
 
-        for security in securities:
-            for (sec, year), yearly_bases in groupby(costbases, lambda c: (c.activity.security_id, c.activity.tradeDate.year)):
-                for cb in yearly_bases:
-                    yearly_data[sec][year-year_offset] += cb.capital_gain
-                    last_acb[sec] = cb.acb_total
+        for (sec, year), yearly_bases in groupby(costbases, lambda c: (c.activity.security_id, c.activity.tradeDate.year)):
+            for cb in yearly_bases:
+                yearly_data[sec][year-year_offset] += cb.capital_gain
+                last_acb[sec] = cb.acb_total
 
         pending_gains = {}
         for security, value in self.GetTaxableHoldingDetails().today_security_values():
-            if security in last_acb:
-                pending_gains[security] = value - last_acb[security]
-
-        return all_years, yearly_data, pending_gains
-
-
-    def GetCapgainsByYear(self):
-        activities_all = self.GetActivities(only_taxable=True)
-        securities = self.GetCapGainsSecurities()
-        all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year+1))
-        yearly_data = {s : [0]*len(all_years) for s in securities}
-        year_offset = all_years[0]
-        last_acb = {}
-
-        for security in securities:
-            activities = activities_all.filter(security_id=security).without_dividends().with_capgains_data()
-            for year, yearly_activities in groupby(activities, lambda a: a.tradeDate.year):
-                for a in yearly_activities:
-                    yearly_data[a.security_id][year-year_offset] += a.capgain
-                    last_acb[a.security_id] = a.totalacb
-
-        pending_gains = {}
-        for security, value in self.GetHoldingDetails().taxable().today_security_values():
             if security in last_acb:
                 pending_gains[security] = value - last_acb[security]
 
