@@ -394,7 +394,9 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         return self.order_by().values_list('security_id', flat=True).distinct()
 
     def deposits(self):
-        return self.filter(type__in=[Activity.Type.Deposit, Activity.Type.Withdrawal])
+        return self.filter(type__in=[Activity.Type.Deposit,
+                                     Activity.Type.Withdrawal,
+                                     Activity.Type.Transfer])
 
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)

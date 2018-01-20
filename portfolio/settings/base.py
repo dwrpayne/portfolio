@@ -185,6 +185,10 @@ MESSAGE_TAGS = {
     messages.ERROR: 'alert-danger',
 }
 
+# Session settings
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+
 # Hijack
 HIJACK_USE_BOOTSTRAP = True
 
