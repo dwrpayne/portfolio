@@ -4,7 +4,6 @@
         <thead>           
             <tr>
                 <th>Account</th>
-                <th>ID</th>
                 <th>SOD</th>
                 <th>Current</th>
                 <th>Cash</th>
@@ -14,7 +13,6 @@
         <tfoot>
             <tr>
                 <td>Total</td>
-                <td></td>
                 <td>{{account_total.yesterday_balance | currencyround}}</td>
                 <td>{{account_total.cur_balance | currencyround}}</td>
                 <td>{{account_total.cur_cash_balance | currencyround}}</td>
@@ -25,7 +23,6 @@
         {% for account_name, balances in accounts.items %}
             <tr>
                 <td><a href="{% url 'finance:accountdetail' balances.id %}">{{account_name}}</a></td>
-                <td>{{balances.id|truncatechars:15 }}</td>
                 <td>{{balances.yesterday_balance | currencyround}}</td>
                 <td>{{balances.cur_balance | currencyround}}</td>
                 <td>{{balances.cur_cash_balance | currencyround}}</td>

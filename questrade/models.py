@@ -6,7 +6,7 @@ from json import dumps, loads, JSONDecodeError
 import pendulum
 import requests
 from dateutil import parser
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from datasource.models import DataSourceMixin
@@ -157,24 +157,29 @@ class QuestradeClient(models.Model):
         # We need refresh if we are less than 10 minutes from expiry.
         return self.token_expiry < (timezone.now() - datetime.timedelta(seconds=600))
 
+    @classmethod
+    def UpdateAccessToken(cls, pk):
+        with transaction.atomic():
+            client = cls.objects.select_for_update().get(pk=pk)
+            _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
+            r = requests.get(_URL_LOGIN + client.refresh_token)
+            r.raise_for_status()
+            try:
+                json = r.json()
+                client.api_server = json['api_server'] + 'v1/'
+                client.refresh_token = json['refresh_token']
+                client.access_token = json['access_token']
+                client.token_expiry = timezone.now() + datetime.timedelta(seconds=json['expires_in'])
+                client.save()
+            except JSONDecodeError:
+                print("Failed to get a valid Questrade access token for {}.".format(client))
+                raise ConnectionError()
+
     def Authorize(self, force=False):
         assert self.refresh_token, "We don't have a refresh_token at all! How did that happen?"
-        with self.authorization_lock:
-            if self.needs_refresh or force:
-                _URL_LOGIN = 'https://login.questrade.com/oauth2/token?grant_type=refresh_token&refresh_token='
-                r = requests.get(_URL_LOGIN + self.refresh_token)
-                r.raise_for_status()
-                try:
-                    json = r.json()
-                    self.api_server = json['api_server'] + 'v1/'
-                    self.refresh_token = json['refresh_token']
-                    self.access_token = json['access_token']
-                    self.token_expiry = timezone.now() + datetime.timedelta(seconds=json['expires_in'])
-                    # Make sure to save out to DB
-                    self.save()
-                except JSONDecodeError:
-                    print("Failed to get a valid Questrade access token for {}.".format(self))
-                    raise ConnectionError()
+        if self.needs_refresh or force:
+            self.UpdateAccessToken(self.pk)
+            self.refresh_from_db()
 
         self.session = requests.Session()
         self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
