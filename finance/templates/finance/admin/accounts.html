@@ -20,9 +20,9 @@
                 <td>{{ account.activities.newest_date }}</td>
                 <td>{{ account.cur_balance | currency}}</td>
                 <td>
-                    <button type="submit" class="refresh" data-refresh-type="sync-{{account.id}}">Sync Activities</button>&nbsp;&nbsp;&nbsp;
-                    <button type="submit" class="refresh" data-refresh-type="activities-{{account.id}}">Regenerate Activities</button>&nbsp;&nbsp;&nbsp;
-                    <button type="submit" class="refresh" data-refresh-type="holdings-{{account.id}}">Regenerate Holdings</button>
+                    <button type="submit" class="refresh" data-refresh-type="sync-{{account.pk}}">Sync Activities</button>&nbsp;&nbsp;&nbsp;
+                    <button type="submit" class="refresh" data-refresh-type="activities-{{account.pk}}">Regenerate Activities</button>&nbsp;&nbsp;&nbsp;
+                    <button type="submit" class="refresh" data-refresh-type="holdings-{{account.pk}}">Regenerate Holdings</button>
                 </td>
             </tr>
         {% endfor %}

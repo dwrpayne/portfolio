@@ -53,7 +53,7 @@
                 </a>
                 <ul class="dropdown-menu">
                     {% for account in request.user.userprofile.GetAccounts %}
-                    <li><a href="{% url 'finance:accountdetail' account.id %}">{{account.display_name}}</a></li>
+                    <li><a href="{% url 'finance:accountdetail' account.pk %}">{{account.display_name}}</a></li>
                     {% endfor %}
                 </ul>
             </li>
@@ -84,7 +84,7 @@
                     Logged in as {{ request.user }}<span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
-                    <li><a href="{% url 'finance:userprofile' user.id %}">Profile</a></li>
+                    <li><a href="{% url 'finance:userprofile' user.pk %}">Profile</a></li>
                     <li><a href="{% url 'password_change' %}">Change Password</a></li>
                     <li><a href="{% url 'finance:uploadcsv' %}">Upload Account Data</a></li>
                     <li><a href="{% url 'logout' %}">Logout</a></li>

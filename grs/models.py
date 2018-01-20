@@ -86,7 +86,7 @@ class GrsClient(models.Model):
         response = self.session.post(
             'https://ssl.grsaccess.com/english/member/activity_reports_details.aspx',
             data={
-                'MbrPlanId': account.id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
+                'MbrPlanId': account.account_id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
                 'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'
             }
         )
@@ -117,10 +117,10 @@ class GrsAccount(BaseAccount):
     activitySyncDateRange = 360
 
     def __str__(self):
-        return '{} {} {}'.format(self.client, self.id, self.type)
+        return '{} {} {}'.format(self.client, self.account_id, self.type)
 
     def __repr__(self):
-        return 'GrsAccount<{},{},{}>'.format(self.client, self.id, self.type)
+        return 'GrsAccount<{},{},{}>'.format(self.client, self.account_id, self.type)
 
     def CreateActivities(self, start, end):
         with self.client as client:

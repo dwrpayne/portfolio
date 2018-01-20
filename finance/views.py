@@ -64,7 +64,7 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
         accountcsv.save()
         messages.success(self.request,
                          'Your file was successfully uploaded and will be processed shortly.'.format(os.path.basename(accountcsv.csvfile.name)))
-        HandleCsvUpload.delay(accountcsv.id)
+        HandleCsvUpload.delay(accountcsv.pk)
         return super().form_valid(form)
 
 
@@ -105,7 +105,7 @@ class UserProfileView(LoginRequiredMixin, UpdateView):
         return context
 
     def get(self, request, *args, **kwargs):
-        if not request.user.id == int(kwargs.get('pk', -1)):
+        if not request.user.pk == int(kwargs.get('pk', -1)):
             raise PermissionDenied
         return super().get(request, *args, **kwargs)
 
@@ -143,7 +143,7 @@ class UserPasswordPost(LoginRequiredMixin, UpdateView):
         return PasswordChangeForm(self.request.user, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        if not request.user.id == int(kwargs.get('pk', -1)):
+        if not request.user.pk == int(kwargs.get('pk', -1)):
             raise PermissionDenied
         return super().post(request, *args, **kwargs)
 
@@ -165,17 +165,14 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
     context_object_name = 'accounts'
     ordering = ['user__username']
 
-    def get_queryset(self):
-        return super().get_queryset().exclude(user__username='guest')
-
     def ajax_request(self, request, action):
-        action, account_id = action.split('-')
+        action, account_pk = action.split('-')
         if action == 'sync':
-            BaseAccount.objects.get(pk=account_id).SyncAndRegenerate()
+            BaseAccount.objects.get(pk=account_pk).SyncAndRegenerate()
         elif action == 'activities':
-            BaseAccount.objects.get(pk=account_id).RegenerateActivities()
+            BaseAccount.objects.get(pk=account_pk).RegenerateActivities()
         elif action == 'holdings':
-            BaseAccount.objects.get(pk=account_id).RegenerateHoldings()
+            BaseAccount.objects.get(pk=account_pk).RegenerateHoldings()
         else:
             raise Http404('Account function does not exist!')
         HoldingDetail.Refresh()

@@ -275,10 +275,10 @@ class QuestradeAccount(BaseAccount):
     activitySyncDateRange = 28
 
     def __str__(self):
-        return "{} {} {}".format(self.client, self.id, self.type)
+        return "{} {} {}".format(self.client, self.account_id, self.type)
 
     def __repr__(self):
-        return 'QuestradeAccount<{},{},{}>'.format(self.client, self.id, self.type)
+        return 'QuestradeAccount<{},{},{}>'.format(self.client, self.account_id, self.type)
 
     @property
     def cur_balance(self):
@@ -290,13 +290,13 @@ class QuestradeAccount(BaseAccount):
 
     def CreateActivities(self, start, end):
         with self.client as client:
-            for json in client.GetActivities(self.id, start, end):
+            for json in client.GetActivities(self.account_id, start, end):
                 QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=dumps(json))
 
     def SyncBalances(self):
         with self.client as client:
             try:
-                json = client.GetAccountBalances(self.id)
+                json = client.GetAccountBalances(self.account_id)
                 self.curBalanceSynced = sum([
                     Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
                     for entry in json['perCurrencyBalances']

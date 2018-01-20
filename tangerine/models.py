@@ -113,7 +113,7 @@ class TangerineAccount(BaseAccount):
         return self.internal_display_name
 
     def __repr__(self):
-        return "TangerineAccount<{}>".format(self.id)
+        return "TangerineAccount<{}>".format(self.account_id)
 
     @property
     def cur_balance(self):
@@ -121,7 +121,7 @@ class TangerineAccount(BaseAccount):
 
     def CreateActivities(self, start, end):
         with self.client as client:
-            for trans in client.GetActivities(self.id, start, end):
+            for trans in client.GetActivities(self.account_id, start, end):
                 TangerineRawActivity.objects.get_or_create(account=self, activity_id=trans['id'],
                     defaults={
                         'day': parser.parse(trans['transaction_date']).date(),

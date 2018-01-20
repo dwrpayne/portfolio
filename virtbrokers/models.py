@@ -44,7 +44,7 @@ class VirtBrokersAccount(BaseAccount):
         return self.display_name
 
     def __repr__(self):
-        return 'VirtBrokersAccount<{},{},{}>'.format(self.display_name, self.id, self.type)
+        return 'VirtBrokersAccount<{},{},{}>'.format(self.display_name, self.account_id, self.type)
 
     def import_from_csv(self, csv_file):
         csv_file.open('r')

@@ -28,10 +28,6 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
     def for_user(self, user):
         return self.filter(user=user) if user else self
 
-    def get_balance_totals(self):
-        properties = ['cur_balance', 'cur_cash_balance', 'yesterday_balance', 'today_balance_change']
-        return {p: sum(getattr(a, p) for a in self) for p in properties}
-
     def SyncAllBalances(self):
         for account in self:
             account.SyncBalances()
@@ -45,7 +41,8 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
                              on_delete=models.CASCADE, related_name='accounts_for_user')
     type = models.CharField(max_length=100)
-    id = models.CharField(max_length=100, primary_key=True)
+    id = models.IntegerField(primary_key=True)
+    account_id = models.CharField(max_length=100)
     taxable = models.BooleanField(default=True)
     display_name = models.CharField(max_length=100, default='')
     creation_date = models.DateField(default='2009-01-01')
@@ -55,10 +52,10 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     activitySyncDateRange = 30
 
     class Meta:
-        ordering = ['id']
+        ordering = ['account_id']
 
     def __repr__(self):
-        return "BaseAccount({},{},{})".format(self.user, self.id, self.type)
+        return "BaseAccount({},{},{})".format(self.user, self.account_id, self.type)
 
     def __str__(self):
         return self.display_name
@@ -157,7 +154,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
 class AccountCsv(models.Model):
     def upload_path(self, filename):
         return 'accountcsv/{}/{}/{}.{}'.format(self.user.username,
-                                               self.account.id,
+                                               self.account.pk,
                                                datetime.date.today().isoformat(),
                                                filename.rsplit('.')[-1])
 
@@ -172,7 +169,7 @@ class AccountCsv(models.Model):
         if not hasattr(self, 'account'):
             data = str(self.csvfile.read())
             self.account = sorted(self.user.userprofile.GetAccounts(),
-                key=lambda a: data.count(a.id))[-1]
+                key=lambda a: data.count(a.pk))[-1]
             return self.account
         return None
 
@@ -220,7 +217,6 @@ class Holding(models.Model):
     objects = HoldingManager.from_queryset(HoldingQuerySet)()
 
     class Meta:
-        unique_together = ('account', 'security', 'startdate')
         get_latest_by = 'startdate'
         indexes = [
             models.Index(fields=['security_id', 'enddate']),
