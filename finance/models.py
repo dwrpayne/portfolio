@@ -1,10 +1,10 @@
 import datetime
 from decimal import Decimal
 from itertools import groupby
-from django.core.exceptions import ValidationError
 
 import pendulum
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models, transaction, connection
 from django.db.models import F, Sum
 from django.db.models.functions import ExtractYear
@@ -500,7 +500,7 @@ class Activity(models.Model):
 
     @cached_property
     def cad_price(self):
-        return SecurityPriceDetail.objects.get(security=self.security, day=self.tradeDate).price
+        return SecurityPriceDetail.objects.get(security=self.security_id, day=self.tradeDate).price
 
     def GetHoldingEffects(self):
         """
@@ -513,11 +513,17 @@ class Activity(models.Model):
             effects[self.security.symbol] = self.qty
         return effects
 
-
-from itertools import groupby
-class CostBasisManager(models.Manager):
+class CostBasisQuerySet(models.QuerySet):
     def for_security(self, security):
         return self.filter(activity__security=security)
+
+    def for_user(self, user):
+        return self.filter(activity__account__user=user)
+
+
+class CostBasisManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().select_related('activity')
 
     def create_from_activities(self, activity_query):
         for security, activities in groupby(activity_query.with_cadprices().order_by('security', 'tradeDate'),
@@ -565,7 +571,10 @@ class CostBasis(models.Model):
     qty_total = models.DecimalField(max_digits=16, decimal_places=6)
     capital_gain = models.DecimalField(max_digits=16, decimal_places=6)
 
-    objects = CostBasisManager()
+    objects = CostBasisQuerySet.as_manager()
+
+    class Meta:
+        ordering = ['activity__tradeDate']
 
 
 class AllocationQuerySet(models.QuerySet):
@@ -654,6 +663,9 @@ class UserProfile(models.Model):
     def GetHoldingDetails(self):
         return HoldingDetail.objects.for_user(self.user)
 
+    def GetTaxableHoldingDetails(self):
+        return self.GetHoldingDetails().taxable()
+
     def GetAccounts(self):
         return BaseAccount.objects.for_user(self.user)
 
@@ -711,6 +723,28 @@ class UserProfile(models.Model):
             ror = self.RateOfReturn(start, end, annualized=False)
             print (start, end, ror)
             yield end, ror
+
+    def GetCapgainsByYear(self):
+        costbases = CostBasis.objects.for_user(self.user)
+        securities = self.GetCapGainsSecurities()
+        all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year + 1))
+        yearly_data = {s: [0] * len(all_years) for s in securities}
+        year_offset = all_years[0]
+        last_acb = {}
+
+        for security in securities:
+            for (sec, year), yearly_bases in groupby(costbases, lambda c: (c.activity.security_id, c.activity.tradeDate.year)):
+                for cb in yearly_bases:
+                    yearly_data[sec][year-year_offset] += cb.capital_gain
+                    last_acb[sec] = cb.acb_total
+
+        pending_gains = {}
+        for security, value in self.GetTaxableHoldingDetails().today_security_values():
+            if security in last_acb:
+                pending_gains[security] = value - last_acb[security]
+
+        return all_years, yearly_data, pending_gains
+
 
     def GetCapgainsByYear(self):
         activities_all = self.GetActivities(only_taxable=True)

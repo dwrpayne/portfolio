@@ -3,58 +3,71 @@
 {% load static %}
 {% block title %} {{view.symbol}} {% endblock title %}
 {% block content %}
-<div class="row" align="center">
-    <h2>{{symbol}}</h2><br /><h3>All values converted to Canadian dollars.</h3>
-</div>
-<div class="row">
-    <div class="col-sm-12">
-        <table class="table table-striped table-hover" id="security_info-table">
-            <thead>           
-                <tr>
-                    <th>Date</th>
-                    <th>Type</th>
-                    <th>Units</th>
-                    <th>Price</th>
-                    <th>Commission</th>
-                    <th>Cap Gain</th>
-                    <th>Total Units</th>
-                    <th>ACB change</th>
-                    <th>New ACB</th>
-                    <th>ACB / Share</th>
-                </tr>
-            </thead>
-            <tfoot>
-                <tr>
-                    <td>{% now "DATE_FORMAT"%}</td>
-                    <td>Total</td>
-                    <td></td>
-                    <td>{{ view.total.price | floatformat:2 }}</td>
-                    <td></td>
-                    <td>Pending: {{ view.total.pending_gain | currency}}</td>
-                    <td>{{ view.total.qty | floatformat:0 }}</td>
-                    <td></td>
-                    <td>{{ view.total.acb | currency }}</td>
-                    <td>{{ view.total.acb_per_share | currency }}</td>
-                </tr>
-            </tfoot>
-            <tbody>
-            {% for activity in view.activities %}
-                <tr {% if activity.capgain %}style="font-weight:bold"{% endif %}>
-                    <td>{{activity.tradeDate}}</td>
-                    <td>{{activity.type}}</td>
-                    <td>{{activity.qty | floatformat:0}}</td>
-                    <td>{{activity.cadprice | floatformat:2}}</td>
-                    <td>{{activity.commission | currency}}</td>
-                    <td>{% if activity.capgain %}{{activity.capgain | currency}}{% endif %}</td>
-                    <td>{{activity.totalqty | floatformat:0}}</td>
-                    <td>{{activity.acbchange | currency }}</td>
-                    <td>{{activity.totalacb | currency}}</td>
-                    <td>{{activity.acbpershare | currency}}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        <br />Pending Gain: {{view.pending_gain | currency}}
+    <div class="row" align="center">
+        <h2>{{view.symbol}}</h2><br />
     </div>
-</div>
+    <div class="row">
+        <div class="col-sm-12">
+            <ul>
+                <li>In taxable accounts, you are holding {{ view.total.qty | floatformat:0}} shares of {{ view.symbol }}.</li>
+                <li>Your average cost per share is C{{ view.total.acb_per_share | currency }}.</li>
+                <li>The current value per share is C{{ view.total.price | currency }}.</li>
+                <li>Current pending capital {% if view.total.pending_gain >= 0 %}gain{% else %}loss{% endif %} of C{{ view.total.pending_gain | currency}}.</li>
+            </ul>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-12">
+            <table class="table table-striped table-hover" id="security_info-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Units</th>
+                        <th>Price (C$)</th>
+                        <th>Commission (C$)</th>
+                        <th>Total Amount (C$)</th>
+                        <th>Cap Gain (C$)</th>
+                        <th>Total Units</th>
+                        <th>ACB change (C$)</th>
+                        <th>New ACB (C$)</th>
+                        <th>ACB / Share (C$)</th>
+                    </tr>
+                </thead>
+                <tfoot>
+                    <tr>
+                        <td>{% now "DATE_FORMAT"%}</td>
+                        <td>Total</td>
+                        <td></td>
+                        <td>{{ view.total.price | floatformat:2 }}</td>
+                        <td></td>
+                        <td></td>
+                        <td>Pending: {{ view.total.pending_gain | currency}}</td>
+                        <td>{{ view.total.qty | floatformat:0 }}</td>
+                        <td></td>
+                        <td>{{ view.total.acb | currency }}</td>
+                        <td>{{ view.total.acb_per_share | currency }}</td>
+                    </tr>
+                </tfoot>
+                <tbody>
+                {% for costbasis in costbases %}
+                    <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
+                        <td>{{costbasis.activity.tradeDate}}</td>
+                        <td>{{costbasis.activity.type}}</td>
+                        <td>{{costbasis.activity.qty | floatformat:0}}</td>
+                        <td>{{costbasis.activity.cad_price | floatformat:2}}</td>
+                        <td>{{costbasis.activity.commission | currency}}</td>
+                        <td>{{costbasis.activity.netAmount | floatformat:2}}</td>
+                        <td>{% if costbasis.capital_gain %}{{costbasis.capital_gain | currency}}{% endif %}</td>
+                        <td>{{costbasis.qty_total | floatformat:0}}</td>
+                        <td>{{costbasis.acb_change | currency }}</td>
+                        <td>{{costbasis.acb_total | currency}}</td>
+                        <td>{{costbasis.acb_per_share | currency}}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <br />Pending Gain: {{view.pending_gain | currency}}
+        </div>
+    </div>
 {% endblock content %}

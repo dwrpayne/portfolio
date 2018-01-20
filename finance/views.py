@@ -1,5 +1,4 @@
 import datetime
-from collections import defaultdict
 import os
 from itertools import groupby
 from operator import attrgetter
@@ -25,7 +24,7 @@ from securities.models import Security
 from utils.misc import plotly_iframe_from_url, partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation, CostBasis
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
@@ -195,21 +194,20 @@ class FeedbackView(FormView):
         return super().form_valid(form)
 
 
-class CapGainsSecurityReport(LoginRequiredMixin, SingleObjectMixin, ListView):
+class CapGainsSecurityReport(LoginRequiredMixin, ListView):
+    model = CostBasis
     template_name = 'finance/capgains.html'
-    context_object_name = 'symbol'
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object(queryset=Security.objects.all())
-        return super().get(request, *args, **kwargs)
+    context_object_name = 'costbases'
 
     def get_queryset(self):
-        self.activities = self.request.user.userprofile.GetActivities(only_taxable=True).for_security(self.object).without_dividends().with_capgains_data()
-        last = self.activities[-1]
-        self.total = {'price' : self.object.pricedetails.latest().cadprice, 'qty' : last.totalqty,
-                 'acb' : last.totalacb, 'acb_per_share' : last.acbpershare,
-                 'pending_gain' : self.object.pricedetails.latest().cadprice * last.totalqty - last.totalacb}
-        return self.activities
+        self.symbol = self.kwargs.get('pk')
+        self.costbases = super().get_queryset().for_security(self.symbol)
+        last = list(self.costbases)[-1]
+        cadprice = last.activity.security.pricedetails.latest().cadprice
+        self.total = {'price' : cadprice, 'qty' : last.qty_total,
+                 'acb' : last.acb_total, 'acb_per_share' : last.acb_per_share,
+                 'pending_gain' : cadprice * last.qty_total - last.acb_total}
+        return self.costbases
 
 
 class CapGainsReport(LoginRequiredMixin, TemplateView):
