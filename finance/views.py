@@ -146,10 +146,6 @@ class UserPasswordPost(LoginRequiredMixin, UpdateView):
             raise PermissionDenied
         return super().post(request, *args, **kwargs)
 
-        return render(request, 'finance/admin/securityrow.html', {'security': security})
-        return HttpResponseRedirect('/finance/user/{}'.format(kwargs.get('pk')))
-
-
 
 class AdminUsers(ListView):
     model = UserProfile

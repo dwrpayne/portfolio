@@ -32,6 +32,7 @@ def DailyUpdateAll():
 
 @shared_task
 def HandleCsvUpload(accountcsv_id):
-    from .models import AccountCsv
+    from .models import AccountCsv, HoldingDetail
     a = AccountCsv.objects.get(pk=accountcsv_id)
     a.account.import_activities(a.csvfile)
+    HoldingDetail.Refresh()

@@ -71,7 +71,7 @@ class RbcAccount(BaseAccount):
     activitySyncDateRange = 0
 
     def __str__(self):
-        self.display_name
+        return self.display_name
 
     def __repr__(self):
         return 'RbcAccount<{},{},{}>'.format(self.display_name, self.account_id, self.type)
