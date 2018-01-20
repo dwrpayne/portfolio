@@ -498,6 +498,9 @@ class Activity(models.Model):
                                  self.Type.Interest, self.Type.Withdrawal]:
                 raise ValidationError
 
+    @cached_property
+    def cad_price(self):
+        return SecurityPriceDetail.objects.get(security=self.security, day=self.tradeDate).price
 
     def GetHoldingEffects(self):
         """
@@ -513,26 +516,45 @@ class Activity(models.Model):
 
 from itertools import groupby
 class CostBasisManager(models.Manager):
+    def for_security(self, security):
+        return self.filter(activity__security=security)
+
     def create_from_activities(self, activity_query):
         for security, activities in groupby(activity_query.with_cadprices().order_by('security', 'tradeDate'),
                                             lambda a: a.security_id):
             with transaction.atomic():
-                totalqty = Decimal(0)
-                totalacb = Decimal(0)
-                acbpershare = Decimal(0)
+                qty_total = Decimal(0)
+                acb_total = Decimal(0)
+                acb_per_share = Decimal(0)
                 for act in activities:
                     costbasis = CostBasis(activity=act)
                     if act.qty < 0:
-                        costbasis.capital_gain = act.qty * (acbpershare - act.cadprice) + act.commission
-                        costbasis.acb_change = act.qty * acbpershare
+                        costbasis.capital_gain = act.qty * (acb_per_share - act.cadprice) + act.commission
+                        costbasis.acb_change = act.qty * acb_per_share
                     else:
                         costbasis.capital_gain = 0
                         costbasis.acb_change = act.qty * act.cadprice - act.commission
 
-                    costbasis.qty_total = totalqty = totalqty + act.qty
-                    costbasis.acb_total = totalacb = max(0, totalacb + costbasis.acb_change)
-                    costbasis.acb_per_share = acbpershare = totalacb / totalqty if totalqty else 0
+                    costbasis.qty_total = qty_total = qty_total + act.qty
+                    costbasis.acb_total = acb_total = max(0, acb_total + costbasis.acb_change)
+                    costbasis.acb_per_share = acb_per_share = acb_total / qty_total if qty_total else 0
                     costbasis.save()
+
+    def create(self, activity, **kwargs):
+        latest_costbasis = self.for_security(activity.security).latest('activity__tradeDate')
+        if activity.qty < 0:
+            capital_gain = activity.qty * (latest_costbasis.acbpershare - activity.cad_price) + activity.commission
+            acb_change = activity.qty * latest_costbasis.acbpershare
+        else:
+            capital_gain = 0
+            acb_change = activity.qty * activity.cad_price - activity.commission
+
+        qty_total = latest_costbasis.qty_total + activity.qty
+        acb_total = max(0, latest_costbasis.acb_total + acb_change)
+        acb_per_share = acb_total / qty_total if qty_total else 0
+
+        super().create(activity=activity, acb_total=acb_total, acb_change=acb_change,
+                       acb_per_share=acb_per_share, qty_total=qty_total, capital_gain=capital_gain)
 
 
 class CostBasis(models.Model):
