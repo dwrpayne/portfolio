@@ -173,6 +173,7 @@ class QuestradeClient(models.Model):
                 client.save()
             except JSONDecodeError:
                 print("Failed to get a valid Questrade access token for {}.".format(client))
+                print("The request result was {}".format(r.content))
                 raise ConnectionError()
 
     def Authorize(self, force=False):
