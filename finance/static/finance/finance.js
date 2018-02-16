@@ -8,9 +8,9 @@ $(document).on('click','button.refresh',function(){
         success: function (data) {
             divs = $(this).attr('data-refresh-div');
             if (divs) {
-                divs = divs.split(';')
+                divs = divs.split(';');
                 for (var i = 0; i < divs.length; i++) {
-                    var html = $(data).closest('#' + divs[i]).html();
+                    var html = $(data).find('#' + divs[i]).html();
                     $('#' + divs[i]).html(html);
                 }
             }

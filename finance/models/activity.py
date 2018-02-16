@@ -126,6 +126,9 @@ class ActivityManager(models.Manager):
         if kwargs['type'] in [Activity.Type.Expiry, Activity.Type.Journal]:
             kwargs['cash_id'] = None
 
+        if kwargs['type'] == Activity.Type.Dividend:
+            kwargs['qty'] = 0
+
         return super().create(**kwargs)
 
     def create_with_deposit(self, **kwargs):

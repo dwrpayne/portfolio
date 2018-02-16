@@ -12,7 +12,8 @@
                 <li>In taxable accounts, you are holding {{ view.total.qty | floatformat:0}} shares of {{ view.symbol }}.</li>
                 <li>Your average cost per share is C{{ view.total.acb_per_share | currency }}.</li>
                 <li>The current value per share is C{{ view.total.price | currency }}.</li>
-                <li>Current pending capital {% if view.total.pending_gain >= 0 %}gain{% else %}loss{% endif %} of C{{ view.total.pending_gain | currency}}.</li>
+                <li>Current pending capital {% if view.total.pending_gain >= 0 %}gain{% else %}loss{% endif %}
+                    of C{{ view.total.pending_gain | currency}} (C{{ view.total.pending_gain_per_share | currency}} per share).</li>
             </ul>
         </div>
     </div>

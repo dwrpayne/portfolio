@@ -3,6 +3,7 @@ from django.db import models
 import requests
 import tangerine.tangerinelib
 from dateutil import parser
+from decimal import Decimal
 
 from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
@@ -42,7 +43,7 @@ class TangerineRawActivity(BaseRawActivity):
         if self.type in ['Purchase', 'Transfer In']:
             activity_type = Activity.Type.Buy
             creation_fn = Activity.objects.create_with_deposit
-            net_amount = -(self.qty * self.price)
+            net_amount = -(Decimal(self.qty) * Decimal(self.price))
         elif self.type == 'Distribution':
             # Tangerine uses this to indicate a DRIP - aka deposit of shares
             # We'll consider it a Buy, with no cash effect and no associated deposit
