@@ -99,7 +99,7 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.order_by('day').filter(day__in=utils.dates.year_ends(self.earliest().day))
 
     def account_values(self):
-        return self.order_by('day').values_list('account', 'day').annotate(total=Sum('value'))
+        return self.order_by('day').values_list('account__display_name', 'day').annotate(total=Sum('value'))
 
     def total_values(self):
         return self.order_by('day').values_list('day').annotate(Sum('value'))

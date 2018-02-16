@@ -80,6 +80,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     def import_activities(self, csv_file):
         activity_count = self.activities.all().count()
 
+
         self.import_from_csv(csv_file)
         if self.activities.all().count() > activity_count:
             self.RegenerateHoldings()
@@ -112,6 +113,8 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             for raw in self.rawactivities.all():
                 raw.CreateActivity()
         self.RegenerateHoldings()
+        from .costbasis import CostBasis
+        CostBasis.objects.create_from_activities(self.activities)
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
