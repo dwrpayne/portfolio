@@ -41,6 +41,23 @@ class AccountDetail(LoginRequiredMixin, DetailView):
         return super().get_queryset().for_user(self.request.user)
 
 
+class SecurityDetail(LoginRequiredMixin, DetailView):
+    model = Security
+    template_name = 'finance/security.html'
+    context_object_name = 'security'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['activities'] = self.object.activities.for_user(self.request.user)
+        return context
+
+    def get(self, request, *args, **kwargs):
+        # TODO: Disable security plotly because I am hitting my free chart limit.
+        #filename = GenerateSecurityPlot(security)
+        self.iframe = ''#plotly_iframe_from_url(filename)
+        return super().get(request, *args, **kwargs)
+
+
 class AccountCsvUpload(LoginRequiredMixin, FormView):
     form_class = AccountCsvForm
     success_url = '/finance/uploadcsv/'
@@ -197,7 +214,7 @@ class CapGainsSecurityReport(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         self.symbol = self.kwargs.get('pk')
-        self.costbases = super().get_queryset().for_security(self.symbol)
+        self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
         last = list(self.costbases)[-1]
         cadprice = last.activity.security.pricedetails.latest().cadprice
         self.total = {'price' : cadprice, 'qty' : last.qty_total,
@@ -243,22 +260,6 @@ class DividendReport(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         return super().get_queryset().for_user(self.request.user).dividends()
-
-
-class SecurityDetail(SingleObjectMixin, ListView):
-    model = Security
-    paginate_by = 10
-    template_name = 'finance/security.html'
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object(queryset=Security.objects.all())
-        return super().get(request, *args, **kwargs)
-
-    def iframe(self):
-        return plotly_iframe_from_url(GenerateSecurityPlot(self.object))
-
-    def get_queryset(self):
-        return self.request.user.userprofile.GetActivities().for_security(self.object)
 
 
 class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
@@ -396,6 +397,10 @@ def Portfolio(request):
     return render(request, 'finance/portfolio.html', GetHoldingsContext(userprofile))
 
 
+class HistoryDetail(LoginRequiredMixin, ListView):
+    pass
+
+
 @login_required
 def History(request, period):
     holdings = request.user.userprofile.GetHoldingDetails()
@@ -417,20 +422,6 @@ def History(request, period):
     }
 
     return render(request, 'finance/history.html', context)
-
-
-@login_required
-def securitydetail(request, symbol):
-    security = Security.objects.get(symbol=symbol)
-
-    # TODO: Disable security plotly because I am hitting my free chart limit.
-    #filename = GenerateSecurityPlot(security)
-    iframe = ''#plotly_iframe_from_url(filename)
-
-    activities = request.user.userprofile.GetActivities().for_security(symbol)
-
-    context = {'activities': activities, 'symbol': symbol, 'iframe': iframe}
-    return render(request, 'finance/security.html', context)
 
 
 @login_required

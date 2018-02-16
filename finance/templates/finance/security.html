@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{symbol}} {% endblock title %}
+{% block title %} {{security.symbol}} {% endblock title %}
 {% block content %}  
 <div class="row" align="center">
-    <h2>{{symbol}}</h2><br /><h3>All values converted to Canadian dollars.</h3>
+    <h2>{{security.symbol}}</h2><br /><h3>All values converted to Canadian dollars.</h3>
 </div>
 <div class="row">
      {{iframe | safe}}
 </div>
 <div class="row">
     <div class="col-sm-12">
-        {% include "finance/activity_table.html" with show_account="true" show_security="false"%}
+        {% include "finance/activity_table.html" with show_account="true" show_security="false" %}
     </div>
 </div>
 {% endblock content %}
