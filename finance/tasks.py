@@ -26,9 +26,11 @@ def SyncActivityTask(userprofile=None):
 
 @shared_task
 def DailyUpdateAll():
+    from .models import UserProfile
     SyncActivityTask()
     SyncSecurityTask()
     SyncAccountBalanceTask()
+    UserProfile.objects.refresh_graphs()
 
 @shared_task
 def HandleCsvUpload(accountcsv_id):

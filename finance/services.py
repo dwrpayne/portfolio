@@ -69,6 +69,8 @@ def GenerateReturnPlot(userprofile):
 def GeneratePortfolioPlots(userprofile):
     graph = LineGraph('portfolio-values-short-{}'.format(userprofile.username))
     day_val_pairs = userprofile.GetHoldingDetails().total_values()
+    if not day_val_pairs:
+        return None, None
     graph.add_trace('Total', day_val_pairs)
 
     deposits = dict(userprofile.GetActivities().get_all_deposits(running_totals=True))

@@ -14,12 +14,19 @@ from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis
 from ..services import GeneratePortfolioPlots
 
 
+class UserProfileManager(models.Manager):
+    def refresh_graphs(self):
+        for profile in self.get_queryset():
+            profile.generate_plots()
+
 class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plotly_url = models.CharField(max_length=500, null=True, blank=True)
     plotly_url2 = models.CharField(max_length=500, null=True, blank=True)
     phone = models.CharField(max_length=32, null=True, blank=True)
     country = models.CharField(max_length=32, null=True, blank=True)
+
+    objects = UserProfileManager()
 
     @property
     def username(self):
