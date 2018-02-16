@@ -2,7 +2,7 @@ from decimal import Decimal
 from itertools import groupby
 
 from django.db import models, transaction
-from . import Activity
+from .activity import Activity
 
 class CostBasisQuerySet(models.QuerySet):
     def for_security(self, security):

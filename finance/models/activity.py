@@ -11,7 +11,7 @@ from securities.models import Security, SecurityPriceDetail
 from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
 from utils.db import RunningSum
 
-from . import BaseAccount
+from .account import BaseAccount
 
 
 class BaseRawActivityQuerySet(PolymorphicQuerySet):
