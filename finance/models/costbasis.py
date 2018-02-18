@@ -57,7 +57,7 @@ class CostBasisManager(models.Manager):
 
 
 class CostBasis(models.Model):
-    activity = models.OneToOneField(Activity, null=True, blank=True)
+    activity = models.OneToOneField(Activity, null=True, blank=True, on_delete=models.CASCADE)
     cad_price_per_share = models.DecimalField(max_digits=16, decimal_places=6)
     acb_total = models.DecimalField(max_digits=16, decimal_places=6)
     acb_change = models.DecimalField(max_digits=16, decimal_places=6)

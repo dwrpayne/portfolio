@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal
+import decimal
 from re import sub
 
 from django import template
@@ -17,7 +17,10 @@ def lookup(value, key):
 @register.filter()
 @stringfilter
 def colorize(amount):
-    amount_num = Decimal(sub(r'[^\d.-]', '', amount))
+    try:
+        amount_num = decimal.Decimal(sub(r'[^\d.-]', '', amount))
+    except decimal.InvalidOperation:
+        return amount
     if abs(amount_num) == 0:
         color = 'black'
     elif amount_num < 0:
@@ -42,6 +45,8 @@ def currencyround(dollars):
 
 @register.filter()
 def percentage(amount, decimals=2):
+    if not amount:
+        return amount
     return '{:,.{}f}%'.format(amount * 100, decimals)
 
 

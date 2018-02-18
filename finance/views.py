@@ -412,7 +412,7 @@ def History(request, period):
 
     vals = holdings.account_values()
 
-    array = numpy.rec.array(list(vals), dtype=[('account', 'S20'), ('day', 'S10'), ('val', 'f4')])
+    array = numpy.rec.array(list(vals), dtype=[('account', 'U20'), ('day', 'U10'), ('val', 'f4')])
     df = pandas.DataFrame(array)
     table = df.pivot_table(index='day', columns='account', values='val', fill_value=0)
     rows = table.iloc[::-1].iterrows()

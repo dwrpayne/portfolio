@@ -3,7 +3,7 @@ import datetime
 from django.conf import settings
 from django.db import models, transaction
 from django.utils.functional import cached_property
-from polymorphic.manager import PolymorphicManager
+from polymorphic.managers import PolymorphicManager
 from polymorphic.models import PolymorphicModel
 from polymorphic.query import PolymorphicQuerySet
 from polymorphic.showfields import ShowFieldTypeAndContent
@@ -150,7 +150,7 @@ class AccountCsv(models.Model):
 
     csvfile = models.FileField(upload_to=upload_path)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    account = models.ForeignKey(BaseAccount, blank=True)
+    account = models.ForeignKey(BaseAccount, blank=True, on_delete=models.CASCADE)
 
     def find_matching_account(self):
         """
