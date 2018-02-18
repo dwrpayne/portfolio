@@ -69,14 +69,15 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='BaseAccount',
             fields=[
+                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('type', models.CharField(max_length=100)),
-                ('id', models.CharField(max_length=100, primary_key=True, serialize=False)),
+                ('account_id', models.CharField(max_length=100)),
                 ('taxable', models.BooleanField(default=True)),
                 ('display_name', models.CharField(default='', editable=False, max_length=100)),
                 ('creation_date', models.DateField(default='2009-01-01')),
             ],
             options={
-                'ordering': ['id'],
+                'ordering': ['account_id'],
             },
             bases=(polymorphic.showfields.ShowFieldTypeAndContent, models.Model),
         ),

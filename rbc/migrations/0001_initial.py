@@ -33,11 +33,10 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='RbcClient',
             fields=[
-                ('baseclient_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='finance.BaseClient')),
+                ('baseclient_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='finance.BaseAccount')),
             ],
             options={
                 'abstract': False,
             },
-            bases=('finance.baseclient',),
         ),
     ]

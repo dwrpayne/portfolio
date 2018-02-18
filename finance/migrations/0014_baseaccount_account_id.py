@@ -12,10 +12,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='baseaccount',
-            name='account_id',
-            field=models.CharField(default=0, max_length=100),
-            preserve_default=False,
-        ),
     ]

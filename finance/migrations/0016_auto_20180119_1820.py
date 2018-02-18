@@ -12,13 +12,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterModelOptions(
-            name='baseaccount',
-            options={'ordering': ['account_id']},
-        ),
-        migrations.AlterField(
-            model_name='baseaccount',
-            name='id',
-            field=models.IntegerField(primary_key=True, serialize=False),
-        ),
     ]

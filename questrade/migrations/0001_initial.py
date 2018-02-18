@@ -44,7 +44,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='QuestradeClient',
             fields=[
-                ('baseclient_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='finance.BaseClient')),
+                ('baseclient_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='finance.BaseAccount')),
                 ('username', models.CharField(max_length=32)),
                 ('refresh_token', models.CharField(max_length=100)),
                 ('access_token', models.CharField(blank=True, max_length=100, null=True)),
@@ -54,7 +54,6 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=('finance.baseclient',),
         ),
         migrations.CreateModel(
             name='QuestradeRawActivity',

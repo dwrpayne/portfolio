@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='TangerineClient',
             fields=[
-                ('baseclient_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='finance.BaseClient')),
+                ('baseclient_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='finance.BaseAccount')),
                 ('username', models.CharField(max_length=32)),
                 ('password', models.CharField(max_length=100)),
                 ('securityq1', models.CharField(max_length=1000)),
@@ -48,7 +48,6 @@ class Migration(migrations.Migration):
             options={
                 'abstract': False,
             },
-            bases=('finance.baseclient',),
         ),
         migrations.CreateModel(
             name='TangerineRawActivity',
