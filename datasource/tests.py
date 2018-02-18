@@ -44,7 +44,8 @@ class ConstantDataSourceTestCase(TestCase):
     def test_basic(self):
         data = self.datasource.GetData(date(2017, 1, 1), date(2017, 1, 4))
         dates, values = list(zip(*data))
-        self.assertSequenceEqual(values, [2.0]*4)
+        self.assertSequenceEqual(values, [2.0]*11)
+        self.assertIn(date(2017,1,1), dates)
 
 
 class PandasDataSourceTestCase(TestCase):
@@ -52,12 +53,12 @@ class PandasDataSourceTestCase(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         bankofcanada = PandasDataSource.create_bankofcanada('USD')
-        cls.bocdata = list(bankofcanada.GetData(date(2018, 1, 1), date(2018, 1, 6)))
+        cls.bocdata = list(bankofcanada.GetData(date(2018, 1, 1), date(2018, 1, 6)))[-6:]
 
     def test_boc_data(self):
         dates, values = list(zip(*self.bocdata))
         rounded = [round(v, 5) for v in values]
-        self.assertSequenceEqual(rounded, [.79891, .79789, .79904, .80626, .80626])
+        self.assertSequenceEqual(rounded, [0.79713, 0.79891, 0.79789, 0.79904, 0.80626, 0.80626])
 
     def test_boc_date(self):
         self.assertEqual(self.bocdata[-1][0], date(2018, 1, 6))
@@ -68,15 +69,15 @@ class AlphavantageDataSourceTestCase(TestCase):
     def setUpClass(cls):
         super().setUpClass()
         tsla = AlphaVantageDataSource.objects.create(symbol='TSLA')
-        cls.bocdata = list(tsla.GetData(date(2018, 1, 1), date(2018, 1, 6)))
+        cls.tsladata = list(tsla.GetData(date(2018, 1, 1), date(2018, 1, 6)))[-6:]
 
-    def test_boc_data(self):
-        dates, values = list(zip(*self.bocdata))
+    def test_tsla_data(self):
+        dates, values = list(zip(*self.tsladata))
         rounded = [round(v, 5) for v in values]
-        self.assertSequenceEqual(rounded, [.79891, .79789, .79904, .80626, .80626])
+        self.assertSequenceEqual(rounded, [311.35, 320.53, 317.25, 314.62, 316.58, 316.58])
 
-    def test_boc_date(self):
-        self.assertEqual(self.bocdata[-1][0], date(2018, 1, 6))
+    def test_tsla_date(self):
+        self.assertEqual(self.tsladata[-1][0], date(2018, 1, 6))
 
 
 
