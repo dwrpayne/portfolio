@@ -87,6 +87,7 @@ class UserProfile(models.Model):
         prices = SecurityPriceDetail.objects.for_securities(securities).today()
         return securities.count() == prices.count()
 
+
     def GetCommissionByYear(self):
         return dict(self.GetActivities().annotate(
             year=ExtractYear('tradeDate')
@@ -128,6 +129,24 @@ class UserProfile(models.Model):
             print (start, end, ror)
             yield end, ror
 
+    def get_capital_gain_summary(self, symbol):
+        security = Security.objects.get(symbol=symbol)
+        last = CostBasis.objects.for_security(security).for_user(self.user).latest()
+        if last.qty_total == 0:
+            return {}
+        cadprice = security.live_price_cad
+        total_value = last.qty_total * cadprice
+        pending_gain = cadprice * last.qty_total - last.acb_total
+        return {'price' : cadprice,
+                'qty' : last.qty_total,
+                'acb' : last.acb_total,
+                'acb_per_share' : last.acb_per_share,
+                'pending_gain' : pending_gain,
+                'pending_gain_per_share' : pending_gain / last.qty_total,
+                'total_value': total_value,
+                'percent_gains' : pending_gain / total_value,
+                }
+
     def GetCapgainsByYear(self):
         costbases = CostBasis.objects.for_user(self.user)
         all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year + 1))
@@ -140,12 +159,12 @@ class UserProfile(models.Model):
                 yearly_data[sec][year-year_offset] += cb.capital_gain
                 last_acb[sec] = cb.acb_total
 
-        pending_gains = {}
+        pending_by_security = {}
         for security, value in self.GetTaxableHoldingDetails().today_security_values():
             if security in last_acb:
-                pending_gains[security] = value - last_acb[security]
+                pending_by_security[security] = value - last_acb[security]
 
-        return all_years, yearly_data, pending_gains
+        return all_years, yearly_data, pending_by_security
 
     def GetInceptionDate(self):
         return self.GetActivities().earliest().tradeDate

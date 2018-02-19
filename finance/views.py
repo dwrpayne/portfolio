@@ -48,7 +48,7 @@ class SecurityDetail(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['activities'] = self.object.activities.for_user(self.request.user)
+        context['activities'] = reversed(list(self.object.activities.for_user(self.request.user)))
         return context
 
     def get(self, request, *args, **kwargs):
@@ -214,15 +214,8 @@ class CapGainsSecurityReport(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         self.symbol = self.kwargs.get('pk')
+        self.summary = self.request.user.userprofile.get_capital_gain_summary(self.symbol)
         self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
-        last = list(self.costbases)[-1]
-        cadprice = last.activity.security.pricedetails.latest().cadprice
-        self.total = {'price' : cadprice,
-                      'qty' : last.qty_total,
-                      'acb' : last.acb_total,
-                      'acb_per_share' : last.acb_per_share,
-                      'pending_gain' : cadprice * last.qty_total - last.acb_total,
-                      'pending_gain_per_share' : (cadprice * last.qty_total - last.acb_total) / last.qty_total}
         return self.costbases
 
 
@@ -230,11 +223,13 @@ class CapGainsReport(LoginRequiredMixin, TemplateView):
     template_name = 'finance/capgains.html'
 
     def get(self, request, *args, **kwargs):
-        self.years, self.yearly_gains, self.pending_gains = request.user.userprofile.GetCapgainsByYear()
+        self.years, self.yearly_gains, self.pending_by_security = request.user.userprofile.GetCapgainsByYear()
         self.total_gains = []
         for i, year in enumerate(self.years):
             self.total_gains.append(sum(gains[i] for gains in self.yearly_gains.values()))
-        self.total_pending = sum(self.pending_gains.values())
+        self.total_pending = sum(self.pending_by_security.values())
+        self.summary_by_security = {security: request.user.userprofile.get_capital_gain_summary(security)
+                                    for security,pending_gain in self.pending_by_security.items()}
         return super().get(self, request, *args, **kwargs)
 
 

@@ -39,7 +39,9 @@ class LineGraph:
         self.add_trace_xy(name, *list(zip(*tuples)), mode)
 
     def add_trace_xy(self, name, x_values, y_values, mode='lines'):
-        self.traces.append(go.Scattergl(name=name, x=x_values, y=y_values, mode=mode))
+        self.traces.append(
+            go.Scattergl(name=name, x=x_values, y=y_values, mode=mode)
+        )
 
     def set_titles(self, title='', xaxis='', yaxis=''):
         self.title = title
@@ -71,14 +73,14 @@ def GeneratePortfolioPlots(userprofile):
     day_val_pairs = userprofile.GetHoldingDetails().total_values()
     if not day_val_pairs:
         return None, None
-    graph.add_trace('Total', day_val_pairs)
+    graph.add_trace('Total', ((day, round(val)) for day, val in day_val_pairs))
 
     deposits = dict(userprofile.GetActivities().get_all_deposits(running_totals=True))
     dep_dates, dep_totals = list(zip(*deposits.items()))
     prev_dates = [d - datetime.timedelta(days=1) for d in dep_dates[1:]] + [datetime.date.today()]
     dep_dates = list(chain.from_iterable(zip(dep_dates, prev_dates)))
     dep_totals = list(chain.from_iterable(zip(dep_totals, dep_totals)))
-    graph.add_trace_xy('Deposits', x_values=dep_dates, y_values=dep_totals)
+    graph.add_trace_xy('Deposits', x_values=dep_dates, y_values=list(map(round, dep_totals)))
 
     growth = [(day, val - dep_totals[find_le_index(dep_dates, day, 0)]) for day, val in day_val_pairs]
     graph.add_trace('Total Growth', growth)

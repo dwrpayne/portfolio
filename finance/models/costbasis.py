@@ -1,10 +1,8 @@
-from decimal import Decimal
 from itertools import groupby
-
-from django.db import models, transaction
+from django.db import models
 from .activity import Activity
 
-class CostBasisQuerySet(models.QuerySet):
+class CostBasisQuerySet(models.QuerySet, ):
     def for_security(self, security):
         return self.filter(activity__security=security)
 
@@ -19,7 +17,7 @@ class CostBasisManager(models.Manager):
     def create_from_activities(self, activity_query):
         for security, activities in groupby(activity_query.with_exchange_rates().order_by('security', 'tradeDate'),
                                             lambda a: a.security_id):
-            if security:#with transaction.atomic():
+            if security:
                 prev_costbasis = CostBasis()
                 for act in activities:
                     prev_costbasis = self.create_with_previous(act, prev_costbasis)
@@ -70,4 +68,5 @@ class CostBasis(models.Model):
 
     class Meta:
         ordering = ['activity__tradeDate']
+        get_latest_by = 'activity__tradeDate'
 

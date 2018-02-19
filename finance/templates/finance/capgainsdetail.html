@@ -8,13 +8,7 @@
     </div>
     <div class="row">
         <div class="col-sm-12">
-            <ul>
-                <li>In taxable accounts, you are holding {{ view.total.qty | floatformat:0}} shares of {{ view.symbol }}.</li>
-                <li>Your average cost per share is C{{ view.total.acb_per_share | currency }}.</li>
-                <li>The current value per share is C{{ view.total.price | currency }}.</li>
-                <li>Current pending capital {% if view.total.pending_gain >= 0 %}gain{% else %}loss{% endif %}
-                    of C{{ view.total.pending_gain | currency}} (C{{ view.total.pending_gain_per_share | currency}} per share).</li>
-            </ul>
+            {% include "finance/capgainssummary.html" with summary=view.summary symbol=view.symbol %}
         </div>
     </div>
     <div class="row">
@@ -35,21 +29,23 @@
                         <th>ACB / Share (C$)</th>
                     </tr>
                 </thead>
+            {% if view.summary %}
                 <tfoot>
                     <tr>
                         <td>{% now "DATE_FORMAT"%}</td>
                         <td>Total</td>
                         <td></td>
-                        <td>{{ view.total.price | floatformat:2 }}</td>
+                        <td>{{ view.summary.price | floatformat:2 }}</td>
                         <td></td>
                         <td></td>
-                        <td>Pending: {{ view.total.pending_gain | currency}}</td>
-                        <td>{{ view.total.qty | floatformat:0 }}</td>
+                        <td>Pending: {{ view.summary.pending_gain | currency}}</td>
+                        <td>{{ view.summary.qty | floatformat:0 }}</td>
                         <td></td>
-                        <td>{{ view.total.acb | currency }}</td>
-                        <td>{{ view.total.acb_per_share | currency }}</td>
+                        <td>{{ view.summary.acb | currency }}</td>
+                        <td>{{ view.summary.acb_per_share | currency }}</td>
                     </tr>
                 </tfoot>
+            {% endif %}
                 <tbody>
                 {% for costbasis in costbases %}
                     <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
@@ -68,7 +64,6 @@
                 {% endfor %}
                 </tbody>
             </table>
-            <br />Pending Gain: {{view.pending_gain | currency}}
         </div>
     </div>
 {% endblock content %}

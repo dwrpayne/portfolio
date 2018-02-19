@@ -195,14 +195,15 @@ class Security(models.Model):
 
     @property
     def live_price(self):
-        try:
-            return self.prices.get(day=datetime.date.today()).price
-        except SecurityPrice.DoesNotExist:
-            return self.prices.latest().price
+        return self.prices.latest().price
 
     @live_price.setter
     def live_price(self, value):
         self.prices.update_or_create(day=datetime.date.today(), defaults={'price': value})
+
+    @property
+    def live_price_cad(self):
+        return self.pricedetails.latest().cadprice
 
     @property
     def yesterday_price(self):

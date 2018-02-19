@@ -29,7 +29,9 @@
         <tbody>
             {% for holding_detail in holding_data %}
             <tr>
-                <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter}}" >&gt;</div></td>
+                <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter}}">
+                    <span class="glyphicon glyphicon-menu-right"></span></div>
+                </td>
                 <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
                 <td>{{holding_detail.price | floatformat:2}}</td>
                 <td>{{holding_detail.price_delta | floatformat:2 | colorize}} {{holding_detail.price_percent_delta | percentage | parens | colorize}}</td>
@@ -58,7 +60,9 @@
         <tbody>
             {% for holding_detail in cash_data %}
             <tr>
-                <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter|add:"1000"}}" >&gt;</div></td>
+                <td><div data-toggle="collapse" data-target=".holdings-table-child-{{forloop.counter|add:"1000"}}" >
+                    <span class="glyphicon glyphicon-menu-right"></span></div>
+                </td>
                 <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
                 <td>{{holding_detail.qty | currency }}</td>
                 <td>{% if holding_detail.qty_delta %}{{holding_detail.qty_delta | currency | colorize}}{% endif %}</td>

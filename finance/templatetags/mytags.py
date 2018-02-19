@@ -68,3 +68,7 @@ def prev_day(day):
 @register.filter()
 def next_day(day):
     return day + datetime.timedelta(days=1)
+
+@register.filter()
+def gain_word(capital_gain):
+    return 'gain' if capital_gain >=0 else 'loss'
