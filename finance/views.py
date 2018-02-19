@@ -217,10 +217,12 @@ class CapGainsSecurityReport(LoginRequiredMixin, ListView):
         self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
         last = list(self.costbases)[-1]
         cadprice = last.activity.security.pricedetails.latest().cadprice
-        self.total = {'price' : cadprice, 'qty' : last.qty_total,
-                 'acb' : last.acb_total, 'acb_per_share' : last.acb_per_share,
-                 'pending_gain' : cadprice * last.qty_total - last.acb_total,
-                 'pending_gain_per_share' : (cadprice * last.qty_total - last.acb_total) / last.qty_total}
+        self.total = {'price' : cadprice,
+                      'qty' : last.qty_total,
+                      'acb' : last.acb_total,
+                      'acb_per_share' : last.acb_per_share,
+                      'pending_gain' : cadprice * last.qty_total - last.acb_total,
+                      'pending_gain_per_share' : (cadprice * last.qty_total - last.acb_total) / last.qty_total}
         return self.costbases
 
 
