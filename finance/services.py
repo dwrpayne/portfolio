@@ -4,7 +4,7 @@ from itertools import chain
 import plotly
 import plotly.graph_objs as go
 
-from utils.misc import find_le_index
+from utils.misc import find_le_index, window
 
 
 class RefreshButtonHandlerMixin:
@@ -88,28 +88,20 @@ def GeneratePortfolioPlots(userprofile):
 
     graph = LineGraph('portfolio-growth-short-{}'.format(userprofile.username))
     daily_growth = []
-    for (y_day, y_val), (t_day, t_val) in zip(growth, growth[1:]):
-        if abs(t_val - y_val) > 1:
-            daily_growth.append((t_day, t_val - y_val))
+    for (y_day, y_val), (t_day, t_val) in window(growth):
+        daily_growth.append((t_day, t_val - y_val))
+
+    moving_average_size=60
+    moving_average = []
+    for entries in window(daily_growth, moving_average_size):
+        average = sum(val for day, val in entries) / moving_average_size
+        moving_average.append((entries[-1][0], average))
+
+    daily_growth = [pair for pair in daily_growth if abs(pair[1])>1]
+
     graph.add_trace('Daily growth', daily_growth, mode='markers')
+    graph.add_trace('{} Day Moving Average'.format(moving_average_size), moving_average, mode='lines')
     graph.set_titles(title='Daily Change in Value')
     plot2 = graph.plot()
 
     return plot1, plot2
-
-    # dep_dict = dict(deposits)
-    # sp = Security.objects.get(symbol='SPXTR')
-    # sp_prices_byday = dict(sp.prices.filter(
-    #    day=F('security__currency__rates__day')
-    #    ).values_list(
-    #        'day', F('price') * F('security__currency__rates__price')
-    #    ))
-    # sp_qtys = {}
-    # deps = dict(deposits)    # running_qty = 0
-    # for day, dep in deps.items():
-    #    running_qty += dep / sp_prices_byday[day]
-    #    sp_qtys[day]=running_qty
-
-    # sp_vals = {day : sp_qtys[find_le(list(sp_qtys), day, dates[0])] * sp_prices_byday[day] for day in dates}
-    # sp_lists = list(zip(*sorted(list(sp_vals.items()))))
-    # traces.append( go.Scatter(name='SP 500', x=sp_lists[0], y=sp_lists[1], mode='lines+markers') )
