@@ -35,10 +35,10 @@ class LineGraph:
     def is_plotted(self):
         return not self.url
 
-    def add_trace(self, name, tuples, mode='lines+markers'):
+    def add_trace(self, name, tuples, mode='lines'):
         self.add_trace_xy(name, *list(zip(*tuples)), mode)
 
-    def add_trace_xy(self, name, x_values, y_values, mode='lines+markers'):
+    def add_trace_xy(self, name, x_values, y_values, mode='lines'):
         self.traces.append(go.Scattergl(name=name, x=x_values, y=y_values, mode=mode))
 
     def set_titles(self, title='', xaxis='', yaxis=''):
