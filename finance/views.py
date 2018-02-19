@@ -357,7 +357,6 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         BaseAccount.objects.get(pk=id).display_name: {
             'id' : id,
             'cur_balance' : today_balance,
-            'yesterday_balance' : yesterday_balances.get(id, 0),
             'cur_cash_balance' : today_cash_balances.get(id, 0),
             'today_balance_change' : today_balance - yesterday_balances.get(id, 0)
         }
@@ -367,7 +366,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     from collections import defaultdict
     total = defaultdict(int)
     for acc, d in accounts.items():
-        for key in ['cur_balance', 'yesterday_balance', 'cur_cash_balance', 'today_balance_change']:
+        for key in ['cur_balance', 'cur_cash_balance', 'today_balance_change']:
             total[key] += d[key]
     context['account_total'] = total
 
