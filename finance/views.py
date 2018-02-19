@@ -17,16 +17,17 @@ from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.dates import DateMixin, DayMixin
-from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import FormView, UpdateView
 
 from securities.models import Security
-from utils.misc import plotly_iframe_from_url, partition
+from utils.misc import partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation, CostBasis
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
+
+from .services import get_portfolio_graphs
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -48,14 +49,10 @@ class SecurityDetail(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['activities'] = reversed(list(self.object.activities.for_user(self.request.user)))
+        activities = self.object.activities.for_user(self.request.user)
+        context['activities'] = list(activities.order_by('-tradeDate'))
+        self.chart_html = GenerateSecurityPlot(self.object, activities)
         return context
-
-    def get(self, request, *args, **kwargs):
-        # TODO: Disable security plotly because I am hitting my free chart limit.
-        #filename = GenerateSecurityPlot(security)
-        self.iframe = ''#plotly_iframe_from_url(filename)
-        return super().get(request, *args, **kwargs)
 
 
 class AccountCsvUpload(LoginRequiredMixin, FormView):
@@ -390,6 +387,8 @@ def Portfolio(request):
 
         elif 'refresh-plot' in request.GET:
             userprofile.generate_plots()
+
+    userprofile.portfolio_iframe2, userprofile.growth_iframe2 = get_portfolio_graphs(userprofile)
 
     return render(request, 'finance/portfolio.html', GetHoldingsContext(userprofile))
 

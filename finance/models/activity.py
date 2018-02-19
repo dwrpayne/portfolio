@@ -169,6 +169,10 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
                                      Activity.Type.Withdrawal,
                                      Activity.Type.Transfer])
 
+    def transactions(self):
+        return self.filter(type__in=[Activity.Type.Buy,
+                                     Activity.Type.Sell])
+
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)
 

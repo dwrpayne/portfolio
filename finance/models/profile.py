@@ -11,7 +11,6 @@ from securities.models import Security, SecurityPriceDetail
 from utils.misc import plotly_iframe_from_url
 from utils.misc import xirr, total_return
 from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis
-from ..services import GeneratePortfolioPlots
 
 
 class UserProfileManager(models.Manager):
@@ -49,8 +48,7 @@ class UserProfile(models.Model):
         return sum(self.GetHoldingDetails().today()).value
 
     def generate_plots(self):
-        urls = GeneratePortfolioPlots(self)
-        self.update_plotly_urls(urls)
+        pass
 
     def GetHeldSecurities(self):
         return Holding.objects.for_user(
