@@ -14,20 +14,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  url(r'^blog/', include('blog.urls'))
 """
 from django.conf import settings
-from django.conf.urls import url, include
+from django.urls import include, path
 from django.contrib import admin
 
 urlpatterns = [
-    url(r'^', include('django.contrib.auth.urls')),
-    url(r'^admin/', admin.site.urls),
-    url(r'^finance/', include('finance.urls', namespace='finance')),
-    url(r'^hijack/', include('hijack.urls', namespace='hijack')),
+    path('', include('django.contrib.auth.urls')),
+    path('admin/', admin.site.urls),
+    path('finance/', include('finance.urls', namespace='finance')),
+    path('hijack/', include('hijack.urls', namespace='hijack')),
 ]
-
-
 
 if settings.DEBUG:
     import debug_toolbar
     urlpatterns = [
-        url(r'^__debug__/', include(debug_toolbar.urls)),
+        path('__debug__/', include(debug_toolbar.urls)),
     ] + urlpatterns
