@@ -24,9 +24,12 @@ class HighChartLineGraph:
     def __init__(self, title, width=700, height=500):
         self.highchart = Highstock(width=width, height=height)
         self.highchart.set_options('xAxis', {'type': 'datetime', 'minRange': 14 * 24 * 3600000})
+        self.highchart.set_options('yAxis', {'plotLines': [{'value':0, 'width':2, 'color':'black'}]})
         self.highchart.options['boost'] = {}
         self.highchart.set_options('boost', {'useGPUTranslations': True}, force_options=True)
         self.highchart.set_options('title', {'text': title})
+        self.highchart.set_options('navigator', {'enabled': False})
+        self.highchart.set_options('chart', {'zoomType': 'xy'})
         #self.highchart.set_options('rangeSelector', {'floating': True,'y': 0 })
         self.highchart.set_options('plotOptions', {'series': {'tooltip': {'valueDecimals': 2}}})
 
@@ -49,10 +52,10 @@ def GenerateSecurityPlot(security, activities=None):
 
     graph = HighChartLineGraph(security.symbol, width=1000)
     graph.add_trace('Price ({})'.format(security.currency), fix_prices(security.pricedetails.values_list('day', 'price')),
-                    id='price', compare='percent')
+                    id='price')
 
-    if not security.currency == 'CAD':
-        graph.add_trace('Price (CAD)', fix_prices(security.pricedetails.values_list('day', 'cadprice')))
+    #if not security.currency == 'CAD':
+    #    graph.add_trace('Price (CAD)', fix_prices(security.pricedetails.values_list('day', 'cadprice')))
 
     graph.add_trace('Purchases', [{'x': datetime.combine(day, datetime.min.time()),
                                    'fillColor': 'GreenYellow' if qty > 0 else 'red',
