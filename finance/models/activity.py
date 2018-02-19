@@ -201,13 +201,13 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         except self.model.DoesNotExist:
             return None
 
-    def with_cadprices(self):
+    def with_exchange_rates(self):
         """
-        Annotates each member of the QuerySet with a "cadprice" field.
+        Annotates each activity of the QuerySet with a "exch" field.
         """
         return self.filter(
-            tradeDate=F('security__pricedetails__day')).annotate(
-            cad_price=Sum(F('security__pricedetails__cadprice'))
+            tradeDate=F('cash__prices__day')).annotate(
+            exch=Sum(F('cash__prices__price'))
         )
 
 
