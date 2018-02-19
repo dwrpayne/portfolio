@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from django.db.models import F, Sum
+from django.db.models import F, RowRange, Sum, Window
 from django.utils.functional import cached_property
 from model_utils import Choices
 from polymorphic.models import PolymorphicModel
@@ -9,7 +9,6 @@ from polymorphic.showfields import ShowFieldTypeAndContent
 
 from securities.models import Security, SecurityPriceDetail
 from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
-from utils.db import RunningSum
 
 from .account import BaseAccount
 
@@ -184,7 +183,11 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
             return []
         if running_totals:
             return self.deposits().annotate(
-                cum_total = RunningSum('netAmount', 'tradeDate')
+                cum_total = Window(
+                    expression=Sum('netAmount'),
+                    order_by=F('tradeDate').asc(),
+                    frame=RowRange(end=0)
+                )
             ).values_list('tradeDate', 'cum_total')
         else:
             return self.deposits().values_list('tradeDate', 'netAmount')

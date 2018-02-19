@@ -1,14 +1,4 @@
-from django.db.models import Func, Sum
 from datetime import date, timedelta
-
-class RunningSum(Func):
-    def __init__(self, sum_field, orderby_field):
-        super().__init__(
-            Sum(sum_field),
-            template='%(expressions)s OVER (ORDER BY %(order_by)s)',
-            order_by='"{}"'.format(orderby_field)
-        )
-
 
 class SecurityMixinQuerySet:
     def for_security(self, symbol):
