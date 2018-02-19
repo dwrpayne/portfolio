@@ -225,7 +225,7 @@ class CapGainsSecurityReport(LoginRequiredMixin, ListView):
 
 
 class CapGainsReport(LoginRequiredMixin, TemplateView):
-    template_name = 'finance/capgains2.html'
+    template_name = 'finance/capgains.html'
 
     def get(self, request, *args, **kwargs):
         self.years, self.yearly_gains, self.pending_gains = request.user.userprofile.GetCapgainsByYear()
