@@ -56,7 +56,7 @@
                         <td>{{costbasis.activity.tradeDate}}</td>
                         <td>{{costbasis.activity.type}}</td>
                         <td>{{costbasis.activity.qty | floatformat:0}}</td>
-                        <td>{{costbasis.activity.cad_price | floatformat:2}}</td>
+                        <td>{{costbasis.cad_price_per_share | floatformat:2}}</td>
                         <td>{{costbasis.activity.commission | currency}}</td>
                         <td>{{costbasis.activity.netAmount | floatformat:2}}</td>
                         <td>{% if costbasis.capital_gain %}{{costbasis.capital_gain | currency}}{% endif %}</td>
