@@ -209,7 +209,7 @@ class FeedbackView(FormView):
 
 class CapGainsSecurityReport(LoginRequiredMixin, ListView):
     model = CostBasis
-    template_name = 'finance/capgains.html'
+    template_name = 'finance/capgainsdetail.html'
     context_object_name = 'costbases'
 
     def get_queryset(self):
