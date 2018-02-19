@@ -29,7 +29,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True,
                              on_delete=models.CASCADE, related_name='accounts_for_user')
     type = models.CharField(max_length=100)
-    id = models.IntegerField(primary_key=True)
     account_id = models.CharField(max_length=100)
     taxable = models.BooleanField(default=True)
     display_name = models.CharField(max_length=100, default='')
