@@ -27,8 +27,6 @@ from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocatio
 from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
-from .services import get_portfolio_graphs
-
 
 class AccountDetail(LoginRequiredMixin, DetailView):
     model = BaseAccount

@@ -192,9 +192,6 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 # Hijack
 HIJACK_USE_BOOTSTRAP = True
 
-# Plotly
-PLOTLY_USERNAME = 'cecilpl'
-PLOTLY_API_KEY = config('PLOTLY_API_KEY')
 
 # Email
 EMAIL_HOST = 'smtp.sendgrid.net'
