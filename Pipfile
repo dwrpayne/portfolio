@@ -30,6 +30,7 @@ django-hijack = "*"
 python-decouple = "*"
 pydot = "*"
 django-fernet-fields = "*"
+python-highcharts = {git = "https://github.com/dwrpayne/python-highcharts.git", ref = "master"}
 
 
 [dev-packages]

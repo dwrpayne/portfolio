@@ -83,12 +83,13 @@ def get_portfolio_graphs(userprofile):
     graph.add_trace('Total Value', [(datetime.combine(day, datetime.min.time()), int(val)) for day, val in day_val_pairs],
                     color='blue', height=600, tooltip={'valuePrefix': '$', 'valueDecimals': 0})
 
-    deposits = dict(userprofile.GetActivities().get_all_deposits(running_totals=True))
-    dep_dates, dep_totals = list(zip(*deposits.items()))
+    deposits = list(userprofile.GetActivities().get_all_deposits(running_totals=True))
+    deposits.append((date.today(), deposits[-1][1]))
     graph.add_trace('Total Contributions',
-                    zip([datetime.combine(day, datetime.min.time()) for day in dep_dates], list(map(int, dep_totals))),
+                    [(datetime.combine(day, datetime.min.time()), int(value)) for day, value in deposits],
                     step='left', color='orange', tooltip={'valuePrefix':'$', 'valueDecimals': 0})
 
+    dep_dates, dep_totals = list(zip(*deposits))
     prev_dates = [d - timedelta(days=1) for d in dep_dates[1:]] + [date.today()]
     dep_dates = list(chain.from_iterable(zip(dep_dates, prev_dates)))
     dep_totals = list(chain.from_iterable(zip(dep_totals, dep_totals)))
