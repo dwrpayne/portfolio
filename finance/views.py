@@ -373,8 +373,6 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 @login_required
 def Portfolio(request):
     userprofile = request.user.userprofile
-    if not userprofile.portfolio_iframe:
-        userprofile.generate_plots()
 
     if not userprofile.AreSecurityPricesUpToDate():
         SyncSecurityTask.delay(False)
@@ -387,8 +385,6 @@ def Portfolio(request):
 
         elif 'refresh-plot' in request.GET:
             userprofile.generate_plots()
-
-    userprofile.portfolio_iframe2, userprofile.growth_iframe2 = get_portfolio_graphs(userprofile)
 
     return render(request, 'finance/portfolio.html', GetHoldingsContext(userprofile))
 

@@ -27,13 +27,6 @@ def partition(pred, iterable):
     return filterfalse(pred, t1), filter(pred, t2)
 
 
-def plotly_iframe_from_url(url):
-    if not url:
-        return None
-    return '<iframe id="igraph" scrolling="no" style="border:none;" seamless="seamless" src="{}"' \
-           '?modebar=false&link=false" height="525" width="100%"/></iframe>'.format(url)
-
-
 def window(iterable, size=2):
     """
     :param iterable: Input iterator.

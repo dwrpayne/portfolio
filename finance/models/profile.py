@@ -8,7 +8,6 @@ from django.db.models import Sum
 from django.db.models.functions import ExtractYear
 
 from securities.models import Security, SecurityPriceDetail
-from utils.misc import plotly_iframe_from_url
 from utils.misc import xirr, total_return
 from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis
 
@@ -20,8 +19,6 @@ class UserProfileManager(models.Manager):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    plotly_url = models.CharField(max_length=500, null=True, blank=True)
-    plotly_url2 = models.CharField(max_length=500, null=True, blank=True)
     phone = models.CharField(max_length=32, null=True, blank=True)
     country = models.CharField(max_length=32, null=True, blank=True)
 
@@ -30,18 +27,6 @@ class UserProfile(models.Model):
     @property
     def username(self):
         return self.user.username
-
-    def update_plotly_urls(self, urls):
-        self.plotly_url, self.plotly_url2 = urls
-        self.save()
-
-    @property
-    def portfolio_iframe(self):
-        return plotly_iframe_from_url(self.plotly_url)
-
-    @property
-    def growth_iframe(self):
-        return plotly_iframe_from_url(self.plotly_url2)
 
     @property
     def current_portfolio_value(self):
