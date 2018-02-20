@@ -17,6 +17,11 @@ urlpatterns = [
     path('feedback/', views.FeedbackView.as_view(), name='feedback'),
     path('dividends/', views.DividendReport.as_view(), name='dividends'),
 
+    # AJAX chart data
+    path('portfoliochart/', views.portfolio_chart, name='portfoliochart'),
+    path('growthchart/', views.growth_chart, name='growthchart'),
+
+    # Profile
     path('user/<int:pk>/', views.UserProfileView.as_view(), name='userprofile'),
     path('user/<int:pk>/password/', views.UserPasswordPost.as_view(), name='passwordchange'),
 

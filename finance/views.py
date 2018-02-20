@@ -12,7 +12,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.forms import modelformset_factory
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
 from django.views.generic import DetailView, ListView, TemplateView
@@ -20,11 +20,11 @@ from django.views.generic.dates import DateMixin, DayMixin
 from django.views.generic.edit import FormView, UpdateView
 
 from securities.models import Security
-from utils.misc import partition
+from utils.misc import partition, window
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation, CostBasis
-from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin
+from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
 from .services import get_portfolio_graphs
@@ -419,6 +419,15 @@ def History(request, period):
 
     return render(request, 'finance/history.html', context)
 
+def portfolio_chart(request):
+    userprofile = request.user.userprofile
+    return JsonResponse(list(zip(*get_growth_data(userprofile))), safe=False)
+
+def growth_chart(request):
+    userprofile = request.user.userprofile
+    days, values, deposits, growth = get_growth_data(userprofile)
+    daily_growth = [t - y for y, t in window(growth)]
+    return JsonResponse(list(zip(days, daily_growth)), safe=False)
 
 @login_required
 def index(request):

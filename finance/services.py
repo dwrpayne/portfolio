@@ -20,30 +20,63 @@ class RefreshButtonHandlerMixin:
         pass
 
 
+
 class HighChartLineGraph:
     def __init__(self, title, width=700, height=500):
         self.highchart = Highstock(width=width, height=height)
-        self.highchart.set_options('xAxis', {'type': 'datetime', 'minRange': 14 * 24 * 3600000})
+        self.highchart.set_options('title', {'text':title})
+
+    def xaxis(self, title):
+        self.highchart.set_options('xAxis', {'title': {'enabled':True, 'text':title}})
+        return self
+
+    def yaxis(self, title):
+        self.highchart.set_options('yAxis', {'title': {'enabled':True, 'text':title}})
+        return self
+
+    def datetime(self):
+        self.highchart.set_options('xAxis', {'type': 'datetime'})
+        return self
+
+    def boost_gpu(self):
+        self.highchart.set_options('boost', {'useGPUTranslations': True})
+        return self
+
+    def bold_zero_axis(self):
         self.highchart.set_options('yAxis', {'plotLines': [{'value':0, 'width':2, 'color':'black'}]})
-        self.highchart.options['boost'] = {}
-        self.highchart.set_options('boost', {'useGPUTranslations': True}, force_options=True)
-        self.highchart.set_options('title', {'text': title})
-        self.highchart.set_options('navigator', {'enabled': False})
-        self.highchart.set_options('chart', {'zoomType': 'xy'})
-        #self.highchart.set_options('rangeSelector', {'floating': True,'y': 0 })
-        self.highchart.set_options('plotOptions', {'series': {'tooltip': {'valueDecimals': 2}}})
+        return self
 
-    def add_trace(self, name, tuples, series_type='line', **kwargs):
-        data = list(tuples)
-        self.highchart.add_data_set(data, series_type=series_type, name=name, **kwargs)
+    def navigator(self, enabled=True):
+        self.highchart.set_options('navigator', {'enabled': enabled})
+        return self
 
-    def set_titles(self, xaxis='', yaxis='', title=''):
-        if xaxis: self.highchart.set_options('xAxis', {'title': {'enabled':True, 'text':xaxis}})
-        if yaxis: self.highchart.set_options('yAxis', {'title': {'enabled':True, 'text':yaxis}})
+    def zoom(self, zoomtype):
+        self.highchart.set_options('chart', {'zoomType': zoomtype})
+        return self
+
+    def tooltipvalues(self, prefix='', suffix='', decimals=2):
+        self.highchart.set_options('plotOptions', {'series': {'tooltip': {'valueDecimals': decimals,
+                                                                          'valuePrefix': prefix,
+                                                                          'valueSuffix': suffix}}})
+        return self
+
+    def shared_tooltip(self):
+        self.highchart.set_options('tooltip', {'split':False, 'shared':True})
+        return self
+
+    def set_option(self, **kwargs):
+        self.highchart.set_options(**kwargs)
+
+    def add_trace(self, name, data, series_type='line', **kwargs):
+        self.highchart.add_data_set(list(data), name=name, series_type=series_type, **kwargs)
+        #pass
+
+    def add_csv(self, csv_file):
+        self.csv_file = csv_file
 
     def plot(self):
         self.highchart.buildcontent()
-        return self.highchart.iframe
+        return self.highchart._htmlcontent.decode('utf-8')
 
 
 def GenerateSecurityPlot(security, activities=None):
@@ -74,48 +107,66 @@ def GenerateSecurityPlot(security, activities=None):
     return graph.plot()
 
 
+def get_growth_data(userprofile):
+    days, values = list(zip(*userprofile.GetHoldingDetails().total_values()))
+    dep_days, dep_amounts = map(list, list(zip(*userprofile.GetActivities().get_all_deposits())))
+    next_dep = 0
+    deposits = []
+    for day in days:
+        while dep_days and dep_days[0] == day:
+            dep_days.pop(0)
+            next_dep += dep_amounts.pop(0)
+        else:
+            deposits.append(next_dep)
+
+    growth = [val - dep for val, dep in zip(values, deposits)]
+    return days, values, deposits, growth
+
+
 def get_portfolio_graphs(userprofile):
     graph = HighChartLineGraph('Portfolio Value Over Time'.format(userprofile.username))
-    graph.highchart.set_options('tooltip', {'split':False, 'shared':True})
+    graph.datetime().boost_gpu().bold_zero_axis().navigator(False).zoom('xy').tooltipvalues(prefix='$', decimals=2).shared_tooltip()
+
     day_val_pairs = userprofile.GetHoldingDetails().total_values()
     if not day_val_pairs:
         return None, None
-    graph.add_trace('Total Value', [(datetime.combine(day, datetime.min.time()), int(val)) for day, val in day_val_pairs],
-                    color='blue', height=600, tooltip={'valuePrefix': '$', 'valueDecimals': 0})
+    value_data = [(datetime.combine(day, datetime.min.time()), int(val)) for day, val in day_val_pairs]
 
     deposits = list(userprofile.GetActivities().get_all_deposits(running_totals=True))
     deposits.append((date.today(), deposits[-1][1]))
-    graph.add_trace('Total Contributions',
-                    [(datetime.combine(day, datetime.min.time()), int(value)) for day, value in deposits],
-                    step='left', color='orange', tooltip={'valuePrefix':'$', 'valueDecimals': 0})
+    deposits_data = [(datetime.combine(day, datetime.min.time()), int(value)) for day, value in deposits]
 
     dep_dates, dep_totals = list(zip(*deposits))
     prev_dates = [d - timedelta(days=1) for d in dep_dates[1:]] + [date.today()]
     dep_dates = list(chain.from_iterable(zip(dep_dates, prev_dates)))
     dep_totals = list(chain.from_iterable(zip(dep_totals, dep_totals)))
     growth = [(datetime.combine(day, datetime.min.time()), int(val - dep_totals[find_le_index(dep_dates, day, 0)])) for day, val in day_val_pairs]
-    graph.add_trace('Net Growth', growth, color='lime', negativeColor='red', tooltip={'valuePrefix':'$', 'valueDecimals': 0})
+
+    graph.add_trace('Total Value', value_data, color='blue')
+    graph.add_trace('Total Contributions', deposits_data, step='left', color='orange')
+    graph.add_trace('Net Growth', growth, color='lime', negativeColor='red')
 
     plot1 = graph.plot()
 
     graph = HighChartLineGraph('Daily Gain/Loss')
+    graph.datetime().boost_gpu().navigator(False).zoom('xy').tooltipvalues(decimals=2).shared_tooltip()
     graph.highchart.add_JSsource('https://code.highcharts.com/stock/indicators/indicators.js')
     daily_growth = []
     for (y_day, y_val), (t_day, t_val) in window(growth):
         daily_growth.append((t_day, t_val - y_val))
 
-    graph.add_trace('Daily growth', daily_growth, series_type='scatter', id='growth',
+    graph.add_trace('Daily growth', [], series_type='scatter', id='growth',
                     color='royalblue', marker={'radius':2, 'symbol':'circle'},
                     tooltip={'headerFormat':'<span style="font-size: 10px">{point.key}</span><br/>',
                              'pointFormatter': '''function() {
                                                    if (this.y >=0) {
                                                         return "Gain: <b>$" + this.y + "</b>";
-                                                   } 
+                                                   }
                                                    return "Loss: <b>$(" + Math.abs(this.y) + ")</b>";
                                                }'''})
 
     period = 60
-    graph.add_trace('{} Day Average Daily Profit'.format(period), [], series_type='sma',
+    graph.add_trace('{} Day Average Daily Profit'.format(period), [], series_type='line',
                     linkedTo='growth', params={'period':period},
                     color='lime', negativeColor='red',
                     tooltip={'pointFormat': '<span style="color:{point.color}">\u25CF</span> {series.name}: <b>${point.y:.2f}</b><br/>'})
