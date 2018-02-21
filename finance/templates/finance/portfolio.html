@@ -5,13 +5,7 @@
 {% block content %}
     <div class="row">
         <div class="col-sm-8">{% include "finance/holdings.html" %}</div>
-        <div class="col-sm-3">{% include "finance/balances.html" %}</div>
-        <div class="col-sm-1">
-            <br/><br/>
-            <button type="submit" class="refresh" data-refresh-type="plot" data-refresh-div="history-plot;growth-plot">
-                Refresh Graphs
-            </button>
-        </div>
+        <div class="col-sm-4">{% include "finance/balances.html" %}</div>
     </div>
     <div class="row">
         <div class="col-sm-6" id="history-plot"></div>

@@ -47,13 +47,12 @@
     {# Set of blocks that can be used to display JavaScript files #}
     {% block footer_javascript %}
         {% block footer_javascript_site %}
-            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+            <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
             <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-            <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
-            <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+            <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
             <script src="https://code.highcharts.com/stock/highstock.src.js"></script>
-            <script src="https://code.highcharts.com/modules/exporting.src.js"></script>
-            <script src="https://code.highcharts.com/modules/boost.src.js"></script>
+            <script src="https://code.highcharts.com/modules/exporting.js"></script>
+            <script src="https://code.highcharts.com/modules/boost.js"></script>
             <script src="{% static "finance/jquery.tablesorter.min.js" %}"></script>
             <script src="{% static "finance/finance.js" %}"></script>       
         {% endblock footer_javascript_site %}
