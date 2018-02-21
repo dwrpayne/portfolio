@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse, JsonResponse
+from django.db.models import Sum
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
 from django.views.generic import DetailView, ListView, TemplateView
@@ -422,6 +423,23 @@ def growth_chart(request):
     days, values, deposits, growth = get_growth_data(userprofile)
     daily_growth = [t - y for y, t in window(growth)]
     return JsonResponse(list(zip(days, daily_growth)), safe=False)
+
+def security_chart(request, symbol):
+    def to_ts(d):
+        return datetime.datetime.combine(d, datetime.time.min).timestamp()*1000
+    security = Security.objects.get(symbol=symbol)
+    pricedetails = security.pricedetails
+    prices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'price')]
+    cadprices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'cadprice')]
+    data = [prices, cadprices]
+
+    userprofile = request.user.userprofile
+    activities = userprofile.GetActivities().for_security(security)
+    purchases = activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty')).values_list('tradeDate', 'total_qty', 'price')
+    dividends = [(to_ts(d), float(p)) for d,p in activities.dividends().values_list('tradeDate', 'price').distinct()]
+    data.extend([dividends])
+    return JsonResponse(data, safe=False)
+
 
 @login_required
 def index(request):

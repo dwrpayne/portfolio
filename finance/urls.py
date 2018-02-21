@@ -20,6 +20,7 @@ urlpatterns = [
     # AJAX chart data
     path('portfoliochart/', views.portfolio_chart, name='portfoliochart'),
     path('growthchart/', views.growth_chart, name='growthchart'),
+    path('securitychart/<symbol>/', views.security_chart, name='securitychart'),
 
     # Profile
     path('user/<int:pk>/', views.UserProfileView.as_view(), name='userprofile'),

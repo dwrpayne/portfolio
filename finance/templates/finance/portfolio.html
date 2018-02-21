@@ -103,7 +103,7 @@
                rows: growthdata
            },
            navigator: {
-               enabled: false,
+               enabled: false
            },
            plotOptions: {
                series: {
@@ -134,9 +134,12 @@
                {
                    type: 'sma',
                    color: 'lime',
-                   name: '60 Day Average Daily Profit',
+                   name: '90 Day Average Daily Profit',
                    linkedTo: 'growth',
                    negativeColor: 'red',
+                   params: {
+                       period: 90
+                   },
                    tooltip: {
                        pointFormat: '<span style="color:{point.color}">\u25cf</span> {series.name}: <b>${point.y:.2f}</b><br/>'
                    }

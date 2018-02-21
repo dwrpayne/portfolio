@@ -4,8 +4,7 @@
 {% block title %} {{security.symbol}} {% endblock title %}
 {% block content %}  
 <div class="row" align="center">
-{{ view.chart_html | safe}}
-
+<div id="securitycontainer"></div>
 </div>
 <div class="row">
     <div class="col-sm-12">
@@ -14,3 +13,71 @@
 </div>
 
 {% endblock content %}
+{% block footer_javascript_page %}
+    <script src="https://code.highcharts.com/modules/data.js"></script>
+    <script src="https://code.highcharts.com/stock/indicators/indicators.js"></script>
+    <script>
+    $.get("{% url 'finance:securitychart' security %}", function(data) {
+        Highcharts.StockChart({
+            boost: {
+                useGPUTranslations: true
+            },
+            chart: {
+                renderTo: "securitycontainer",
+                width: 1000,
+                height: 500,
+                type: 'line',
+                zoomType: 'xy'
+            },
+            credits: {
+                enabled: false
+            },
+            navigator: {
+                enabled: false,
+            },
+            plotOptions: {
+                series: {
+                    dataGrouping: {
+                        units: [
+                            ['day', [1]],
+                            ['week', [1]],
+                            ['month', [1]]
+                        ],
+                        approximation: function (arr){
+                            return Math.max(...arr);
+                        },
+                        enabled:true,
+                        groupPixelWidth:5
+                    },
+                    tooltip: {
+                        valueDecimals: 2
+                    }
+                }
+            },
+            series: [{
+                name: 'Price',
+                type: 'line',
+                data: data[0],
+                color: 'blue'
+            }, {
+                name: 'CAD Price',
+                type: 'line',
+                data: data[1],
+                color: 'orange'
+            },{
+                name: 'Dividends',
+                type: 'flags',
+                fillcolor: 'LightCyan',
+                data: data[2]
+            }],
+            title: {
+                text: '{{ security.symbol }}'
+            },
+            tooltip: {
+                split: false,
+                shared: true
+            }
+        });
+    });
+    </script>
+{% endblock footer_javascript_page %}
