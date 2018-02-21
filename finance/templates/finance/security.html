@@ -58,17 +58,25 @@
                 name: 'Price',
                 type: 'line',
                 data: data[0],
-                color: 'blue'
+                color: 'blue',
+                id: 'price'
             }, {
                 name: 'CAD Price',
                 type: 'line',
                 data: data[1],
                 color: 'orange'
             },{
+                name: 'Purchases',
+                type: 'flags',
+                shape: 'squarepin',
+                onSeries: 'price',
+                data: data[2]
+            },{
                 name: 'Dividends',
                 type: 'flags',
                 fillcolor: 'LightCyan',
-                data: data[2]
+                shape: 'circlepin',
+                data: data[3]
             }],
             title: {
                 text: '{{ security.symbol }}'

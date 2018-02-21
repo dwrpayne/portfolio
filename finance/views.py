@@ -435,9 +435,17 @@ def security_chart(request, symbol):
 
     userprofile = request.user.userprofile
     activities = userprofile.GetActivities().for_security(security)
-    purchases = activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty')).values_list('tradeDate', 'total_qty', 'price')
-    dividends = [(to_ts(d), float(p)) for d,p in activities.dividends().values_list('tradeDate', 'price').distinct()]
-    data.extend([dividends])
+    purchase_data = activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty')).values_list('tradeDate', 'total_qty', 'price')
+    purchases = [{'x': to_ts(day),
+                  'fillColor': 'GreenYellow' if qty > 0 else 'red',
+                  'title': str(int(qty)),
+                  'text': '{} {:.0f} @ {:.2f}'.format('Buy' if qty > 0 else 'Sell', qty, price),
+                  } for day, qty, price in purchase_data]
+    dividends = [{'x': to_ts(day),
+                  'title': '{:.2f}'.format(price),
+                  'text': 'Dividend of ${:.2f}'.format(price),
+                  } for day, price in activities.dividends().values_list('tradeDate', 'price').distinct()]
+    data.extend([purchases, dividends])
     return JsonResponse(data, safe=False)
 
 
