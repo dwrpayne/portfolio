@@ -430,7 +430,9 @@ def security_chart(request, symbol):
     security = Security.objects.get(symbol=symbol)
     pricedetails = security.pricedetails
     prices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'price')]
-    cadprices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'cadprice')]
+    cadprices = []
+    if not security.currency == 'CAD':
+        cadprices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'cadprice')]
     data = [prices, cadprices]
 
     userprofile = request.user.userprofile
@@ -445,7 +447,7 @@ def security_chart(request, symbol):
                   'title': '{:.2f}'.format(price),
                   'text': 'Dividend of ${:.2f}'.format(price),
                   } for day, price in activities.dividends().values_list('tradeDate', 'price').distinct()]
-    data.extend([purchases, dividends])
+    data.extend([purchases, []])
     return JsonResponse(data, safe=False)
 
 
