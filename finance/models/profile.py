@@ -70,6 +70,9 @@ class UserProfile(models.Model):
         prices = SecurityPriceDetail.objects.for_securities(securities).today()
         return securities.count() == prices.count()
 
+    def RegenerateCostBasis(self):
+        CostBasis.objects.for_user(self.user).delete()
+        CostBasis.objects.create_from_activities(self.GetActivities(True))
 
     def GetCommissionByYear(self):
         return dict(self.GetActivities().annotate(

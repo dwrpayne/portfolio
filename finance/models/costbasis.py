@@ -14,6 +14,9 @@ class CostBasisManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().select_related('activity')
 
+    def latest(self, user, security):
+        return super().get_queryset().for_user(user).for_security(security).latest()
+
     def create_from_activities(self, activity_query):
         activity_query = activity_query.exclude(type=Activity.Type.Dividend)
         for security, activities in groupby(activity_query.with_exchange_rates().order_by('security', 'tradeDate'),
@@ -48,8 +51,7 @@ class CostBasisManager(models.Manager):
                               acb_per_share=acb_per_share, qty_total=qty_total, capital_gain=capital_gain)
 
     def create(self, activity, **kwargs):
-        latest_costbasis = self.for_user(activity.account.user).for_security(activity.security).latest('activity__tradeDate')
-        return self.create_with_previous(activity, latest_costbasis)
+        return self.create_with_previous(activity, self.latest(activity.account.user, activity.security))
 
 
 class CostBasis(models.Model):
