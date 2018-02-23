@@ -221,7 +221,7 @@ class HoldingChange:
     def create_from_detail(detail):
         assert isinstance(detail, HoldingDetail)
 
-        hc = HoldingChange(account=detail.account, security=detail.security, qty=detail.qty,
+        hc = HoldingChange(account=detail.account_id, security=detail.security_id, qty=detail.qty,
                            value=detail.value, price=detail.price, day=detail.day, exch=detail.exch
                            )
         return hc
