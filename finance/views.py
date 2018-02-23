@@ -48,7 +48,7 @@ class SecurityDetail(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        activities = self.object.activities.for_user(self.request.user)
+        activities = self.object.activities.for_user(self.request.user).select_related('account')
         context['activities'] = list(activities.order_by('-tradeDate'))
         self.chart_html = GenerateSecurityPlot(self.object, activities)
         return context
