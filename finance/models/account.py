@@ -112,9 +112,10 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             for raw in self.rawactivities.all():
                 raw.CreateActivity()
         self.RegenerateHoldings()
-        from .costbasis import CostBasis
-        CostBasis.objects.filter(activity__account=self).delete()
-        CostBasis.objects.create_from_activities(self.activities)
+        if self.taxable:
+            from .costbasis import CostBasis
+            CostBasis.objects.filter(activity__account=self).delete()
+            CostBasis.objects.create_from_activities(self.activities)
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()

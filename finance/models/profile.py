@@ -120,7 +120,9 @@ class UserProfile(models.Model):
         cadprice = security.live_price_cad
         total_value = last.qty_total * cadprice
         pending_gain = cadprice * last.qty_total - last.acb_total
-        return {'price' : cadprice,
+        return {'cadprice' : cadprice,
+                'price': security.live_price,
+                'exchange': cadprice / security.live_price,
                 'qty' : last.qty_total,
                 'acb' : last.acb_total,
                 'acb_per_share' : last.acb_per_share,

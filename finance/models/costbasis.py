@@ -15,6 +15,7 @@ class CostBasisManager(models.Manager):
         return super().get_queryset().select_related('activity')
 
     def create_from_activities(self, activity_query):
+        activity_query = activity_query.exclude(type=Activity.Type.Dividend)
         for security, activities in groupby(activity_query.with_exchange_rates().order_by('security', 'tradeDate'),
                                             lambda a: a.security_id):
             if security:
@@ -41,7 +42,8 @@ class CostBasisManager(models.Manager):
         acb_total = max(0, previous_costbasis.acb_total + acb_change)
         acb_per_share = acb_total / qty_total if qty_total else 0
 
-        return super().create(activity=activity, cad_price_per_share=cad_price, total_cad_value=total_cad_value,
+        return super().create(activity=activity, exchange=activity.exch,
+                              cad_price_per_share=cad_price, total_cad_value=total_cad_value,
                               cad_commission=cad_commission, acb_total=acb_total, acb_change=acb_change,
                               acb_per_share=acb_per_share, qty_total=qty_total, capital_gain=capital_gain)
 
@@ -51,10 +53,8 @@ class CostBasisManager(models.Manager):
 
 
 class CostBasis(models.Model):
-    """
-    CostBasis
-    """
     activity = models.OneToOneField(Activity, null=True, blank=True, on_delete=models.CASCADE)
+    exchange = models.DecimalField(max_digits=16, decimal_places=6)
     cad_price_per_share = models.DecimalField(max_digits=16, decimal_places=6)
     total_cad_value = models.DecimalField(max_digits=16, decimal_places=6)
     cad_commission = models.DecimalField(max_digits=16, decimal_places=6)

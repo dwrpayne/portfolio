@@ -167,10 +167,6 @@ class Security(models.Model):
         self.datasource = datasource
         self.save()
 
-    def RefreshMetadata(self):
-        if self.type == self.Type.Stock:
-            self.metadata = GetYahooStockData(self.symbol)
-
     def NeedsSync(self):
         return self.GetShouldSyncRange(False)[0] is not None
 

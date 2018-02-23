@@ -3,7 +3,7 @@
 <ul>
     <li>In taxable accounts, you are holding {{ summary.qty | floatformat:0}} shares of {{ symbol }}.</li>
     <li>Your average cost per share is C{{ summary.acb_per_share | currency }}.</li>
-    <li>The current value per share is C{{ summary.price | currency }}.</li>
+    <li>The current value per share is C{{ summary.cadprice | currency }}.</li>
     <li>The total value is C{{ summary.total_value | currency }}.</li>
     <li>You have a current pending capital {{ summary.pending_gain | gain_word }}
         of C{{ summary.pending_gain | currency}} (C{{ summary.pending_gain_per_share | currency}} per share).</li>
