@@ -8,7 +8,7 @@
 </div>
 <div class="row">
     <div class="col-sm-12">
-        {% include "finance/activity_table.html" with show_account="true" show_security="false" %}
+        {% include "finance/activity_table.html" with show_account=True show_security=False %}
     </div>
 </div>
 
@@ -17,7 +17,7 @@
     <script src="https://code.highcharts.com/modules/data.js"></script>
     <script src="https://code.highcharts.com/stock/indicators/indicators.js"></script>
     <script>
-    $.get("{% url 'finance:securitychart' security %}", function(data) {
+    $.get("{% url 'finance:securitychart' security %}", function(series) {
         Highcharts.StockChart({
             boost: {
                 useGPUTranslations: true
@@ -27,13 +27,13 @@
                 width: 1000,
                 height: 500,
                 type: 'line',
-                zoomType: 'xy'
+                zoomType: 'x'
             },
             credits: {
                 enabled: false
             },
-            navigator: {
-                enabled: false,
+            legend: {
+                enabled: true,
             },
             plotOptions: {
                 series: {
@@ -54,31 +54,7 @@
                     }
                 }
             },
-            series: [{
-                name: 'Price',
-                type: 'line',
-                data: data[0],
-                color: 'blue',
-                id: 'price'
-            }, {
-                name: 'CAD Price',
-                type: 'line',
-                data: data[1],
-                color: 'orange'
-            },{
-                name: 'Purchases',
-                type: 'flags',
-                shape: 'squarepin',
-                onSeries: 'price',
-                allowXOverlap: true,
-                data: data[2]
-            },{
-                name: 'Dividends',
-                type: 'flags',
-                fillcolor: 'LightCyan',
-                shape: 'circlepin',
-                data: data[3]
-            }],
+            series: series,
             title: {
                 text: '{{ security.symbol }}'
             },

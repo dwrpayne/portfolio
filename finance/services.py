@@ -79,34 +79,6 @@ class HighChartLineGraph:
         return self.highchart._htmlcontent.decode('utf-8')
 
 
-def GenerateSecurityPlot(security, activities=None):
-    def fix_prices(prices):
-        return [(datetime.combine(day, datetime.min.time()), float(round(price, 2))) for day, price in prices]
-
-    graph = HighChartLineGraph(security.symbol, width=1000)
-    graph.add_trace('Price ({})'.format(security.currency), fix_prices(security.pricedetails.values_list('day', 'price')),
-                    id='price')
-
-    #if not security.currency == 'CAD':
-    #    graph.add_trace('Price (CAD)', fix_prices(security.pricedetails.values_list('day', 'cadprice')))
-
-    graph.add_trace('Purchases', [{'x': datetime.combine(day, datetime.min.time()),
-                                   'fillColor': 'GreenYellow' if qty > 0 else 'red',
-                                   'title': str(int(qty)),
-                                   'text': '{} {:.0f} @ {:.2f}'.format('Buy' if qty > 0 else 'Sell', qty, price),
-                                   } for day, qty, price in activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty')).values_list('tradeDate', 'total_qty', 'price')],
-                    series_type='flags', onSeries='price', shape='squarepin')
-
-    graph.add_trace('Dividends', [{'x': datetime.combine(day, datetime.min.time()),
-                                   'fillColor': 'LightCyan',
-                                   'title': '${:.2f}'.format(price),
-                                   'text': 'Dividend of ${:.2f}'.format(price),
-                                   } for day, price in activities.dividends().values_list('tradeDate', 'price').distinct()],
-                    series_type='flags', shape='circlepin')
-
-    return graph.plot()
-
-
 def get_growth_data(userprofile):
     days, values = list(zip(*userprofile.GetHoldingDetails().total_values()))
     dep_days, dep_amounts = map(list, list(zip(*userprofile.GetActivities().get_all_deposits())))

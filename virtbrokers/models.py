@@ -27,6 +27,10 @@ class VirtBrokersRawActivity(BaseRawActivity):
         elif self.type == 'INT':         self.type = Activity.Type.Interest
         else:                            assert False, 'Unmapped activity type in Virtual Brokers'
 
+        if self.type == Activity.Type.Dividend:
+            # We expect qty and netAmount to be valid here
+            self.price = self.netAmount / self.qty
+
         security = None
         if self.symbol:
             security, _ = Security.objects.get_or_create(symbol=self.symbol,

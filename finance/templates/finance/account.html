@@ -8,7 +8,7 @@ s{% extends "base.html" %}
 </div>
 <div class="row">
     <div class="col-sm-12">
-        {% include "finance/activity_table.html" with show_security="true" show_account="" activities=view.activities %}
+        {% include "finance/activity_table.html" with show_security=True show_account=False activities=view.activities %}
     </div>
 </div>
 {% endblock content %}

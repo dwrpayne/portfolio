@@ -25,7 +25,7 @@ from utils.misc import partition, window
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation, CostBasis
-from .services import GenerateSecurityPlot, RefreshButtonHandlerMixin, get_growth_data
+from .services import RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
 
@@ -50,7 +50,6 @@ class SecurityDetail(LoginRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         activities = self.object.activities.for_user(self.request.user).select_related('account')
         context['activities'] = list(activities.order_by('-tradeDate'))
-        self.chart_html = GenerateSecurityPlot(self.object, activities)
         return context
 
 
@@ -428,27 +427,48 @@ def security_chart(request, symbol):
     def to_ts(d):
         return datetime.datetime.combine(d, datetime.time.min).timestamp()*1000
     security = Security.objects.get(symbol=symbol)
-    pricedetails = security.pricedetails
-    prices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'price')]
-    cadprices = []
-    if not security.currency == 'CAD':
-        cadprices = [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'cadprice')]
-    data = [prices, cadprices]
+    series = []
+    series.append({
+        'name': 'Price',
+        'data': [(to_ts(d), float(p)) for d,p in security.prices.values_list('day', 'price')],
+        'color': 'blue',
+        'id': 'price'
+    })
+    # if not security.currency == 'CAD':
+    #     series.append({
+    #         'name': 'CAD Price',
+    #         'data': [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'cadprice')],
+    #         'color': 'orange'
+    #     })
 
     userprofile = request.user.userprofile
     activities = userprofile.GetActivities().for_security(security)
-    purchase_data = activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty')).values_list('tradeDate', 'total_qty', 'price')
-    purchases = [{'x': to_ts(day),
+    purchase_data = activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty'), ).values_list('tradeDate', 'total_qty', 'price')
+    series.append({
+        'name': 'Purchases',
+        'type': 'flags',
+        'shape': 'squarepin',
+        'onSeries': 'price',
+        'allowOverlapX': True,
+        'data': [{'x': to_ts(day),
                   'fillColor': 'GreenYellow' if qty > 0 else 'red',
                   'title': str(int(qty)),
                   'text': '{} {:.0f} @ {:.2f}'.format('Buy' if qty > 0 else 'Sell', qty, price),
                   } for day, qty, price in purchase_data]
-    dividends = [{'x': to_ts(day),
+    })
+    series.append({
+        'name': 'Dividends',
+        'type': 'flags',
+        'fillColor': 'LightCyan',
+        'shape': 'circlepin',
+        'allowOverlapX': True,
+        'data': [{'x': to_ts(day),
                   'title': '{:.2f}'.format(price),
                   'text': 'Dividend of ${:.2f}'.format(price),
                   } for day, price in activities.dividends().values_list('tradeDate', 'price').distinct()]
-    data.extend([purchases, []])
-    return JsonResponse(data, safe=False)
+
+    })
+    return JsonResponse(series, safe=False)
 
 
 @login_required
