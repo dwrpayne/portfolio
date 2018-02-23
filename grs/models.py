@@ -86,8 +86,8 @@ class GrsClient(models.Model):
         response = self.session.post(
             'https://ssl.grsaccess.com/english/member/activity_reports_details.aspx',
             data={
-                'MbrPlanId': account.account_id, 'txtEffStartDate': start.format('MM/DD/YYYY'),
-                'txtEffEndDate': end.format('MM/DD/YYYY'), 'Submit': 'Submit'
+                'MbrPlanId': account.account_id, 'txtEffStartDate': start.format('%m/%d/%Y'),
+                'txtEffEndDate': end.format('%m/%d/%Y'), 'Submit': 'Submit'
             }
         )
         response.raise_for_status()
