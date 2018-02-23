@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from datetime import date, timedelta
 import requests
 import pandas
@@ -87,7 +88,7 @@ class PandasDataSource(DataSourceMixin):
 
 
 class AlphaVantageDataSource(DataSourceMixin):
-    api_key = models.CharField(max_length=32, default='P38D2XH1GFHST85V')
+    api_key = models.CharField(max_length=32, default=settings.ALPHAVANTAGE_KEY)
     function = models.CharField(max_length=32, default='TIME_SERIES_DAILY')
     symbol = models.CharField(max_length=32)
 

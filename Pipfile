@@ -7,7 +7,7 @@ name = "pypi"
 
 [packages]
 
-celery = "==4.0.2"
+celery = {git = "https://github.com/celery/celery.git", ref = "master"}
 Django = "*"
 requests = "*"
 dj-database-url = "*"

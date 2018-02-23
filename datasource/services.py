@@ -1,13 +1,13 @@
 from decimal import Decimal
 import json
 import requests
-
+from django.conf import settings
 
 # TODO: Yuck, this is really hacky and needs a refactor. I just need it working for now.
 # TODO: Maybe a ManyToMany field to support multiple data sources per security?
 # TODO: Or maybe a DataSource that aggregates data from multiple sources
 def GetLiveAlphaVantageExchangeRate(symbol):
-    params = {'function': 'CURRENCY_EXCHANGE_RATE', 'apikey': 'P38D2XH1GFHST85V',
+    params = {'function': 'CURRENCY_EXCHANGE_RATE', 'apikey': settings.ALPHAVANTAGE_KEY,
               'from_currency': symbol, 'to_currency': 'CAD'}
     r = requests.get('https://www.alphavantage.co/query', params=params)
     if r.ok:

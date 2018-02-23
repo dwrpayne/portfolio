@@ -136,7 +136,8 @@ MEDIA_URL = '/upload/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'upload')
 
 # Encryption
-FERNET_KEYS = [config('FERNET_KEY')]
+OLD_KEYS = ['wh!njj$_m#fw1a%up--i_0a$d2r2kb1g6=m@fqq3qqyb1dro*4\'`n']
+FERNET_KEYS = [config('FERNET_KEY'), *OLD_KEYS]
 
 # Logging
 LOGGING = {
@@ -192,6 +193,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 # Hijack
 HIJACK_USE_BOOTSTRAP = True
 
+ALPHAVANTAGE_KEY = config('ALPHAVANTAGE_KEY')
 
 # Email
 EMAIL_HOST = 'smtp.sendgrid.net'
