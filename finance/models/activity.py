@@ -138,6 +138,14 @@ class ActivityManager(models.Manager):
         kwargs['netAmount'] *= -1
         self.create(**kwargs)
 
+    def create_with_withdrawal(self, **kwargs):
+        self.create(**kwargs)
+
+        kwargs.update({'security' : None, 'description' : 'Generated Withdrawal', 'qty' : 0,
+                      'price' : 0, 'type' : Activity.Type.Withdrawal})
+        kwargs['netAmount'] *= -1
+        self.create(**kwargs)
+
     def create_fx(self, to_currency, to_amount, from_currency, from_amount, **kwargs):
         from_args = kwargs
         from_args['cash_id'] = from_currency

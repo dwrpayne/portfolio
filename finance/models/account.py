@@ -113,6 +113,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
                 raw.CreateActivity()
         self.RegenerateHoldings()
         from .costbasis import CostBasis
+        CostBasis.objects.filter(activity__account=self).delete()
         CostBasis.objects.create_from_activities(self.activities)
 
     def RegenerateHoldings(self):

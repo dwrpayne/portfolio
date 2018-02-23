@@ -48,6 +48,10 @@ class TangerineRawActivity(BaseRawActivity):
             # Tangerine uses this to indicate a DRIP - aka deposit of shares
             # We'll consider it a Buy, with no cash effect and no associated deposit
             activity_type = Activity.Type.Buy
+        elif self.type == 'Redemption':
+            activity_type = Activity.Type.Sell
+            creation_fn = Activity.objects.create_with_withdrawal
+            net_amount = -(Decimal(self.qty) * Decimal(self.price))
         else:
             activity_type = Activity.Type.NotImplemented
 
