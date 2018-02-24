@@ -11,7 +11,6 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.forms import modelformset_factory
 from django.http import Http404, HttpResponse, JsonResponse
 from django.db.models import Sum
 from django.shortcuts import redirect
@@ -23,8 +22,8 @@ from django.views.generic.edit import FormView, UpdateView
 from securities.models import Security
 from utils.misc import partition, window
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
-from .forms import UserForm
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, Allocation, CostBasis
+from .forms import UserForm, AllocationForm, AllocationFormSet
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis
 from .services import RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
@@ -288,17 +287,50 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
 
 class RebalanceView(LoginRequiredMixin, FormView):
     template_name = 'finance/rebalance.html'
-    form_class = modelformset_factory(Allocation, fields=['securities', 'desired_pct'])
+    form_class = AllocationForm
+
+    def get_filled_allocations(self, cashadd=0):
+        return self.request.user.userprofile.GetRebalanceInfo(cashadd)
 
     def get_context_data(self, **kwargs):
         cashadd = int(self.request.GET.get('cashadd', 0))
-        allocs, leftover = self.request.user.userprofile.GetRebalanceInfo(cashadd)
+        allocs, leftover = self.get_filled_allocations()
 
         context = super().get_context_data(**kwargs)
+        context['formset'] = AllocationFormSet(queryset=allocs)
+
         context.update( {'allocs': allocs, 'leftover': leftover} )
         return context
 
-    # TODO: Create formset_factory with extra param right here!
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def post(self, request, *args, **kwargs):
+        if 'form-add' in request.POST:
+            return super().post(request, *args, **kwargs)
+        else:
+            form = AllocationFormSet(self.request.POST)
+            if form.is_valid():
+                return self.formset_valid(form)
+            else:
+                return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, 'An error occurred.')
+        return render(self.request, self.template_name, self.get_context_data())
+
+    def formset_valid(self, form):
+        form.save()
+        return render(self.request, self.template_name, self.get_context_data())
+
+    def form_valid(self, form):
+        allocationform = form.save(commit=False)
+        allocationform.user = self.request.user
+        allocationform.save()
+        form.save_m2m()
+        return render(self.request, self.template_name, self.get_context_data())
 
 
 def GetHoldingsContext(userprofile, as_of_date=None):

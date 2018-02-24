@@ -39,13 +39,15 @@ def currency(dollars, decimals=2):
 
 @register.filter()
 def currencyround(dollars):
+    if dollars == '':
+        return ''
     prefix = '' if dollars > -0.004 else '-'
     return '{}${:,d}'.format(prefix, abs(round(dollars)))
 
 
 @register.filter()
 def percentage(amount, decimals=2):
-    if not amount:
+    if amount == '' or amount is None:
         return amount
     return '{:,.{}f}%'.format(amount * 100, decimals)
 

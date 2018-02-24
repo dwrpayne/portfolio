@@ -1,5 +1,5 @@
 import datetime
-from itertools import groupby, chain
+from itertools import groupby
 
 import pendulum
 from django.conf import settings
@@ -36,8 +36,10 @@ class UserProfile(models.Model):
         pass
 
     def GetHeldSecurities(self):
-        return Holding.objects.for_user(
-            self.user).current().values_list('security_id', flat=True).distinct()
+        return Security.objects.filter(pk__in=self.GetCurrentHoldings().values_list('security'))
+
+    def GetCurrentHoldings(self):
+        return Holding.objects.for_user(self.user).current()
 
     def GetCapGainsSecurities(self):
         only_taxable_accounts = True
@@ -160,27 +162,25 @@ class UserProfile(models.Model):
     def GetRebalanceInfo(self, cashadd=0):
         holdings = self.GetHoldingDetails().today().select_related('account', 'security')
         total_value = sum(holdings).value + cashadd
-        allocs = self.user.allocations.all()
-        leftover = {'desired_pct': 1, 'current_pct': 1, 'current_amt': total_value}
+        allocs = self.user.allocations.all().order_by('-desired_pct')
+        leftover = {'desired_pct': 100, 'current_pct': 100, 'current_amt': total_value,
+                    'desired_amt': 0, 'buysell': 0,
+                    'list_securities': ', '.join(map(str,self.user.allocations.get_unallocated_securities()))}
         for alloc in allocs:
-            alloc.current_amt = sum(holdings.for_securities(alloc.securities.all())).value
+            holdingsum = sum(holdings.for_securities(alloc.securities.all()))
+            alloc.current_amt = holdingsum.value if holdingsum else 0
             if alloc.securities.filter(symbol='CAD'):
                 alloc.current_amt += cashadd
 
-            alloc.current_pct = alloc.current_amt / total_value
-            alloc.desired_amt = alloc.desired_pct * total_value
+            alloc.current_pct = alloc.current_amt / total_value * 100
+            alloc.desired_amt = alloc.desired_pct * total_value / 100
             alloc.buysell = alloc.desired_amt - alloc.current_amt
 
             leftover['desired_pct'] -= alloc.desired_pct
             leftover['current_pct'] -= alloc.current_pct
             leftover['current_amt'] -= alloc.current_amt
+            leftover['desired_amt'] += alloc.desired_amt
+            leftover['buysell'] += alloc.buysell
 
-        if leftover['desired_pct'] > 0:
-            leftover['list_securities'] = ', '.join(holdings.exclude(security__in=allocs.values_list(
-                'securities', flat=True)).values_list('security', flat=True))
-            leftover['desired_amt'] = leftover['desired_pct'] * total_value
-            leftover['buysell'] = leftover['desired_amt'] - leftover['current_amt']
-            return allocs, leftover
-
-        return allocs, None
+        return allocs, leftover
 

@@ -1,8 +1,11 @@
 from django import forms
 from django.core.mail import send_mail
-from .models import AccountCsv, UserProfile
+from .models import AccountCsv, UserProfile, Allocation
 from django.contrib.auth import get_user_model
-from django.forms.models import inlineformset_factory
+from django.forms.models import inlineformset_factory, modelformset_factory
+from django.forms.widgets import NumberInput, CheckboxSelectMultiple
+from django.core.exceptions import ValidationError
+
 
 class FeedbackForm(forms.Form):
     name = forms.CharField(widget=forms.HiddenInput(), max_length=100)
@@ -51,3 +54,36 @@ class AccountCsvForm(forms.ModelForm):
         user = kwargs.pop('user')
         super().__init__(*args, **kwargs)
         self.fields['account'].queryset = self.fields['account'].queryset.for_user(user)
+
+
+class AllocationForm(forms.ModelForm):
+    class Meta:
+        model = Allocation
+        fields = ['securities', 'desired_pct']
+        labels = {'securities': 'Select a group of securities to add a grouped allocation for.',
+                  'desired_pct': 'The percentage of your portfolio to allocate to this group of securities'}
+        widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100}),
+                   'securities': CheckboxSelectMultiple}
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user')
+        super().__init__(*args, **kwargs)
+        self.fields['securities'].queryset = user.allocations.get_unallocated_securities()
+
+    def clean_securities(self):
+        securities = self.cleaned_data['securities']
+        if self.cleaned_data['user'].userprofile.allocations.filter(securities__in=securities):
+            raise ValidationError('User already has an allocation for this security')
+        return securities
+
+
+class BaseAllocationFormSet(forms.BaseFormSet):
+    def clean(self):
+        if any(self.errors):
+            return
+
+
+AllocationFormSet = modelformset_factory(Allocation,
+                                         fields=('desired_pct',),
+                                         extra=0,
+                                         can_delete=True)
