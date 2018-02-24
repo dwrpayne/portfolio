@@ -49,19 +49,22 @@
         </table>
         <input type="submit" name="formset-modify" value="Modify allocations" />
     </form>
-    <form action="" method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <input type="submit" name="form-add" value="Add new allocation" />
-    </form>
-
+    {% if leftover %}
+        <br><br>
+            <b>You have not specified an allocation for the following securities you hold. You can set a target allocation for a group of securities.</b>
+        <form action="" method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <input type="submit" name="form-add" value="Add new allocation" />
+        </form>
+    {% endif %}
 
     </div>
-    <div class="col-sm-3">
+    <div class="col-sm-2">
         <div class="form-group">
             <form action="" id="date-submit-form" method="get">
                 <label for="cashadd">Additional cash to invest:</label>
-                <input type="text" class="form-control" id="cashadd" name="cashadd">
+                <input type="number" class="form-control" required id="cashadd" name="cashadd" placeholder="{{ cashadd }}">
                 <button type="submit">Submit</button>
             </form>
         </div>

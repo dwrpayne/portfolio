@@ -60,30 +60,36 @@ class AllocationForm(forms.ModelForm):
     class Meta:
         model = Allocation
         fields = ['securities', 'desired_pct']
-        labels = {'securities': 'Select a group of securities to add a grouped allocation for.',
+        labels = {'securities': 'Select one or several securities.',
                   'desired_pct': 'The percentage of your portfolio to allocate to this group of securities'}
-        widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100}),
+        widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width':50}),
                    'securities': CheckboxSelectMultiple}
 
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user')
+        self.user = kwargs.pop('user')
         super().__init__(*args, **kwargs)
-        self.fields['securities'].queryset = user.allocations.get_unallocated_securities()
+        self.fields['securities'].queryset = self.user.allocations.get_unallocated_securities()
 
     def clean_securities(self):
         securities = self.cleaned_data['securities']
-        if self.cleaned_data['user'].userprofile.allocations.filter(securities__in=securities):
+        if self.user.allocations.filter(securities__in=securities):
             raise ValidationError('User already has an allocation for this security')
         return securities
 
 
-class BaseAllocationFormSet(forms.BaseFormSet):
+class BaseAllocationFormSet(forms.BaseModelFormSet):
     def clean(self):
         if any(self.errors):
             return
+        total = sum(form.cleaned_data['desired_pct'] for form in self.forms)
+        if total > 100:
+            raise forms.ValidationError("Total percentages must sum to less than 100. Yours totalled {}".format(total))
+
 
 
 AllocationFormSet = modelformset_factory(Allocation,
+                                         formset=BaseAllocationFormSet,
                                          fields=('desired_pct',),
+                                         widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width':50})},
                                          extra=0,
                                          can_delete=True)

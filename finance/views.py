@@ -294,17 +294,24 @@ class RebalanceView(LoginRequiredMixin, FormView):
 
     def get_context_data(self, **kwargs):
         cashadd = int(self.request.GET.get('cashadd', 0))
-        allocs, leftover = self.get_filled_allocations()
+        allocs, leftover = self.get_filled_allocations(cashadd)
 
         context = super().get_context_data(**kwargs)
         context['formset'] = AllocationFormSet(queryset=allocs)
-
+        context['cashadd'] = cashadd
         context.update( {'allocs': allocs, 'leftover': leftover} )
+
+        total = sum(a.desired_pct for a in allocs)
+        if total < 100 and not leftover:
+            messages.warning(self.request, 'Your allocation percentages only total to {}. Your numbers will be inaccurate until you fix this!'.format(total))
+
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
+        if not 'form-add' in self.request.POST:
+            kwargs['empty_permitted'] = True
         return kwargs
 
     def post(self, request, *args, **kwargs):
@@ -318,7 +325,16 @@ class RebalanceView(LoginRequiredMixin, FormView):
                 return self.form_invalid(form)
 
     def form_invalid(self, form):
-        messages.error(self.request, 'An error occurred.')
+        if 'formset-modify' in self.request.POST:
+            for error in form.non_form_errors():
+                messages.error(self.request, error)
+            for errorlist in form.errors:
+                for error in errorlist:
+                    messages.error(self.request, error)
+        else:
+            for error in form.errors:
+                messages.error(self.request, error)
+
         return render(self.request, self.template_name, self.get_context_data())
 
     def formset_valid(self, form):
@@ -493,8 +509,10 @@ def security_chart(request, symbol):
 @login_required
 def index(request):
     context = {}
-    if not request.user.userprofile.AreSecurityPricesUpToDate():
-        context['updating'] = True
+    current = Security.objects.filter(holdings__enddate=None).distinct()
+    num_prices = current.filter(prices__day=datetime.date.today()).count()
+    if current.count() > num_prices:
+        messages.warning(request, 'Currently updating out-of-date stock data ({} of {} complete). The system will not work until we finish the data sync. Please try again in a few seconds.'.format(num_prices, current.count()))
         SyncSecurityTask.delay(False)
 
     if request.user.is_authenticated:
