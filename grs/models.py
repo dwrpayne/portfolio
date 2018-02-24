@@ -28,7 +28,7 @@ class GrsRawActivity(BaseRawActivity):
 
     def CreateActivity(self):
         security, created = Security.mutualfunds.get_or_create(symbol=self.symbol,
-                                           defaults={'currency':'CAD', 'datasource': None})
+                                           defaults={'currency':'CAD'})
         if created:
             security.SetDataSource(GrsDataSource.objects.get_or_create(symbol=self.symbol))
 

@@ -12,7 +12,7 @@ class SecurityAdmin(admin.ModelAdmin):
     latest_update_day.short_description = "Latest Price"
     list_filter = ['currency', 'type']
     list_display = ['symbol', 'type', 'currency', 'live_price',
-                    'first_update_day', 'latest_update_day', 'datasource']
+                    'first_update_day', 'latest_update_day', 'get_datasource_list']
 
 
 admin.site.register(Security, SecurityAdmin)

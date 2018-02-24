@@ -17,5 +17,5 @@
     <td><button type="submit" class="refresh" data-refresh-div="row-{{ security }}" data-refresh-type="sync-{{ security.symbol }}">Sync</td>
     <td>{{ security.last_sync_time}}</td>
     <td>{{ security.prices.latest.price | currency}}</td>
-    <td>{{ security.datasource }}</td>
+    <td>{{ security.datasources.all }}</td>
 </tr>

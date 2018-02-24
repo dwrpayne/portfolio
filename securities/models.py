@@ -16,10 +16,10 @@ from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 class SecurityQuerySet(models.QuerySet):
     def create(self, **kwargs):
         kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
-        kwargs.setdefault('datasource', self.model.get_default_datasource(kwargs['type'], kwargs['symbol']))
-        if kwargs['type'] == self.model.Type.Stock:
-            pass  # kwargs['metadata'] = GetYahooStockData(kwargs['symbol'])
-        return super().create(**kwargs)
+        obj = super().create(**kwargs)
+        obj.datasources.add(self.model.get_default_datasource(kwargs['type'], kwargs['symbol']))
+        obj.save()
+        return obj
 
 
 class SecurityManager(models.Manager):
@@ -105,8 +105,7 @@ class Security(models.Model):
     description = models.CharField(max_length=500, null=True, blank=True, default='')
     type = models.CharField(max_length=12, choices=Type, default=Type.Stock)
     currency = models.CharField(max_length=3, default='XXX')
-    datasource = models.ForeignKey(DataSourceMixin, null=True, blank=True,
-                                   default=None, on_delete=models.SET_NULL)
+    datasources = models.ManyToManyField(DataSourceMixin, related_name='securities')
     last_sync_time = models.DateTimeField(null=True, blank=True, default=None)
 
     objects = SecurityManager.from_queryset(SecurityQuerySet)()
@@ -163,8 +162,16 @@ class Security(models.Model):
             obj, created = MorningstarDataSource.objects.get_or_create(symbol=symbol)
         return obj
 
+    def get_datasource_list(self):
+        return ', '.join(map(str,self.datasources.all()))
+
     def SetDataSource(self, datasource):
-        self.datasource = datasource
+        self.datasources.clear()
+        self.datasources.add(datasource)
+        self.save()
+
+    def AddDataSource(self, datasource):
+        self.datasources.add(datasource)
         self.save()
 
     def NeedsSync(self):
@@ -213,7 +220,7 @@ class Security(models.Model):
         if start is None:
             return []
 
-        data = self.datasource.GetData(start, end)
+        data = self.datasources.first().GetData(start, end)
 
         with transaction.atomic():
             for day, price in data:
