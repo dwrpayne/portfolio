@@ -51,7 +51,8 @@
     </form>
     {% if leftover %}
         <br><br>
-            <b>You have not specified an allocation for the following securities you hold. You can set a target allocation for a group of securities.</b>
+            <b>You have not specified an allocation percentage for the following securities you hold. You can set a target allocation for a group of securities.</b><br>
+            <b>You have {{ unassigned_pct }}% remaining to assign.</b>
         <form action="" method="post">
             {% csrf_token %}
             {{ form.as_p }}

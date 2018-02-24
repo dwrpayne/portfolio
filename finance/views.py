@@ -29,7 +29,7 @@ from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, H
 
 
 def check_for_missing_securities(request):
-    current = Holding.objects.current().distinct()
+    current = Holding.objects.current().values_list('security_id').distinct()
     num_prices = current.filter(security__prices__day=datetime.date.today()).count()
     if current.count() > num_prices:
         messages.warning(request, 'Currently updating out-of-date stock data. Please try again in a few seconds.'.format(num_prices, current.count()))
@@ -308,6 +308,7 @@ class RebalanceView(LoginRequiredMixin, FormView):
         context.update( {'allocs': allocs, 'leftover': leftover} )
 
         total = sum(a.desired_pct for a in allocs)
+        context['unassigned_pct'] = 100 - total
         if total < 100 and not leftover:
             messages.warning(self.request, 'Your allocation percentages only total to {}. Your numbers will be inaccurate until you fix this!'.format(total))
 
@@ -360,8 +361,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
     today_query = userprofile.GetHoldingDetails().at_date(as_of_date).select_related('security', 'account')
     yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1)).select_related('security', 'account')
-    yesterday_list = list(yesterday_query)
-    account_data = {(h.security_id, h.account_id) : 0 for h in today_query | yesterday_query}
+    account_data = {(h.security_id, h.account_id) : 0 for h in list(today_query) + list(yesterday_query)}
     for h in today_query:
         account_data[(h.security_id, h.account_id)] += h
     for h in yesterday_query:

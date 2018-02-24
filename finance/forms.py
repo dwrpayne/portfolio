@@ -61,7 +61,7 @@ class AllocationForm(forms.ModelForm):
         model = Allocation
         fields = ['securities', 'desired_pct']
         labels = {'securities': 'Select one or several securities.',
-                  'desired_pct': 'The percentage of your portfolio to allocate to this group of securities'}
+                  'desired_pct': 'The percentage of your portfolio to allocate to this group of securities: '}
         widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width':50}),
                    'securities': CheckboxSelectMultiple}
 
