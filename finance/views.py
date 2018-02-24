@@ -23,14 +23,14 @@ from securities.models import Security
 from utils.misc import partition, window
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm, AllocationForm, AllocationFormSet
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, Holding
 from .services import RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
 
 def check_for_missing_securities(request):
-    current = Security.objects.filter(holdings__enddate=None).distinct()
-    num_prices = current.filter(prices__day=datetime.date.today()).count()
+    current = Holding.objects.current().distinct()
+    num_prices = current.filter(security__prices__day=datetime.date.today()).count()
     if current.count() > num_prices:
         messages.warning(request, 'Currently updating out-of-date stock data. Please try again in a few seconds.'.format(num_prices, current.count()))
         messages.debug(request, '{} of {} synced'.format(num_prices, current.count()))
@@ -91,9 +91,6 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
     model = Security
     template_name = 'finance/admin/securities.html'
     context_object_name = 'securities'
-
-    def securities_by_status(self):
-        return partition(lambda s: not s.NeedsSync(), self.get_queryset())
 
     def ajax_request(self, request, action):
         action, symbol = action.split('-')

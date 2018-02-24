@@ -25,10 +25,8 @@
             <th>Data Source</th>
         </thead>
         <tbody>
-            {% for status in view.securities_by_status %}
-                {% for security in status %}
-                    {% include "finance/admin/securityrow.html" %}
-                {% endfor %}
+            {% for security in securities %}
+                {% include "finance/admin/securityrow.html" %}
             {% endfor %}
         </tbody>
     </table>
