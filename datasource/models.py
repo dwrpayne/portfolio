@@ -101,8 +101,7 @@ class AlphaVantageDataSource(DataSourceMixin):
     def validate_symbol(self):
         """Go through our list of possible symbol transformations to find one that has data in the last week"""
         original_symbol = self.symbol
-        possible_symbols = [self.symbol, self.symbol + '.TO',
-                            self.symbol.replace('.', '-'), self.symbol.replace('.', '-') + '.TO']
+        possible_symbols = [self.symbol, self.symbol + '.TO', self.symbol.replace('.', '-') + '.TO']
 
         for symbol in possible_symbols:
             self.symbol = symbol

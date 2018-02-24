@@ -77,21 +77,23 @@ class QuestradeRawActivity(BaseRawActivity):
 
         # TODO: This should be in a database table for sure.
         if not json['symbol']:
-            if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol'] = 'XIU.TO'
+            if 'ISHARES S&P/TSX 60 INDEX' in json['description']:          json['symbol'] = 'XIU'
             elif 'VANGUARD GROWTH ETF' in json['description']:             json['symbol'] = 'VUG'
             elif 'SMALLCAP GROWTH ETF' in json['description']:             json['symbol'] = 'VBK'
             elif 'SMALL-CAP VALUE ETF' in json['description']:             json['symbol'] = 'VBR'
-            elif 'ISHARES MSCI EAFE INDEX' in json['description']:         json['symbol'] = 'XIN.TO'
+            elif 'ISHARES MSCI EAFE INDEX' in json['description']:         json['symbol'] = 'XIN'
             elif 'AMERICAN CAPITAL AGENCY CORP' in json['description']:    json['symbol'] = 'AGNC'
             elif 'MSCI JAPAN INDEX FD' in json['description']:             json['symbol'] = 'EWJ'
             elif 'VANGUARD EMERGING' in json['description']:               json['symbol'] = 'VWO'
             elif 'EMERGING MKTS' in json['description']:                   json['symbol'] = 'VWO'
             elif 'VANGUARD MID-CAP GROWTH' in json['description']:         json['symbol'] = 'VOT'
-            elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol'] = 'XBB.TO'
+            elif 'ISHARES DEX SHORT TERM BOND' in json['description']:     json['symbol'] = 'XBB'
             elif 'ELECTRONIC ARTS INC' in json['description']:             json['symbol'] = 'EA'
-            elif 'WESTJET AIRLINES' in json['description']:                json['symbol'] = 'WJA.TO'
+            elif 'WESTJET AIRLINES' in json['description']:                json['symbol'] = 'WJA'
 
-        if json['symbol'] == 'TWMJF': json['symbol'] = 'WEED.TO'
+        if json['symbol'] == 'TWMJF': json['symbol'] = 'WEED'
+        if json['symbol'].endswith('.TO'):
+            json['symbol'] = json['symbol'][:-3]
 
         if json['action'] == 'FXT':
             if 'AS OF ' in json['description']:

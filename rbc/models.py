@@ -29,10 +29,6 @@ class RbcRawActivity(BaseRawActivity):
             self.type = 'Buy'
             self.price = Decimal(self.description.split('REINV@')[1].split()[0].split('$')[1])
 
-        # Todo: stocks shouldn't have .TO - that is datasource level only.
-        if self.symbol in ['VCN', 'VFV', 'VDY', 'VDU']:
-            self.symbol += '.TO'
-
         security = None
         if self.symbol:
             security, _ = Security.objects.get_or_create(symbol=self.symbol,
