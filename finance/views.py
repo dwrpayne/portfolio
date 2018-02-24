@@ -28,6 +28,15 @@ from .services import RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
 
 
+def check_for_missing_securities(request):
+    current = Security.objects.filter(holdings__enddate=None).distinct()
+    num_prices = current.filter(prices__day=datetime.date.today()).count()
+    if current.count() > num_prices:
+        messages.warning(request, 'Currently updating out-of-date stock data. Please try again in a few seconds.'.format(num_prices, current.count()))
+        messages.debug(request, '{} of {} synced'.format(num_prices, current.count()))
+        SyncSecurityTask.delay(False)
+
+
 class AccountDetail(LoginRequiredMixin, DetailView):
     model = BaseAccount
     template_name = 'finance/account.html'
@@ -406,10 +415,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 @login_required
 def Portfolio(request):
     userprofile = request.user.userprofile
-
-    if not userprofile.AreSecurityPricesUpToDate():
-        SyncSecurityTask.delay(False)
-        return render(request, 'finance/index.html', {'updating':True})
+    check_for_missing_securities(request)
 
     if request.is_ajax():
         if 'refresh-account' in request.GET:
@@ -509,11 +515,7 @@ def security_chart(request, symbol):
 @login_required
 def index(request):
     context = {}
-    current = Security.objects.filter(holdings__enddate=None).distinct()
-    num_prices = current.filter(prices__day=datetime.date.today()).count()
-    if current.count() > num_prices:
-        messages.warning(request, 'Currently updating out-of-date stock data ({} of {} complete). The system will not work until we finish the data sync. Please try again in a few seconds.'.format(num_prices, current.count()))
-        SyncSecurityTask.delay(False)
+    check_for_missing_securities(request)
 
     if request.user.is_authenticated:
         return render(request, 'finance/index.html', context)
