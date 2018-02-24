@@ -291,17 +291,11 @@ class RebalanceView(LoginRequiredMixin, FormView):
     form_class = modelformset_factory(Allocation, fields=['securities', 'desired_pct'])
 
     def get_context_data(self, **kwargs):
-        cashadd = kwargs.get('cashadd', 0)
-        allocs, missing = self.request.user.userprofile.GetRebalanceInfo(cashadd)
-
-        total = [sum(getattr(a, 'desired_pct', 0) for a in allocs),
-                 sum(getattr(a, 'current_pct', 0) for a in allocs),
-                 sum(getattr(a, 'desired_amt', 0) for a in allocs),
-                 sum(getattr(a, 'current_amt', 0) for a in allocs),
-                 sum(getattr(a, 'buysell', 0) for a in allocs)]
+        cashadd = int(self.request.GET.get('cashadd', 0))
+        allocs, leftover = self.request.user.userprofile.GetRebalanceInfo(cashadd)
 
         context = super().get_context_data(**kwargs)
-        context.update( {'allocs': allocs, 'missing': missing, 'total': total} )
+        context.update( {'allocs': allocs, 'leftover': leftover} )
         return context
 
     # TODO: Create formset_factory with extra param right here!
@@ -313,20 +307,12 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     today_query = userprofile.GetHoldingDetails().at_date(as_of_date).select_related('security', 'account')
     yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1)).select_related('security', 'account')
     yesterday_list = list(yesterday_query)
-    account_data = []
-    for today in today_query:
-        yesterday_matches = [y for y in yesterday_query if y.account == today.account and y.security == today.security]
-        if yesterday_matches:
-            account_data.append(today-yesterday_matches[0])
-            yesterday_list.remove(yesterday_matches[0])
-        else:
-            # We bought this security today.
-            account_data.append(today - 0)
-
-    # Check yesterday's holdings to see if there were any that we haven't processed yet (ie sold today)
-    for yesterday in yesterday_list:
-        account_data.append(0 - yesterday)
-
+    account_data = {(h.security_id, h.account_id) : 0 for h in today_query | yesterday_query}
+    for h in today_query:
+        account_data[(h.security_id, h.account_id)] += h
+    for h in yesterday_query:
+        account_data[(h.security_id, h.account_id)] -= h
+    account_data = account_data.values()
 
     holding_data = []
     for security, holdings in groupby(account_data, lambda h: h.security):
@@ -335,7 +321,8 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         holding_data.append(h)
 
     holding_data = sorted(holding_data, key=attrgetter('security'))
-    holding_data, cash_data = partition(lambda h: h.security_type==Security.Type.Cash, holding_data)
+    cash_types = Security.cash.values_list('symbol', flat=True)
+    holding_data, cash_data = partition(lambda h: h.security in cash_types, holding_data)
 
     context = {'holding_data': holding_data,
                'cash_data': cash_data,

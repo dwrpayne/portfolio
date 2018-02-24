@@ -17,16 +17,6 @@
                     <th>Buy/Sell</th>
                 </tr>
             </thead>
-            <tfoot>
-                <tr>
-                    <td></td>
-                    <td>{{total.0 | percentage:0}}</td>
-                    <td>{{total.1 | percentage}}</td>
-                    <td>{{total.2 | currencyround}}</td>
-                    <td>{{total.3 | currencyround}}</td>
-                    <td>{{total.4 | currencyround | colorize}}</td>
-                </tr>
-            </tfoot>
             <tbody>
                 {% for alloc in allocs %}
                 <tr>
@@ -38,16 +28,14 @@
                     <td>{{alloc.buysell | currencyround | colorize}}</td>
                 </tr>
                 {% endfor %}
-                {% for holding in missing %}
                 <tr>
-                    <td>{{holding.security}}</td>
-                    <td>**MISSING**</td>
-                    <td>{{holding.current_pct | percentage}}</td>
-                    <td>**MISSING**</td>
-                    <td>{{holding.value | currencyround}}</td>
-                    <td>DEFINE ME</td>
+                    <td>{{leftover.list_securities}}</td>
+                    <td>{{leftover.desired_pct | percentage:0}} (Inferred)</td>
+                    <td>{{leftover.current_pct | percentage}}</td>
+                    <td>{{leftover.desired_amt | currencyround}}</td>
+                    <td>{{leftover.current_amt | currencyround}}</td>
+                    <td>{{leftover.buysell | currencyround | colorize}}</td>
                 </tr>
-                {% endfor %}
             </tbody>
         </table>
     </div>

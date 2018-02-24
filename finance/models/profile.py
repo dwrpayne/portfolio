@@ -1,5 +1,5 @@
 import datetime
-from itertools import groupby
+from itertools import groupby, chain
 
 import pendulum
 from django.conf import settings
@@ -158,16 +158,29 @@ class UserProfile(models.Model):
         return self.GetActivities().earliest().tradeDate
 
     def GetRebalanceInfo(self, cashadd=0):
-        holdings = self.GetHoldingDetails().today()
+        holdings = self.GetHoldingDetails().today().select_related('account', 'security')
         total_value = sum(holdings).value + cashadd
-        allocs = self.user.allocations.with_rebalance_info(total_value, cashadd)
+        allocs = self.user.allocations.all()
+        leftover = {'desired_pct': 1, 'current_pct': 1, 'current_amt': total_value}
+        for alloc in allocs:
+            alloc.current_amt = sum(holdings.for_securities(alloc.securities.all())).value
+            if alloc.securities.filter(symbol='CAD'):
+                alloc.current_amt += cashadd
 
-        missing_holdings = holdings.exclude(security__in=allocs.values_list('securities'))
-        missing = []
-        for sec, group in groupby(missing_holdings, lambda h: h.security):
-            value = sum(group).value
-            missing.append({'security': sec,
-                            'value': value,
-                            'current_pct': value / total_value if total_value else 0})
-        return allocs, missing
+            alloc.current_pct = alloc.current_amt / total_value
+            alloc.desired_amt = alloc.desired_pct * total_value
+            alloc.buysell = alloc.desired_amt - alloc.current_amt
+
+            leftover['desired_pct'] -= alloc.desired_pct
+            leftover['current_pct'] -= alloc.current_pct
+            leftover['current_amt'] -= alloc.current_amt
+
+        if leftover['desired_pct'] > 0:
+            leftover['list_securities'] = ', '.join(holdings.exclude(security__in=allocs.values_list(
+                'securities', flat=True)).values_list('security', flat=True))
+            leftover['desired_amt'] = leftover['desired_pct'] * total_value
+            leftover['buysell'] = leftover['desired_amt'] - leftover['current_amt']
+            return allocs, leftover
+
+        return allocs, None
 
