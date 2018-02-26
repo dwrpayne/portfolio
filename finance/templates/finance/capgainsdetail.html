@@ -57,7 +57,7 @@
                 <tbody>
                 {% for costbasis in costbases %}
                     <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
-                        <td>{{costbasis.activity.tradeDate}}</td>
+                        <td>{{costbasis.activity.trade_date}}</td>
                         <td>{{costbasis.activity.type}}</td>
                         <td>{{costbasis.activity.qty | floatformat:0}}</td>
                         {% ifnotequal costbases.0.activity.cash_id "CAD" %}

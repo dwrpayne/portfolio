@@ -20,7 +20,7 @@
     <tbody>
     {% for activity in activities %}
         <tr>
-            <td>{{activity.tradeDate}}</td>
+            <td>{{activity.trade_date}}</td>
             <td>{{activity.type}}</td>
             {% if show_security %}
                 <td>{{activity.security_id}}</td>
@@ -31,7 +31,7 @@
             <td>{{activity.cash_id}}</td>
             <td>{{activity.qty | floatformat:2}}</td>
             <td>{{activity.price | currency}}</td>
-            <td>{{activity.netAmount | currency}}</td>
+            <td>{{activity.net_amount | currency}}</td>
             <td>{{activity.description}}</td>
         </tr>
     {% endfor %}

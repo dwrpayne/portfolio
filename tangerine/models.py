@@ -55,10 +55,10 @@ class TangerineRawActivity(BaseRawActivity):
         else:
             activity_type = Activity.Type.NotImplemented
 
-        creation_fn(account=self.account, tradeDate=self.day, security=security,
+        creation_fn(account=self.account, trade_date=self.day, security=security,
                     cash_id=security.currency,
                     description=self.description, qty=self.qty,
-                    price=self.price, netAmount=net_amount, type=activity_type, raw=self)
+                    price=self.price, net_amount=net_amount, type=activity_type, raw=self)
 
 
 class TangerineClient(models.Model):

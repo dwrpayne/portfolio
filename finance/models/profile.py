@@ -73,7 +73,7 @@ class UserProfile(models.Model):
 
     def GetCommissionByYear(self):
         return dict(self.GetActivities().annotate(
-            year=ExtractYear('tradeDate')
+            year=ExtractYear('trade_date')
         ).order_by().values('year').annotate(c=Sum('commission')).values_list('year', 'c'))
 
     def RateOfReturn(self, start, end, annualized=True):
@@ -139,7 +139,7 @@ class UserProfile(models.Model):
         year_offset = all_years[0]
         last_acb = {}
 
-        for (sec, year), yearly_bases in groupby(costbases, lambda c: (c.activity.security_id, c.activity.tradeDate.year)):
+        for (sec, year), yearly_bases in groupby(costbases, lambda c: (c.activity.security_id, c.activity.trade_date.year)):
             for cb in yearly_bases:
                 yearly_data[sec][year-year_offset] += cb.capital_gain
                 last_acb[sec] = cb.acb_total
@@ -152,7 +152,7 @@ class UserProfile(models.Model):
         return all_years, yearly_data, pending_by_security
 
     def GetInceptionDate(self):
-        return self.GetActivities().earliest().tradeDate
+        return self.GetActivities().earliest().trade_date
 
     def GetRebalanceInfo(self, cashadd=0):
         holdings = self.GetHoldingDetails().today().select_related('account', 'security')

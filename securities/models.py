@@ -65,7 +65,7 @@ class OptionSecurityManager(SecurityManager):
 
     def UpdateDataSources(self):
         for option in self.get_queryset():
-            start, *_, end = option.activities.values_list('tradeDate', 'price')
+            start, *_, end = option.activities.values_list('trade_date', 'price')
             datasource, created = InterpolatedDataSource.objects.get_or_create(start_day=start[0],
                                                                                start_val=start[1],
                                                                                end_day=end[0],
@@ -135,13 +135,13 @@ class Security(models.Model):
     def earliest_price_needed(self):
         if not self.activities.exists():
             return datetime.date.today()
-        return self.activities.earliest().tradeDate
+        return self.activities.earliest().trade_date
 
     @cached_property
     def latest_price_needed(self):
         if not self.activities.exists() or self.holdings.current().exists():
             return datetime.date.today()
-        return self.activities.latest().tradeDate
+        return self.activities.latest().trade_date
 
     @cached_property
     def price_multiplier(self):

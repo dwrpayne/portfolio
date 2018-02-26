@@ -37,7 +37,7 @@ class ManualRawActivity(BaseRawActivity):
     currency = models.CharField(max_length=100, blank=True, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6, default=0)
     price = models.DecimalField(max_digits=16, decimal_places=6, default=0)
-    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    net_amount = models.DecimalField(max_digits=16, decimal_places=2)
     type = models.CharField(max_length=100)
 
     class Meta:
@@ -47,7 +47,7 @@ class ManualRawActivity(BaseRawActivity):
     def CreateDeposit(cls, account, day, amount, currency='CAD'):
         ManualRawActivity.objects.create(account=account, day=day, currency=currency,
                                          description='', symbol='', qty=0, price=0,
-                                         netAmount=amount, type='Deposit')
+                                         net_amount=amount, type='Deposit')
 
     @classmethod
     def CreateFX(cls, account, day, to_currency, from_currency, cad_amt, rate):
@@ -61,10 +61,10 @@ class ManualRawActivity(BaseRawActivity):
             from_amt = cad_amt
         ManualRawActivity.objects.create(account=account, day=day, qty=0, price=0,
                                          description='AUTO CONV @ {}'.format(rate), symbol='',
-                                         currency=from_currency, netAmount=-from_amt, type='FX')
+                                         currency=from_currency, net_amount=-from_amt, type='FX')
         ManualRawActivity.objects.create(account=account, day=day, qty=0, price=0,
                                          description='AUTO CONV @ {}'.format(rate), symbol='',
-                                         currency=to_currency, netAmount=to_amt, type='FX')
+                                         currency=to_currency, net_amount=to_amt, type='FX')
 
     @classmethod
     def CreateBuy(cls, account, day, symbol, price, qty, amount, currency, exch=1, amt_in_cad=True, description=''):
@@ -72,7 +72,7 @@ class ManualRawActivity(BaseRawActivity):
 
         ManualRawActivity.objects.create(account=account, day=day, qty=qty, price=price,
                                          description=description, symbol=symbol, currency=currency,
-                                         netAmount=-amount/exch, type='Buy')
+                                         net_amount=-amount/exch, type='Buy')
 
     @classmethod
     def CreateSell(cls, account, day, symbol, price, qty, amount, currency, exch=1, description=''):
@@ -81,24 +81,24 @@ class ManualRawActivity(BaseRawActivity):
 
         ManualRawActivity.objects.create(account=account, day=day, qty=-qty, price=price,
                                          description=description, symbol='', currency=currency,
-                                         netAmount=abs(amount/exch), type='Sell')
+                                         net_amount=abs(amount/exch), type='Sell')
 
     @classmethod
     def CreateDividend(cls, account, day, symbol, amount, tax=0, currency='CAD', exch=1):
         ManualRawActivity.objects.create(account=account, day=day, currency=currency,
                                          description='', symbol=symbol, qty=0, price=0,
-                                         netAmount=amount/exch, type='Dividend')
+                                         net_amount=amount/exch, type='Dividend')
         if tax:
             ManualRawActivity.objects.create(account=account, day=day, currency=currency,
                                          description='Withholding Tax', symbol=symbol, qty=0, price=0,
-                                         netAmount=-tax/exch, type='Tax')
+                                         net_amount=-tax/exch, type='Tax')
         cls.CreateFX(account, day, 'CAD', currency, amount-tax, exch)
 
     @classmethod
     def CreateFee(cls, account, day, amount, currency='CAD', desc=''):
         ManualRawActivity.objects.create(account=account, day=day, currency=currency,
                                          description=desc, symbol='', qty=0, price=0,
-                                         netAmount=-abs(amount), type='Fee')
+                                         net_amount=-abs(amount), type='Fee')
 
     def CreateActivity(self):
         security = None
@@ -108,11 +108,11 @@ class ManualRawActivity(BaseRawActivity):
 
         commission = 0
         if self.type in [Activity.Type.Buy, Activity.Type.Sell]:
-            commission = self.qty * self.price + self.netAmount
+            commission = self.qty * self.price + self.net_amount
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
+        Activity.objects.create(account=self.account, trade_date=self.day, security=security,
                                 description=self.description, cash_id=self.currency, qty=self.qty,
-                                price=self.price, netAmount=self.netAmount,
+                                price=self.price, net_amount=self.net_amount,
                                 commission=commission, type=self.type, raw=self)
 
 
@@ -135,7 +135,7 @@ class ActivityManager(models.Manager):
 
         kwargs.update({'security' : None, 'description' : 'Generated Deposit', 'qty' : 0,
                       'price' : 0, 'type' : Activity.Type.Deposit})
-        kwargs['netAmount'] *= -1
+        kwargs['net_amount'] *= -1
         self.create(**kwargs)
 
     def create_with_withdrawal(self, **kwargs):
@@ -143,25 +143,25 @@ class ActivityManager(models.Manager):
 
         kwargs.update({'security' : None, 'description' : 'Generated Withdrawal', 'qty' : 0,
                       'price' : 0, 'type' : Activity.Type.Withdrawal})
-        kwargs['netAmount'] *= -1
+        kwargs['net_amount'] *= -1
         self.create(**kwargs)
 
     def create_fx(self, to_currency, to_amount, from_currency, from_amount, **kwargs):
         from_args = kwargs
         from_args['cash_id'] = from_currency
-        from_args['netAmount'] = from_amount
+        from_args['net_amount'] = from_amount
         from_args['type'] = Activity.Type.FX
         self.create(**from_args)
 
         to = kwargs
         to['cash_id'] = to_currency
-        to['netAmount'] = to_amount
+        to['net_amount'] = to_amount
         to['type'] = Activity.Type.FX
         self.create(**to)
 
 
 class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQuerySet):
-    day_field = 'tradeDate'
+    day_field = 'trade_date'
 
     def taxable(self):
         return self.filter(account__taxable=True)
@@ -196,20 +196,20 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         if running_totals:
             return self.deposits().annotate(
                 cum_total = Window(
-                    expression=Sum('netAmount'),
-                    order_by=F('tradeDate').asc(),
+                    expression=Sum('net_amount'),
+                    order_by=F('trade_date').asc(),
                     frame=RowRange(end=0)
                 )
-            ).values_list('tradeDate', 'cum_total')
+            ).values_list('trade_date', 'cum_total')
         else:
-            return self.deposits().values_list('tradeDate', 'netAmount')
+            return self.deposits().values_list('trade_date', 'net_amount')
 
     def newest_date(self):
         """
         :return: The date of the most recent activity.
         """
         try:
-            return self.latest().tradeDate
+            return self.latest().trade_date
         except self.model.DoesNotExist:
             return None
 
@@ -218,14 +218,14 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
         Annotates each activity of the QuerySet with a "exch" field.
         """
         return self.filter(
-            tradeDate=F('cash__prices__day')).annotate(
+            trade_date=F('cash__prices__day')).annotate(
             exch=Sum(F('cash__prices__price'))
         )
 
 
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
-    tradeDate = models.DateField()
+    trade_date = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE,
                                  null=True, related_name='activities')
     description = models.CharField(max_length=1000)
@@ -233,7 +233,7 @@ class Activity(models.Model):
                              null=True, related_name='dontaccess_cash')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
-    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    net_amount = models.DecimalField(max_digits=16, decimal_places=2)
     commission = models.DecimalField(max_digits=16, decimal_places=2, default=0)
     Type = Choices('Deposit', 'Dividend', 'FX', 'Fee', 'Interest', 'Buy', 'Sell', 'Tax',
                    'Transfer', 'Withdrawal', 'Expiry', 'Journal', 'RetCapital', 'NotImplemented')
@@ -245,16 +245,16 @@ class Activity(models.Model):
     class Meta:
         unique_together = ('raw', 'type', 'cash')
         verbose_name_plural = 'Activities'
-        get_latest_by = 'tradeDate'
-        ordering = ['tradeDate']
+        get_latest_by = 'trade_date'
+        ordering = ['trade_date']
 
     def __str__(self):
-        return "{} - {} - {}\t{}\t{}\t{}\t{}".format(self.account, self.tradeDate, self.security, self.qty, self.price,
+        return "{} - {} - {}\t{}\t{}\t{}\t{}".format(self.account, self.trade_date, self.security, self.qty, self.price,
                                                      self.type, self.description)
 
     def __repr__(self):
-        return "Activity({},{},{},{},{},{},{},{})".format(self.tradeDate, self.security_id, self.cash_id, self.qty,
-                                                          self.price, self.netAmount, self.type, self.description)
+        return "Activity({},{},{},{},{},{},{},{})".format(self.trade_date, self.security_id, self.cash_id, self.qty,
+                                                          self.price, self.net_amount, self.type, self.description)
 
     def clean(self):
         if self.security is None:
@@ -264,7 +264,7 @@ class Activity(models.Model):
 
     @cached_property
     def cad_price(self):
-        return SecurityPriceDetail.objects.get(security=self.security_id, day=self.tradeDate).price
+        return SecurityPriceDetail.objects.get(security=self.security_id, day=self.trade_date).price
 
     def GetHoldingEffects(self):
         """
@@ -272,7 +272,7 @@ class Activity(models.Model):
         """
         effects = {}
         if self.cash:
-            effects[self.cash.symbol] = self.netAmount
+            effects[self.cash.symbol] = self.net_amount
         if self.security and self.type != Activity.Type.Dividend:
             effects[self.security.symbol] = self.qty
         return effects

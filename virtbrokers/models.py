@@ -14,7 +14,7 @@ class VirtBrokersRawActivity(BaseRawActivity):
     currency = models.CharField(max_length=100, blank=True, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6, default=0)
     price = models.DecimalField(max_digits=16, decimal_places=6, default=0)
-    netAmount = models.DecimalField(max_digits=16, decimal_places=2)
+    net_amount = models.DecimalField(max_digits=16, decimal_places=2)
     commission = models.DecimalField(max_digits=16, decimal_places=2)
     type = models.CharField(max_length=100)
 
@@ -28,17 +28,17 @@ class VirtBrokersRawActivity(BaseRawActivity):
         else:                            assert False, 'Unmapped activity type in Virtual Brokers'
 
         if self.type == Activity.Type.Dividend:
-            # We expect qty and netAmount to be valid here
-            self.price = self.netAmount / self.qty
+            # We expect qty and net_amount to be valid here
+            self.price = self.net_amount / self.qty
 
         security = None
         if self.symbol:
             security, _ = Security.objects.get_or_create(symbol=self.symbol,
                                                          defaults={'currency': self.currency})
 
-        Activity.objects.create(account=self.account, tradeDate=self.day, security=security,
+        Activity.objects.create(account=self.account, trade_date=self.day, security=security,
                                 description=self.description, cash_id=self.currency, qty=self.qty,
-                                price=self.price, netAmount=self.netAmount,
+                                price=self.price, net_amount=self.net_amount,
                                 commission=self.commission, type=self.type, raw=self)
 
 class VirtBrokersAccount(BaseAccount):
@@ -53,7 +53,7 @@ class VirtBrokersAccount(BaseAccount):
     def import_from_csv(self, csv_file):
         csv_file.open('r')
         fields = ['day', 'EffectiveDate', 'AccountNumber', 'trans_id', 'sub_trans_id', 'symbol', 'description',
-                  'type', 'qty', 'commission', 'price', 'netAmount', 'SecurityType', 'currency', 'rep_cd']
+                  'type', 'qty', 'commission', 'price', 'net_amount', 'SecurityType', 'currency', 'rep_cd']
         reader = csv.DictReader(csv_file, fieldnames=fields)
         for line in reader:
             try:
@@ -71,6 +71,6 @@ class VirtBrokersAccount(BaseAccount):
             line['qty'] = Decimal(line['qty']) if line['qty'] else 0
             line['price'] = Decimal(line['price']) if line['price'] else 0
             line['commission'] = -Decimal(line['commission']) if line['commission'] else 0
-            line['netAmount'] = Decimal(line['netAmount']) if line['netAmount'] else 0
+            line['net_amount'] = Decimal(line['net_amount']) if line['net_amount'] else 0
 
             VirtBrokersRawActivity.objects.get_or_create(account=self, **line)

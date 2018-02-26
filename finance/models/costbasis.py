@@ -19,7 +19,7 @@ class CostBasisManager(models.Manager):
 
     def create_from_activities(self, activity_query):
         activity_query = activity_query.exclude(type=Activity.Type.Dividend)
-        for security, activities in groupby(activity_query.with_exchange_rates().order_by('security', 'tradeDate'),
+        for security, activities in groupby(activity_query.with_exchange_rates().order_by('security', 'trade_date'),
                                             lambda a: a.security_id):
             if security:
                 prev_costbasis = CostBasis()
@@ -30,7 +30,7 @@ class CostBasisManager(models.Manager):
         cad_commission = activity.commission * activity.exch
         cad_price = activity.price * activity.exch
         if not cad_price:
-            cad_price = activity.security.prices.get(day=activity.tradeDate).price * activity.exch
+            cad_price = activity.security.prices.get(day=activity.trade_date).price * activity.exch
         total_cad_value = activity.qty * cad_price - cad_commission
 
         if activity.qty < 0:
@@ -69,6 +69,6 @@ class CostBasis(models.Model):
     objects = CostBasisManager.from_queryset(CostBasisQuerySet)()
 
     class Meta:
-        ordering = ['activity__tradeDate']
-        get_latest_by = 'activity__tradeDate'
+        ordering = ['activity__trade_date']
+        get_latest_by = 'activity__trade_date'
 

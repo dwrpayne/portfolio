@@ -118,7 +118,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         self.holding_set.all().delete()
         for activity in self.activities.all():
             for security, qty_delta in activity.GetHoldingEffects().items():
-                self.holding_set.add_effect(self, security, qty_delta, activity.tradeDate)
+                self.holding_set.add_effect(self, security, qty_delta, activity.trade_date)
         self.holding_set.filter(qty=0).delete()
 
     def CreateActivities(self, start, end):

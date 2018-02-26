@@ -15,7 +15,7 @@ def MakeNormalizedFloat(field, desc):
 
 
 class ManualRawActivityAdmin(admin.ModelAdmin):
-    list_display = ['account', 'day', 'type', 'symbol', 'qty', 'price', 'currency', 'netAmount']
+    list_display = ['account', 'day', 'type', 'symbol', 'qty', 'price', 'currency', 'net_amount']
     list_filter = ['account', 'day', 'symbol', 'type']
 
 
@@ -26,9 +26,9 @@ class ActivityAdmin(admin.ModelAdmin):
     display_qty = MakeNormalizedFloat('qty', 'Quantity')
     display_price = MakeNormalizedFloat('price', 'Price')
 
-    list_display = ['account', 'tradeDate', 'type', 'security',
-                    'display_qty', 'display_price', 'cash', 'netAmount']
-    list_filter = ['account', 'tradeDate', ('security', admin.RelatedOnlyFieldListFilter),
+    list_display = ['account', 'trade_date', 'type', 'security',
+                    'display_qty', 'display_price', 'cash', 'net_amount']
+    list_filter = ['account', 'trade_date', ('security', admin.RelatedOnlyFieldListFilter),
                    'type', ('cash', admin.RelatedOnlyFieldListFilter)]
     search_fields = ['description']
 

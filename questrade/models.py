@@ -59,7 +59,7 @@ class QuestradeRawActivity(BaseRawActivity):
     def AllowDuplicate(cls, s):
         # Hack to support actual duplicate transactions (no disambiguation available)
         # TODO: This should go in the database... somehow...
-        return s == '{"tradeDate": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "netAmount": 55.04, "type": "Trades"}'
+        return s == '{"trade_date": "2012-08-17T00:00:00.000000-04:00", "transactionDate": "2012-08-20T00:00:00.000000-04:00", "settlementDate": "2012-08-20T00:00:00.000000-04:00", "action": "Sell", "symbol": "", "symbolId": 0, "description": "CALL EWJ    01/19/13    10     ISHARES MSCI JAPAN INDEX FD    AS AGENTS, WE HAVE BOUGHT      OR SOLD FOR YOUR ACCOUNT   ", "currency": "USD", "quantity": -5, "price": 0.14, "grossAmount": null, "commission": -14.96, "net_amount": 55.04, "type": "Trades"}'
 
     def GetCleanedJson(self):
         json = loads(self.jsonstr)
@@ -97,13 +97,13 @@ class QuestradeRawActivity(BaseRawActivity):
 
         if json['action'] == 'FXT':
             if 'AS OF ' in json['description']:
-                tradeDate = pendulum.parse(json['tradeDate'])
+                trade_date = pendulum.parse(json['trade_date'])
                 asof = pendulum.from_format(json['description'].split('AS OF ')[1].split(' ')[0], '%m/%d/%y')
-                if (tradeDate - asof).days > 365:
+                if (trade_date - asof).days > 365:
                     asof = asof.add(years=1)
-                json['tradeDate'] = asof.isoformat()
+                json['trade_date'] = asof.isoformat()
 
-        json['tradeDate'] = str(parser.parse(json['tradeDate']).date())
+        json['trade_date'] = str(parser.parse(json['trade_date']).date())
         json['type'] = QuestradeActivityType.objects.GetActivityType(json['type'], json['action'])
         json['qty'] = json['quantity']
         del json['quantity']
@@ -122,9 +122,9 @@ class QuestradeRawActivity(BaseRawActivity):
         json = self.GetCleanedJson()
 
         create_args = {'account': self.account, 'raw': self}
-        for item in ['description', 'tradeDate', 'type', 'security', 'commission', 'cash_id']:
+        for item in ['description', 'trade_date', 'type', 'security', 'commission', 'cash_id']:
             create_args[item] = json[item]
-        for item in ['price', 'netAmount', 'qty']:
+        for item in ['price', 'net_amount', 'qty']:
             create_args[item] = Decimal(str(json[item]))
 
         Activity.objects.create(**create_args)

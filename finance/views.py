@@ -57,7 +57,7 @@ class SecurityDetail(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         activities = self.object.activities.for_user(self.request.user).select_related('account')
-        context['activities'] = list(activities.order_by('-tradeDate'))
+        context['activities'] = list(activities.order_by('-trade_date'))
         return context
 
 
@@ -241,13 +241,13 @@ class DividendReport(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         dividends = self.get_queryset()
-        years = sorted(list(dt.year for dt in dividends.dates('tradeDate', 'year')))
+        years = sorted(list(dt.year for dt in dividends.dates('trade_date', 'year')))
         securities = dividends.security_list()
 
         security_year_amounts = {s : [0]*len(years) for s in securities}
-        for sec, divs in groupby(dividends.order_by('security_id', 'tradeDate'), lambda d: d.security_id):
+        for sec, divs in groupby(dividends.order_by('security_id', 'trade_date'), lambda d: d.security_id):
             for d in divs:
-                security_year_amounts[sec][d.tradeDate.year-years[0]] += d.netAmount
+                security_year_amounts[sec][d.trade_date.year-years[0]] += d.net_amount
             security_year_amounts[sec].append(sum(security_year_amounts[sec]))
 
         context['security_year_amounts'] = sorted(security_year_amounts.items())
@@ -263,7 +263,7 @@ class DividendReport(LoginRequiredMixin, ListView):
 class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
     model = Activity
     template_name = 'finance/snapshot.html'
-    date_field = 'tradeDate'
+    date_field = 'trade_date'
     day_format = "%Y-%m-%d"
     context_object_name = 'activities'
 
@@ -481,7 +481,7 @@ def security_chart(request, symbol):
 
     userprofile = request.user.userprofile
     activities = userprofile.GetActivities().for_security(security)
-    purchase_data = activities.transactions().values('tradeDate').annotate(total_qty=Sum('qty'), ).values_list('tradeDate', 'total_qty', 'price')
+    purchase_data = activities.transactions().values('trade_date').annotate(total_qty=Sum('qty'), ).values_list('trade_date', 'total_qty', 'price')
     series.append({
         'name': 'Purchases',
         'type': 'flags',
@@ -503,7 +503,7 @@ def security_chart(request, symbol):
         'data': [{'x': to_ts(day),
                   'title': '{:.2f}'.format(price),
                   'text': 'Dividend of ${:.2f}'.format(price),
-                  } for day, price in activities.dividends().values_list('tradeDate', 'price').distinct()]
+                  } for day, price in activities.dividends().values_list('trade_date', 'price').distinct()]
 
     })
     return JsonResponse(series, safe=False)
