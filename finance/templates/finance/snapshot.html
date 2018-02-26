@@ -30,6 +30,12 @@
 {% endblock content %}
 {% block footer_javascript_page %}
     <script type="text/javascript">
+        $(document).ready(function() {
+            $('#activities-table').DataTable( {
+                "paging":   false,
+                "searching": false
+            } );
+        } );
         $(function () {
             $('#datepicker').datepicker({
                 dateFormat: "yy-mm-dd",

@@ -1,4 +1,4 @@
-s{% extends "base.html" %}
+{% extends "base.html" %}
 {% load mytags %}
 {% load static %}
 {% block title %} {{account.display_name}} {% endblock title %}
@@ -12,3 +12,14 @@ s{% extends "base.html" %}
     </div>
 </div>
 {% endblock content %}
+{% block footer_javascript_page %}
+    <script>
+        $(document).ready(function() {
+            $('#activities-table').DataTable( {
+                "paging":   false,
+                "searching": false
+            } );
+        } );
+    </script>
+
+{% endblock footer_javascript_page %}
