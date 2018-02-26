@@ -9,6 +9,7 @@ from pandas_datareader import data as pdr
 from pandas_datareader.exceptions import UnstableAPIWarning
 from polymorphic.models import PolymorphicModel
 from polymorphic.showfields import ShowFieldTypeAndContent
+from ratelimit import rate_limited
 
 
 class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
@@ -92,6 +93,7 @@ class AlphaVantageStockSource(DataSourceMixin):
                 return
         self.symbol = 'NO VALID LOOKUP FOR {}'.format(original_symbol)
 
+    @rate_limited(1,2)
     def _Retrieve(self, start, end):
         params = {'function': 'TIME_SERIES_DAILY', 'apikey': self.api_key,
                   'symbol': self.symbol}
@@ -123,6 +125,7 @@ class AlphaVantageCurrencySource(DataSourceMixin):
     def __repr__(self):
         return "AlphaVantageCurrencySource<{},{}>".format(self.from_symbol, self.to_symbol)
 
+    @rate_limited(1,2)
     def _Retrieve(self, start, end):
         params = {'function': 'CURRENCY_EXCHANGE_RATE', 'apikey': self.api_key,
                   'from_currency': self.from_symbol, 'to_currency': self.to_symbol}
