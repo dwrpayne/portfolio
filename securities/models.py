@@ -7,9 +7,9 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import Choices
 
-from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource, AlphaVantageDataSource, \
-    MorningstarDataSource, InterpolatedDataSource
-from datasource.services import GetLiveAlphaVantageExchangeRate, GetYahooStockData
+from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource
+from datasource.models import AlphaVantageStockSource, MorningstarDataSource, InterpolatedDataSource
+from datasource.services import get_data_from_sources
 from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 
 
@@ -17,8 +17,9 @@ class SecurityQuerySet(models.QuerySet):
     def create(self, **kwargs):
         kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
         obj = super().create(**kwargs)
-        obj.datasources.add(self.model.get_default_datasource(kwargs['type'], kwargs['symbol']))
-        obj.save()
+
+        # TODO: This should be a post_create signal
+        obj.set_default_datasources()
         return obj
 
 
@@ -29,8 +30,6 @@ class SecurityManager(models.Manager):
             queryset = queryset.filter(holdings__enddate__isnull=True).distinct()
         for security in queryset:
             security.SyncRates(live_update)
-            if live_update and security.type == self.model.Type.Cash and not security.symbol == 'CAD':
-                security.live_price = GetLiveAlphaVantageExchangeRate(security.symbol)
 
 
 class StockSecurityManager(SecurityManager):
@@ -71,7 +70,7 @@ class OptionSecurityManager(SecurityManager):
                                                                                start_val=start[1],
                                                                                end_day=end[0],
                                                                                end_val=end[1])
-            option.SetDataSource(datasource)
+            option.set_datasources([datasource])
 
     def CreateFromDetails(self, callput, symbol, expiry, strike, currency_str):
         """
@@ -151,26 +150,34 @@ class Security(models.Model):
         if self.type == self.Type.OptionMini:
             return 10
 
-    @classmethod
-    def get_default_datasource(cls, type, symbol):
-        obj = None
-        if type == cls.Type.Stock:
-            obj, created = AlphaVantageDataSource.objects.get_or_create(symbol=symbol)
-        if type == cls.Type.Cash:
-            obj = PandasDataSource.objects.create_bankofcanada(currency_code=symbol)
-        if type == cls.Type.MutualFund:
-            obj, created = MorningstarDataSource.objects.get_or_create(symbol=symbol)
-        return obj
+    def set_default_datasources(self):
+        objs = []
+        if self.type == self.Type.Stock:
+            obj, created = AlphaVantageStockSource.objects.get_or_create(symbol=self.symbol,
+                                                                         priority=AlphaVantageStockSource.PRIORITY_HIGH)
+            objs.append(obj)
+            obj, created = PandasDataSource.create_stock(self.symbol)
+            objs.append(obj)
+
+        elif type == self.Type.Cash:
+            obj = PandasDataSource.create_bankofcanada(currency_code=self.symbol)
+            objs.append(obj)
+
+        elif type == self.Type.MutualFund:
+            obj, created = MorningstarDataSource.objects.get_or_create(symbol=self.symbol)
+            objs.append(obj)
+
+        self.set_datasources(objs)
 
     def get_datasource_list(self):
         return ', '.join(map(str,self.datasources.all()))
 
-    def SetDataSource(self, datasource):
+    def set_datasources(self, datasource):
         self.datasources.clear()
         self.datasources.add(datasource)
         self.save()
 
-    def AddDataSource(self, datasource):
+    def add_datasource(self, datasource):
         self.datasources.add(datasource)
         self.save()
 
@@ -220,7 +227,7 @@ class Security(models.Model):
         if start is None:
             return []
 
-        data = self.datasources.first().GetData(start, end)
+        data = get_data_from_sources(self.datasources.all(), start, end)
 
         with transaction.atomic():
             for day, price in data:

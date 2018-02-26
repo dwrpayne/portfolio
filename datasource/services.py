@@ -1,21 +1,27 @@
-from decimal import Decimal
 import json
 import requests
-from django.conf import settings
+from datetime import timedelta
+import pandas
 
-# TODO: Yuck, this is really hacky and needs a refactor. I just need it working for now.
-# TODO: Maybe a ManyToMany field to support multiple data sources per security?
-# TODO: Or maybe a DataSource that aggregates data from multiple sources
-def GetLiveAlphaVantageExchangeRate(symbol):
-    params = {'function': 'CURRENCY_EXCHANGE_RATE', 'apikey': settings.ALPHAVANTAGE_KEY,
-              'from_currency': symbol, 'to_currency': 'CAD'}
-    r = requests.get('https://www.alphavantage.co/query', params=params)
-    if r.ok:
-        j = r.json()
-        return Decimal(j['Realtime Currency Exchange Rate']['5. Exchange Rate'])
-    else:
-        print('Failed to get data, response: {}'.format(r.content))
-    return None
+
+def get_data_from_sources(sources, start, end):
+    """
+    Gets data from all sources for the specified range and merges them by priority.
+    Returns an iterator of (date, price) tuples
+    """
+    start = start - timedelta(days=7)
+
+    index = pandas.DatetimeIndex(start=start, end=end, freq='D').date
+    merged_series = pandas.Series(index=index, dtype='float64')
+
+    for source in sources.order_by('priority'):
+        print("Getting data from {} for {} to {}".format(source, start, end))
+        data = source._Retrieve(start, end)
+        merged_series.update(pandas.Series(dict(data)))
+
+    merged_series = merged_series.reindex(index).fillna(method='ffill').fillna(method='bfill').sort_index()
+    return merged_series.iteritems()
+
 
 def GetYahooStockData(symbol):
     print('Refreshing metadata for ' + symbol)

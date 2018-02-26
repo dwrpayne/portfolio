@@ -68,7 +68,7 @@ class AlphavantageDataSourceTestCase(TestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        tsla = AlphaVantageDataSource.objects.create(symbol='TSLA')
+        tsla = AlphaVantageStockSource.objects.create(symbol='TSLA')
         cls.tsladata = list(tsla.GetData(date(2018, 1, 1), date(2018, 1, 6)))[-6:]
 
     def test_tsla_data(self):

@@ -8,28 +8,29 @@ name = "pypi"
 [packages]
 
 celery = {git = "https://github.com/celery/celery.git", ref = "master"}
-Django = "*"
+django = "*"
 requests = "*"
 dj-database-url = "*"
 pandas = "*"
-django_polymorphic = "*"
+django-polymorphic = "*"
 django-extensions = "*"
-django_celery_results = "*"
-django_celery_beat = "*"
+django-celery-results = "*"
+django-celery-beat = "*"
 "psycopg2" = "*"
 django-model-utils = "*"
 "beautifulsoup4" = "*"
-Werkzeug = "*"
+werkzeug = "*"
 django-debug-toolbar = "*"
 eventlet = "*"
 pandas-datareader = "*"
 pendulum = {git = "https://github.com/dwrpayne/pendulum.git", ref = "split"}
-mod_wsgi = "*"
+mod-wsgi = "*"
 django-hijack = "*"
 python-decouple = "*"
 pydot = "*"
 django-fernet-fields = "*"
 python-highcharts = {git = "https://github.com/dwrpayne/python-highcharts.git", ref = "master"}
+ratelimit = "*"
 
 
 [dev-packages]
