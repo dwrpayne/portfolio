@@ -13,6 +13,13 @@
     </div>
 {% endblock content %}
 {% block footer_javascript_page %}
+<script>
+$(document).ready(function() {
+    $('#holdings-table').DataTable();
+    $('#holdings-table').show();
+} );
+</script>
+
     <script src="https://code.highcharts.com/modules/data.js"></script>
     <script src="https://code.highcharts.com/stock/indicators/indicators.js"></script>
     <script>

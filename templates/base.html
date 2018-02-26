@@ -18,6 +18,7 @@
                 <link rel="stylesheet" href="{% static "finance/style.css" %}" media="screen">
                 <link rel="stylesheet" href="{% static "hijack/hijack-styles.css" %}" type="text/css" />
                 <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+                <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.16/css/jquery.dataTables.css">
             {% endblock head_css_site %}
             {% block head_css_section %}{% endblock head_css_section %}
             {% block head_css_page %}{% endblock head_css_page %}
@@ -53,6 +54,7 @@
             <script src="https://code.highcharts.com/stock/highstock.src.js"></script>
             <script src="https://code.highcharts.com/modules/exporting.js"></script>
             <script src="https://code.highcharts.com/modules/boost.js"></script>
+            <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.js"></script>
             <script src="{% static "finance/finance.js" %}"></script>       
         {% endblock footer_javascript_site %}
         {% block footer_javascript_section %}{% endblock footer_javascript_section %}
