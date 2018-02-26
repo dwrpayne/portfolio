@@ -24,7 +24,3 @@ $(document).on('click','button.refresh',function(){
         }
     });
 });
-
-$(function () {
-    $(".tablesorter").tablesorter();
-});
