@@ -69,8 +69,10 @@ class QuestradeRawActivity(BaseRawActivity):
             callput, symbol, expiry, strike = json['description'].split()[:4]
             symbol = symbol.strip('.')
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
-            security = Security.options.CreateFromDetails(callput, symbol, expiry, strike, json['currency'])
+            security = Option.objects.CreateFromDetails(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
+            security.add_datasource(QuestradeOptionDataSource.create_from_option(
+                security, self.account.client))
 
             # Questrade options have price per share not per option.
             json['price'] *= security.price_multiplier
@@ -199,6 +201,7 @@ class QuestradeClient(models.Model):
         return self._GetRequest('accounts')
 
     def GetSymbolIds(self, symbols):
+        symbols += [s+'.TO' for s in symbols]
         json = self._GetRequest('symbols', params={'names' : ','.join(symbols)})
         for entry in json['symbols']:
             yield entry['symbolId']
@@ -224,12 +227,14 @@ class QuestradeClient(models.Model):
         return 0
 
     def GetOptionPrice(self, option_id):
-        response = self.session.post(self.api_server + 'market/quotes/options', json={'filters':[option_id]})
+        response = self.session.post(self.api_server + 'markets/quotes/options', json={'optionIds':[option_id]})
         response.raise_for_status()
         json = response.json()
-        data = json['optionQuotes']
-        if data['lastTradePriceTrHrs']: return data['lastTradePriceTrHrs']
-        if data['lastTradePrice']: return data['lastTradePrice']
+        data = json['optionQuotes'][0]
+        if data['lastTradePriceTrHrs']:
+            return data['lastTradePriceTrHrs']
+        if data['lastTradePrice']:
+            return data['lastTradePrice']
         return None
 
     @api_response()
@@ -263,7 +268,7 @@ class QuestradeOptionDataSource(DataSourceMixin):
         return "QuestradeOptionDataSource<{},{}>".format(self.symbol, self.client)
 
     @classmethod
-    def CreateFromOption(cls, option, client):
+    def create_from_option(cls, option, client):
         with client as c:
             underlying_id = c.GetSymbolId(option.underlying)
             optionid = c.GetOptionId(underlying_id, option.expiry, 'call' if option.is_call else 'put', option.strike)
@@ -272,7 +277,8 @@ class QuestradeOptionDataSource(DataSourceMixin):
 
     def _Retrieve(self, start, end):
         with self.client as client:
-            return datetime.date.today(), client.GetOptionPrice(self.optionid)
+            multiplier = Security.options.get(symbol=self.symbol).price_multiplier
+            return [(datetime.date.today(), multiplier * client.GetOptionPrice(self.optionid))]
 
 
 class QuestradeAccount(BaseAccount):

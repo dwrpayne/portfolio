@@ -30,7 +30,8 @@ class GrsRawActivity(BaseRawActivity):
         security, created = Security.mutualfunds.get_or_create(symbol=self.symbol,
                                            defaults={'currency':'CAD'})
         if created:
-            security.add_datasource(GrsDataSource.objects.get_or_create(symbol=self.symbol))
+            security.add_datasource(GrsDataSource.objects.get_or_create(
+                symbol=self.symbol, client=self.account.client))
 
         total_cost = self.qty * self.price
         Activity.objects.create_with_deposit(account=self.account, trade_date=self.day, security=security,

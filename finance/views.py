@@ -257,7 +257,7 @@ class DividendReport(LoginRequiredMixin, ListView):
         return context
 
     def get_queryset(self):
-        return super().get_queryset().for_user(self.request.user).dividends()
+        return super().get_queryset().for_user(self.request.user).dividends().taxable()
 
 
 class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):

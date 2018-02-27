@@ -17,9 +17,11 @@ def get_data_from_sources(sources, start, end):
     for source in sources.order_by('priority'):
         print("Getting data from {} for {} to {}".format(source, start, end))
         data = source._Retrieve(start, end)
-        merged_series.update(pandas.Series(dict(data)))
+        if not isinstance(data, pandas.Series):
+            data = pandas.Series(dict(data))
+        merged_series.update(data)
 
-    merged_series = merged_series.reindex(index).fillna(method='ffill').fillna(method='bfill').sort_index()
+    merged_series = merged_series.reindex(index).fillna(method='ffill').sort_index().dropna()
     return merged_series.iteritems()
 
 

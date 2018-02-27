@@ -147,8 +147,9 @@ class Security(models.Model):
     def price_multiplier(self):
         if self.type == self.Type.Option:
             return 100
-        if self.type == self.Type.OptionMini:
+        elif self.type == self.Type.OptionMini:
             return 10
+        return 1
 
     def set_default_datasources(self):
         objs = []
@@ -231,6 +232,7 @@ class Security(models.Model):
 
         with transaction.atomic():
             for day, price in data:
+                print('updating {} to {}'.format(day, price))
                 self.prices.update_or_create(day=day, defaults={'price': price})
             self.last_sync_time = timezone.now()
             self.save(update_fields=['last_sync_time'])
