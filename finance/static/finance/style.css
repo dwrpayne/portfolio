@@ -17,3 +17,7 @@ button[type=submit]:disabled {
     color : transparent;
 
 }
+
+.highcharts-series path {
+     stroke-linecap: initial;
+}
