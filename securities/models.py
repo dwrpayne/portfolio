@@ -232,7 +232,8 @@ class Security(models.Model):
 
         with transaction.atomic():
             for day, price in data:
-                print('updating {} to {}'.format(day, price))
+                if price < 0.1:
+                    print('ALERT... UPDATING {} to {}'.format(day, price))
                 self.prices.update_or_create(day=day, defaults={'price': price})
             self.last_sync_time = timezone.now()
             self.save(update_fields=['last_sync_time'])

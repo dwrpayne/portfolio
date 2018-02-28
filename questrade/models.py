@@ -276,9 +276,13 @@ class QuestradeOptionDataSource(DataSourceMixin):
         return cls(symbol=option.symbol, optionid=optionid, client=client)
 
     def _Retrieve(self, start, end):
-        with self.client as client:
-            multiplier = Security.options.get(symbol=self.symbol).price_multiplier
-            return [(datetime.date.today(), multiplier * client.GetOptionPrice(self.optionid))]
+        try:
+            with self.client as client:
+                multiplier = Security.options.get(symbol=self.symbol).price_multiplier
+                return [(datetime.date.today(), multiplier * client.GetOptionPrice(self.optionid))]
+        except requests.HTTPError as e:
+            print(e)
+            return []
 
 
 class QuestradeAccount(BaseAccount):
