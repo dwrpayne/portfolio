@@ -79,7 +79,7 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
     def form_valid(self, form):
         accountcsv = form.save(commit=False)
         accountcsv.user = self.request.user
-        matched_account = accountcsv.find_matching_account()
+        accountcsv.find_matching_account()
         accountcsv.save()
         messages.success(self.request,
                          'Your file was successfully uploaded and will be processed shortly.'.format(os.path.basename(accountcsv.csvfile.name)))
@@ -102,7 +102,7 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
             else:
                 security = Security.objects.get(pk=symbol)
                 security.SyncRates(True)
-                return render(request, 'finance/admin/securityrow.html', {'security' : security})
+                return render(request, 'finance/admin/securityrow.html', {'security': security})
         return HttpResponse()
 
     def get_queryset(self):
@@ -245,7 +245,7 @@ class DividendReport(LoginRequiredMixin, ListView):
         securities = dividends.security_list()
 
         security_year_amounts = {s : [0]*len(years) for s in securities}
-        for sec, divs in groupby(dividends.order_by('security_id', 'trade_date'), lambda d: d.security_id):
+        for sec, divs in groupby(dividends.order_by('security_id', 'trade_date'), lambda div: div.security_id):
             for d in divs:
                 security_year_amounts[sec][d.trade_date.year-years[0]] += d.net_amount
             security_year_amounts[sec].append(sum(security_year_amounts[sec]))
@@ -317,7 +317,7 @@ class RebalanceView(LoginRequiredMixin, FormView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
-        if not 'form-add' in self.request.POST:
+        if 'form-add' not in self.request.POST:
             kwargs['empty_permitted'] = True
         return kwargs
 
@@ -451,15 +451,19 @@ def History(request, period):
 
     return render(request, 'finance/history.html', context)
 
+
 def portfolio_chart(request):
     userprofile = request.user.userprofile
+    #names = [['Day', 'Total Value', 'Total Contributions', 'Net Growth']]
     return JsonResponse(list(zip(*get_growth_data(userprofile))), safe=False)
+
 
 def growth_chart(request):
     userprofile = request.user.userprofile
     days, values, deposits, growth = get_growth_data(userprofile)
     daily_growth = [t - y for y, t in window(growth)]
     return JsonResponse(list(zip(days, daily_growth)), safe=False)
+
 
 def security_chart(request, symbol):
     def to_ts(d):
