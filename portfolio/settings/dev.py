@@ -9,3 +9,5 @@ if DEBUG_TOOLBAR_ENABLED:
     MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
 
 MESSAGE_LEVEL = message_constants.DEBUG
+
+CACHES['default']['KEY_PREFIX'] = 'devel'
