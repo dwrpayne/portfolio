@@ -103,6 +103,7 @@ class ManualRawActivity(BaseRawActivity):
     def CreateActivity(self):
         security = None
         if self.symbol:
+            self.symbol = self.symbol.rsplit('.', 1)[0]
             security, _ = Security.objects.get_or_create(symbol=self.symbol,
                                                          defaults={'currency': self.currency})
 

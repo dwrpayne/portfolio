@@ -374,7 +374,8 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         h.account_data = [d for d in account_data if d.security == security]
         holding_data.append(h)
 
-    holding_data = sorted(holding_data, key=attrgetter('security'))
+    # Sort by currency first, then symbol. Keep cash at the end (currency = '')
+    holding_data = sorted(holding_data, key=lambda h: (h.security.currency or 'ZZZ', h.security.symbol))
     cash_types = Security.cash.values_list('symbol', flat=True)
     holding_data, cash_data = partition(lambda h: h.security in cash_types, holding_data)
 

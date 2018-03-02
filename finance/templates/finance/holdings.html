@@ -7,6 +7,7 @@
                 <th>Symbol</th>
                 <th>Price</th>
                 <th>Change</th>
+                <th>Currency</th>
                 <th>Shares</th>
                 <th>Market Value ($C)</th>
                 <th>Daily Gain/Loss ($C)</th>
@@ -17,6 +18,7 @@
             <tr>
                 <td></td>
                 <td>Total</td>
+                <td></td>
                 <td></td>
                 <td></td>
                 <td></td>
@@ -35,6 +37,7 @@
                 <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
                 <td>{{holding_detail.price | floatformat:2}}</td>
                 <td>{{holding_detail.price_delta | floatformat:2 | colorize}} {{holding_detail.price_percent_delta | percentage | parens | colorize}}</td>
+                <td>{{ holding_detail.security.currency }}</td>
                 <td>{{holding_detail.qty | floatformat:0}}
                     {% if holding_detail.qty_delta %}{{holding_detail.qty_delta | floatformat:0 | prefix_plusminus | parens}}{% endif %}
                 </td>
@@ -45,6 +48,7 @@
                 <tr class="collapse holdings-table-child-{{forloop.parentloop.counter}}">
                     <td></td>
                     <td>{{account.account}}</td>
+                    <td></td>
                     <td></td>
                     <td></td>
                     <td>{{account.qty | floatformat:0}}
@@ -74,6 +78,7 @@
                 <tr class="collapse holdings-table-child-{{forloop.parentloop.counter|add:"1000"}}">
                     <td></td>
                     <td>{{account.account}}</td>
+                    <td></td>
                     <td></td>
                     <td></td>
                     <td>{{account.qty | floatformat:0}}</td>

@@ -72,7 +72,7 @@ class OptionSecurityManager(SecurityManager):
                                                                                end_val=end[1])
             option.set_datasources([datasource])
 
-    def CreateFromDetails(self, callput, symbol, expiry, strike, currency_str):
+    def get_or_create_from_details(self, callput, symbol, expiry, strike, currency_str):
         """
         callput is either 'call' or 'put'.
         symbol is the base symbol of the underlying
@@ -86,7 +86,7 @@ class OptionSecurityManager(SecurityManager):
             type = self.model.Type.OptionMini
         optsymbol = "{:<6}{}{}{:0>8}".format(symbol, expiry.strftime(
             '%y%m%d'), callput[0], Decimal(strike) * 1000)
-        option, _ = super().get_or_create(
+        option, created = super().get_or_create(
             symbol=optsymbol,
             defaults={
                 'description': "{} option for {}, strike {} expiring on {}.".format(callput.title(), symbol, strike,
@@ -95,7 +95,7 @@ class OptionSecurityManager(SecurityManager):
                 'currency': currency_str
             })
 
-        return option
+        return option, created
 
 
 class Security(models.Model):

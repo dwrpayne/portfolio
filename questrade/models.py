@@ -69,10 +69,11 @@ class QuestradeRawActivity(BaseRawActivity):
             callput, symbol, expiry, strike = json['description'].split()[:4]
             symbol = symbol.strip('.')
             expiry = datetime.datetime.strptime(expiry, '%m/%d/%y')
-            security = Option.objects.CreateFromDetails(callput, symbol, expiry, strike, json['currency'])
+            security, created = Option.options.get_or_create_from_details(callput, symbol, expiry, strike, json['currency'])
             json['symbol'] = security.symbol
-            security.add_datasource(QuestradeOptionDataSource.create_from_option(
-                security, self.account.client))
+            if created:
+                security.add_datasource(QuestradeOptionDataSource.create_from_option(
+                    security, self.account.client))
 
             # Questrade options have price per share not per option.
             json['price'] *= security.price_multiplier
@@ -105,7 +106,7 @@ class QuestradeRawActivity(BaseRawActivity):
                     asof = asof.add(years=1)
                 json['trade_date'] = asof.isoformat()
 
-        json['trade_date'] = str(parser.parse(json['trade_date']).date())
+        json['trade_date'] = str(parser.parse(json['tradeDate']).date())
         json['type'] = QuestradeActivityType.objects.GetActivityType(json['type'], json['action'])
         json['qty'] = json['quantity']
         del json['quantity']
@@ -126,8 +127,9 @@ class QuestradeRawActivity(BaseRawActivity):
         create_args = {'account': self.account, 'raw': self}
         for item in ['description', 'trade_date', 'type', 'security', 'commission', 'cash_id']:
             create_args[item] = json[item]
-        for item in ['price', 'net_amount', 'qty']:
+        for item in ['price', 'qty']:
             create_args[item] = Decimal(str(json[item]))
+        create_args['net_amount'] = Decimal(str(json['netAmount']))
 
         Activity.objects.create(**create_args)
 
@@ -273,7 +275,7 @@ class QuestradeOptionDataSource(DataSourceMixin):
             underlying_id = c.GetSymbolId(option.underlying)
             optionid = c.GetOptionId(underlying_id, option.expiry, 'call' if option.is_call else 'put', option.strike)
 
-        return cls(symbol=option.symbol, optionid=optionid, client=client)
+        return cls.objects.create(symbol=option.symbol, optionid=optionid, client=client)
 
     def _Retrieve(self, start, end):
         try:
