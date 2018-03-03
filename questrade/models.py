@@ -192,9 +192,12 @@ class QuestradeClient(models.Model):
         self.session.headers.update({'Authorization': 'Bearer' + ' ' + self.access_token})
 
     def _GetRequest(self, url, params=None):
-        if params is None:
-            params = {}
         r = self.session.get(self.api_server + url, params=params)
+        r.raise_for_status()
+        return r.json()
+
+    def _PostRequest(self, url, data=None, json=None):
+        r = self.session.post(self.api_server + url, data=data, json=json)
         r.raise_for_status()
         return r.json()
 
@@ -225,19 +228,13 @@ class QuestradeClient(models.Model):
                 for root in chain['chainPerRoot']:
                     for option in chain['chainPerRoot'][0]['chainPerStrikePrice']:
                         if abs(option['strikePrice'] - strike) < 0.01:
-                            return option['callSymbolId'] if type.lower() == 'call' else option['putSymbolId']
+                            return option[type.lower() + 'SymbolId']
         return 0
 
     def GetOptionPrice(self, option_id):
-        response = self.session.post(self.api_server + 'markets/quotes/options', json={'optionIds':[option_id]})
-        response.raise_for_status()
-        json = response.json()
+        json = self._PostRequest('markets/quotes/options', json={'optionIds':[option_id]})
         data = json['optionQuotes'][0]
-        if data['lastTradePriceTrHrs']:
-            return data['lastTradePriceTrHrs']
-        if data['lastTradePrice']:
-            return data['lastTradePrice']
-        return None
+        return data['lastTradePriceTrHrs'] or data['lastTradePrice']
 
     @api_response()
     def GetAccountBalances(self, id):
