@@ -28,6 +28,9 @@ from .tasks import HandleCsvUpload
 from charts.models import GrowthChart, DailyChangeChart, SecurityChart
 from charts.views import HighChartMixin
 
+from django.views.decorators.cache import never_cache
+from django.utils.decorators import method_decorator
+
 
 class AccountDetail(LoginRequiredMixin, DetailView):
     model = BaseAccount
@@ -82,7 +85,7 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
         HandleCsvUpload.delay(accountcsv.pk)
         return super().form_valid(form)
 
-
+@method_decorator(never_cache, 'dispatch')
 class AdminSecurity(RefreshButtonHandlerMixin, ListView):
     model = Security
     template_name = 'finance/admin/securities.html'
@@ -105,6 +108,7 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
         return self.model.objects.all().prefetch_related('activities', 'prices').order_by('-type', 'symbol')
 
 
+@method_decorator(never_cache, 'dispatch')
 class UserProfileView(LoginRequiredMixin, UpdateView):
     model = get_user_model()
     template_name = 'finance/userprofile.html'
@@ -140,6 +144,7 @@ class UserProfileView(LoginRequiredMixin, UpdateView):
         return HttpResponseRedirect(self.request.path)
 
 
+@method_decorator(never_cache, 'dispatch')
 class UserPasswordPost(LoginRequiredMixin, UpdateView):
     model = get_user_model()
     form_class = PasswordChangeForm
@@ -167,26 +172,29 @@ class AdminUsers(ListView):
     ordering = ['user__date_joined']
 
 
+@method_decorator(never_cache, 'dispatch')
 class AdminAccounts(RefreshButtonHandlerMixin, ListView):
     model = BaseAccount
     template_name = 'finance/admin/accounts.html'
     context_object_name = 'accounts'
     ordering = ['user__username']
 
-    def ajax_request(self, request, action):
-        action, account_pk = action.split('-')
+    def ajax_request(self, request, actions):
+        action = actions[0]
         if action == 'sync':
-            BaseAccount.objects.get(pk=account_pk).SyncAndRegenerate()
+            BaseAccount.objects.get(pk=actions[1]).SyncAndRegenerate()
         elif action == 'activities':
-            BaseAccount.objects.get(pk=account_pk).RegenerateActivities()
+            BaseAccount.objects.get(pk=actions[1]).RegenerateActivities()
         elif action == 'holdings':
-            BaseAccount.objects.get(pk=account_pk).RegenerateHoldings()
+            BaseAccount.objects.get(pk=actions[1]).RegenerateHoldings()
+        elif action == 'holdingdetails':
+            HoldingDetail.Refresh()
         else:
             raise Http404('Account function does not exist!')
-        HoldingDetail.Refresh()
         return HttpResponse()
 
 
+@method_decorator(never_cache, 'dispatch')
 class FeedbackView(FormView):
     template_name = 'finance/feedback.html'
     success_url = '/finance/feedback/?success=true'

@@ -22,8 +22,8 @@ class RefreshButtonHandlerMixin:
     def get(self, request, *args, **kwargs):
         if request.is_ajax():
             key = next(key for key in request.GET if key.startswith('refresh-'))
-            _, action = key.split('-',1)
-            return self.ajax_request(request, action)
+            _, *actions = key.split('-')
+            return self.ajax_request(request, actions)
         return super().get(request, *args, **kwargs)
 
     def ajax_request(self, request, action):
