@@ -1,7 +1,6 @@
 import datetime
 import os
 from itertools import groupby
-from operator import attrgetter
 
 import numpy
 import pandas
