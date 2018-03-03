@@ -20,8 +20,7 @@ class BaseHighChart:
     def get_javascript(self):
         from string import Template
         s = Template(self._JAVASCRIPT_TEMPLATE)
-        return s.safe_substitute({'data_param': self.data_param,
-                                  'container_name': self.container_name})
+        return s.safe_substitute({attr: getattr(self, attr) for attr in dir(self) if not callable(attr)})
 
     def get_data(self, **kwargs):
         return []
@@ -251,7 +250,7 @@ class SecurityChart(BaseHighChart):
             },
             series: series,
             title: {
-                text: '{{ security.symbol }}'
+                text: '$symbol'
             },
             tooltip: {
                 split: false,
@@ -261,24 +260,27 @@ class SecurityChart(BaseHighChart):
         });
     });
     </script>
-
     '''
 
-    def get_data(self, **kwargs):
+    def __init__(self, userprofile, security=None):
+        super().__init__(userprofile)
+        self.security = security
+        self.symbol = security.symbol
+
+    def get_data(self):
         def to_ts(d):
             return datetime.combine(d, time.min).timestamp() * 1000
 
-        security = kwargs['security']
         series = []
         series.append({
             'name': 'Price',
-            'data': [(to_ts(d), float(p)) for d, p in security.prices.values_list('day', 'price')],
+            'data': [(to_ts(d), float(p)) for d, p in self.security.prices.values_list('day', 'price')],
             'color': 'blue',
             'id': 'price'
         })
 
         userprofile = self.userprofile
-        activities = userprofile.GetActivities().for_security(security)
+        activities = userprofile.GetActivities().for_security(self.security)
         purchase_data = activities.transactions().values('trade_date').annotate(total_qty=Sum('qty'), ).values_list(
             'trade_date', 'total_qty', 'price')
         series.append({

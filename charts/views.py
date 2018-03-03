@@ -13,7 +13,7 @@ class HighChartMixin:
 
     def get(self, request, *args, **kwargs):
         for cls in self.chart_classes:
-            obj = cls(self.request.user.userprofile)
+            obj = cls(self.request.user.userprofile, **self.get_chart_kwargs(request))
             setattr(self, cls.__name__.lower(), obj)
             self.chart_objects.append(obj)
 
@@ -21,8 +21,7 @@ class HighChartMixin:
             chart_type = request.GET.get('chart', '')
             for chart in self.chart_objects:
                 if chart_type == chart.data_param:
-                    data = chart.get_data(**self.get_chart_kwargs(request))
-                    return JsonResponse(data, safe=False)
+                    return JsonResponse(chart.get_data(), safe=False)
         return super().get(request, *args, **kwargs)
 
     def get_chart_kwargs(self, request):
