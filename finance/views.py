@@ -25,6 +25,7 @@ from .forms import UserForm, AllocationForm, AllocationFormSet
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, Holding
 from .services import RefreshButtonHandlerMixin, get_growth_data
 from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
+from charts.views import GrowthChart
 
 
 def check_for_missing_securities(request):
