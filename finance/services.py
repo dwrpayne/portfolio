@@ -5,6 +5,7 @@ from utils.misc import find_le_index, window
 
 from highcharts import Highstock
 
+
 class RefreshButtonHandlerMixin:
     """
     Mixin to add support for my custom refresh button.

@@ -5,8 +5,8 @@ from . import views
 app_name = 'finance'
 urlpatterns = [
     path('', views.index, name='index'),
-    path('portfolio/', views.Portfolio, name='portfolio'),
-    path('history/<period>/', views.History, name='history'),
+    path('portfolio/', views.PortfolioView.as_view(), name='portfolio'),
+    path('history/<period>/', views.HistoryDetail.as_view(), name='history'),
     path('snapshot/', views.SnapshotDetail.as_view(), name='snapshot'),
     path('rebalance/', views.RebalanceView.as_view(), name='rebalance'),
     path('account/<pk>/', views.AccountDetail.as_view(), name='accountdetail'),

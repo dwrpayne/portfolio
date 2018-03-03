@@ -409,47 +409,44 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     return context
 
 
-@login_required
-def Portfolio(request):
-    userprofile = request.user.userprofile
-    check_for_missing_securities(request)
+class PortfolioView(LoginRequiredMixin, TemplateView):
+    template_name = 'finance/portfolio.html'
 
-    if request.is_ajax():
-        if 'refresh-account' in request.GET:
-            SyncActivityTask(userprofile)
-            LiveSecurityUpdateTask()
-
-        elif 'refresh-plot' in request.GET:
-            userprofile.generate_plots()
-
-    return render(request, 'finance/portfolio.html', GetHoldingsContext(userprofile))
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(GetHoldingsContext(self.request.user.userprofile))
+        return context
 
 
 class HistoryDetail(LoginRequiredMixin, ListView):
-    pass
+    template_name = 'finance/history.html'
+    model = HoldingDetail
+    context_object_name = 'holdings'
 
+    def get_context_data(self, **kwargs):
+        vals = self.get_queryset().account_values()
 
-@login_required
-def History(request, period):
-    holdings = request.user.userprofile.GetHoldingDetails()
-    if period == 'year':
-        holdings = holdings.year_end()
-    elif period == 'month':
-        holdings = holdings.month_end()
+        array = numpy.rec.array(list(vals), dtype=[('account', 'U20'), ('day', 'U10'), ('val', 'f4')])
+        df = pandas.DataFrame(array)
+        table = df.pivot_table(index='day', columns='account', values='val', fill_value=0)
+        rows = table.iloc[::-1].iterrows()
 
-    vals = holdings.account_values()
+        context = super().get_context_data(**kwargs)
+        context = {
+            'names': list(table.columns) + ['Total'],
+            'rows': ((date, vals, sum(vals)) for date, vals in rows),
+        }
+        return context
 
-    array = numpy.rec.array(list(vals), dtype=[('account', 'U20'), ('day', 'U10'), ('val', 'f4')])
-    df = pandas.DataFrame(array)
-    table = df.pivot_table(index='day', columns='account', values='val', fill_value=0)
-    rows = table.iloc[::-1].iterrows()
+    def get_queryset(self):
+        period = self.kwargs['period']
+        queryset = self.request.user.userprofile.GetHoldingDetails()
+        if period == 'year':
+            return queryset.year_end()
+        elif period == 'month':
+            return queryset.month_end()
+        return queryset
 
-    context = {
-        'names': list(table.columns) + ['Total'],
-        'rows': ((date, vals, sum(vals)) for date, vals in rows),
-    }
-
-    return render(request, 'finance/history.html', context)
 
 
 def portfolio_chart(request):
