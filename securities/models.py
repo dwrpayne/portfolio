@@ -29,7 +29,12 @@ class SecurityManager(models.Manager):
         if live_update:
             queryset = queryset.filter(holdings__enddate__isnull=True).distinct()
         for security in queryset:
-            security.SyncRates(live_update)
+            try:
+                security.SyncRates(live_update)
+            except:
+                import traceback
+                print('Encountered exception:')
+                traceback.print_exc()
 
 
 class StockSecurityManager(SecurityManager):
