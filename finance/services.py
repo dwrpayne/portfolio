@@ -1,9 +1,18 @@
-from datetime import date, datetime, timedelta
-from itertools import chain
-from django.db.models import Sum
-from utils.misc import find_le_index, window
+from datetime import date
 
-from highcharts import Highstock
+from django.contrib import messages
+
+from .models import Holding
+from .tasks import SyncSecurityTask
+
+
+def check_for_missing_securities(request):
+    current = Holding.objects.current().values_list('security_id').distinct()
+    num_prices = current.filter(security__prices__day=date.today()).count()
+    if current.count() > num_prices:
+        messages.warning(request, 'Currently updating out-of-date stock data. Please try again in a few seconds.'.format(num_prices, current.count()))
+        messages.debug(request, '{} of {} synced'.format(num_prices, current.count()))
+        SyncSecurityTask.delay(False)
 
 
 class RefreshButtonHandlerMixin:

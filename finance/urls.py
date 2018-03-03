@@ -18,8 +18,6 @@ urlpatterns = [
     path('dividends/', views.DividendReport.as_view(), name='dividends'),
 
     # AJAX chart data
-    path('portfoliochart/', views.portfolio_chart, name='portfoliochart'),
-    path('growthchart/', views.growth_chart, name='growthchart'),
     path('securitychart/<symbol>/', views.security_chart, name='securitychart'),
 
     # Profile

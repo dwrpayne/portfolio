@@ -23,18 +23,9 @@ from utils.misc import partition, window
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm, AllocationForm, AllocationFormSet
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, Holding
-from .services import RefreshButtonHandlerMixin, get_growth_data
-from .tasks import LiveSecurityUpdateTask, SyncActivityTask, SyncSecurityTask, HandleCsvUpload
-from charts.views import GrowthChart
-
-
-def check_for_missing_securities(request):
-    current = Holding.objects.current().values_list('security_id').distinct()
-    num_prices = current.filter(security__prices__day=datetime.date.today()).count()
-    if current.count() > num_prices:
-        messages.warning(request, 'Currently updating out-of-date stock data. Please try again in a few seconds.'.format(num_prices, current.count()))
-        messages.debug(request, '{} of {} synced'.format(num_prices, current.count()))
-        SyncSecurityTask.delay(False)
+from .services import RefreshButtonHandlerMixin, check_for_missing_securities
+from .tasks import HandleCsvUpload
+from charts.views import GrowthChart, DailyChangeChart
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -418,6 +409,19 @@ class PortfolioView(LoginRequiredMixin, TemplateView):
         context.update(GetHoldingsContext(self.request.user.userprofile))
         return context
 
+    def get(self, request, *args, **kwargs):
+        self.growthchart = GrowthChart(self.request.path,
+                                       self.request.user.userprofile)
+        self.changechart = DailyChangeChart(self.request.path,
+                                            self.request.user.userprofile)
+        if request.is_ajax():
+            chart_type = request.GET.get('chart', '')
+            for chart in [self.growthchart, self.changechart]:
+                if chart_type == chart.data_param:
+                    return chart.get_data()
+
+        return super().get(request, *args, **kwargs)
+
 
 class HistoryDetail(LoginRequiredMixin, ListView):
     template_name = 'finance/history.html'
@@ -449,18 +453,6 @@ class HistoryDetail(LoginRequiredMixin, ListView):
         return queryset
 
 
-
-def portfolio_chart(request):
-    userprofile = request.user.userprofile
-    #names = [['Day', 'Total Value', 'Total Contributions', 'Net Growth']]
-    return JsonResponse(list(zip(*get_growth_data(userprofile))), safe=False)
-
-
-def growth_chart(request):
-    userprofile = request.user.userprofile
-    days, values, deposits, growth = get_growth_data(userprofile)
-    daily_growth = [t - y for y, t in window(growth)]
-    return JsonResponse(list(zip(days, daily_growth)), safe=False)
 
 
 def security_chart(request, symbol):
