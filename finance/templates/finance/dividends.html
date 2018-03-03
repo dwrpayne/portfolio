@@ -3,15 +3,17 @@
 {% load static %}
 {% block title %} {{view.object.symbol}} {% endblock title %}
 {% block content %}  
-<div class="row" align="center">
-    <h2>Annual Dividend Summary</h2>
-    <br /><h3>All values converted to Canadian dollars.</h3>
+<div class="row">
+    <h2 align="center">Annual Dividend Summary</h2><br>
+    <li>This is a year-by-year summary of all the dividends you have realised in taxable accounts.</li>
+    <li>All numbers are converted to Canadian dollars.</li>
 </div>
 <div class="row">
     <div class="col-sm-12">
         <table id="dividend-table" class="display striped hover" >
             <thead>
                 <tr>
+                    <th></th>
                     <th>Symbol</th>
                     {% for year in years %}
                         <th>{{ year }}</th>
@@ -21,16 +23,20 @@
             </thead>
             <tfoot>
                 <tr>
+                    <td></td>
                     <td>Total</td>
                     {% for value in yearly_totals %}
                         <td>{% if value %}{{ value | currency }}{% endif %}</td>
                     {% endfor %}
-                    <th>{{ total | currency }}</th>
+                    <td>{{ total | currency }}</td>
                 </tr>
             </tfoot>
             <tbody>
                 {% for symbol, yearly_values in security_year_amounts %}
                     <tr>
+                        <td class="details-control"><div>
+                            <span class="glyphicon glyphicon-menu-right"></span>
+                        </div></td>
                         <td>{{ symbol }}</td>
                         {% for value in yearly_values %}
                             <td>{% if value %}{{ value | currency }}{% endif %}</td>
@@ -41,17 +47,37 @@
         </table>
     </div>
 </div>
-
 {% endblock content %}
 
 {% block footer_javascript_page %}
     <script type="text/javascript">
+        function format ( d ) {
+            // `d` is the original data object for the row
+            return '';
+        };
         $(document).ready(function() {
-            $('#dividend-table').DataTable( {
+            var table = $('#dividend-table').DataTable( {
                 paging:   false,
                 searching: false,
                 info: false
             } );
-        } );
+
+            // Add event listener for opening and closing details
+            $('#dividend-table tbody').on('click', 'td.details-control', function () {
+                var tr = $(this).closest('tr');
+                var row = table.row( tr );
+
+                if ( row.child.isShown() ) {
+                    // This row is already open - close it
+                    row.child.hide();
+                    tr.removeClass('shown');
+                }
+                else {
+                    // Open this row
+                    row.child( format(row.data()) ).show();
+                    tr.addClass('shown');
+                }
+            });
+        });
     </script>
 {% endblock footer_javascript_page %}
