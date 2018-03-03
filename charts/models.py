@@ -1,4 +1,6 @@
 from django.db import models
+from datetime import datetime, time
+from django.db.models import Sum
 
 class BaseHighChart:
     container_name = 'container'
@@ -21,7 +23,7 @@ class BaseHighChart:
         return s.safe_substitute({'data_param': self.data_param,
                                   'container_name': self.container_name})
 
-    def get_data(self):
+    def get_data(self, **kwargs):
         return []
 
 
@@ -99,7 +101,7 @@ class GrowthChart(BaseHighChart):
     </script>
     '''
 
-    def get_data(self):
+    def get_data(self, **kwargs):
         from finance.services import get_growth_data
         return list(zip(*get_growth_data(self.userprofile)))
 
@@ -195,7 +197,7 @@ class DailyChangeChart(BaseHighChart):
     </script>
     '''
 
-    def get_data(self):
+    def get_data(self, **kwargs):
         from finance.services import get_growth_data
         from utils.misc import window
 
@@ -204,19 +206,19 @@ class DailyChangeChart(BaseHighChart):
         return list(zip(days, daily_growth))
 
 
-class SecurityChartBase(BaseHighChart):
-    container_name = 'change-div'
-    data_param = 'change'
+class SecurityChart(BaseHighChart):
+    container_name = 'security-div'
+    data_param = 'security'
     _JAVASCRIPT_TEMPLATE = '''    
     <script src="https://code.highcharts.com/stock/indicators/indicators.js"></script>
     <script>
-    $.get("{% url 'finance:securitychart' security %}", function(series) {
+    $.get("?chart=$data_param", function(series) {
         Highcharts.StockChart({
             boost: {
                 useGPUTranslations: true
             },
             chart: {
-                renderTo: "securitycontainer",
+                renderTo: "$container_name",
                 width: 1000,
                 height: 500,
                 type: 'line',
@@ -262,10 +264,46 @@ class SecurityChartBase(BaseHighChart):
 
     '''
 
-    def get_data(self):
-        from finance.services import get_growth_data
-        from utils.misc import window
+    def get_data(self, **kwargs):
+        def to_ts(d):
+            return datetime.combine(d, time.min).timestamp() * 1000
 
-        days, values, deposits, growth = get_growth_data(self.userprofile)
-        daily_growth = [t - y for y, t in window(growth)]
-        return list(zip(days, daily_growth))
+        security = kwargs['security']
+        series = []
+        series.append({
+            'name': 'Price',
+            'data': [(to_ts(d), float(p)) for d, p in security.prices.values_list('day', 'price')],
+            'color': 'blue',
+            'id': 'price'
+        })
+
+        userprofile = self.userprofile
+        activities = userprofile.GetActivities().for_security(security)
+        purchase_data = activities.transactions().values('trade_date').annotate(total_qty=Sum('qty'), ).values_list(
+            'trade_date', 'total_qty', 'price')
+        series.append({
+            'name': 'Purchases',
+            'type': 'flags',
+            'shape': 'squarepin',
+            'onSeries': 'price',
+            'allowOverlapX': True,
+            'data': [{'x': to_ts(day),
+                      'fillColor': 'GreenYellow' if qty > 0 else 'red',
+                      'title': str(int(qty)),
+                      'text': '{} {:.0f} @ {:.2f}'.format('Buy' if qty > 0 else 'Sell', qty, price),
+                      } for day, qty, price in purchase_data]
+        })
+        series.append({
+            'name': 'Dividends',
+            'type': 'flags',
+            'fillColor': 'LightCyan',
+            'shape': 'circlepin',
+            'allowOverlapX': True,
+            'data': [{'x': to_ts(day),
+                      'title': '{:.2f}'.format(price),
+                      'text': 'Dividend of ${:.2f}'.format(price),
+                      } for day, price in activities.dividends().values_list('trade_date', 'price').distinct()]
+
+        })
+        return series
+

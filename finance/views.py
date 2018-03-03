@@ -25,7 +25,7 @@ from .forms import UserForm, AllocationForm, AllocationFormSet
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, Holding
 from .services import RefreshButtonHandlerMixin, check_for_missing_securities
 from .tasks import HandleCsvUpload
-from charts.models import GrowthChart, DailyChangeChart
+from charts.models import GrowthChart, DailyChangeChart, SecurityChart
 from charts.views import HighChartMixin
 
 
@@ -41,16 +41,20 @@ class AccountDetail(LoginRequiredMixin, DetailView):
         return super().get_queryset().for_user(self.request.user)
 
 
-class SecurityDetail(LoginRequiredMixin, DetailView):
+class SecurityDetail(LoginRequiredMixin, HighChartMixin, DetailView):
     model = Security
     template_name = 'finance/security.html'
     context_object_name = 'security'
+    chart_classes = [SecurityChart]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         activities = self.object.activities.for_user(self.request.user).select_related('account')
         context['activities'] = list(activities.order_by('-trade_date'))
         return context
+
+    def get_chart_kwargs(self, request):
+        return {'security': self.get_object()}
 
 
 class AccountCsvUpload(LoginRequiredMixin, FormView):
@@ -401,22 +405,15 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
     return context
 
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import never_cache
 
-@method_decorator(never_cache, 'dispatch')
 class PortfolioView(LoginRequiredMixin, HighChartMixin, TemplateView):
     template_name = 'finance/portfolio.html'
+    chart_classes = [GrowthChart, DailyChangeChart]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(GetHoldingsContext(self.request.user.userprofile))
         return context
-
-    def get(self, request, *args, **kwargs):
-        self.growthchart = GrowthChart(self.request.user.userprofile)
-        self.changechart = DailyChangeChart(self.request.user.userprofile)
-        return super().get(request, *args, **kwargs)
 
 
 class HistoryDetail(LoginRequiredMixin, ListView):
@@ -462,12 +459,6 @@ def security_chart(request, symbol):
         'color': 'blue',
         'id': 'price'
     })
-    # if not security.currency == 'CAD':
-    #     series.append({
-    #         'name': 'CAD Price',
-    #         'data': [(to_ts(d), float(p)) for d,p in pricedetails.values_list('day', 'cadprice')],
-    #         'color': 'orange'
-    #     })
 
     userprofile = request.user.userprofile
     activities = userprofile.GetActivities().for_security(security)
