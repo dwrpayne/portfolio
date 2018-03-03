@@ -13,7 +13,8 @@ class HoldingManager(models.Manager):
     def add_effect(self, account, symbol, qty_delta, date):
         # Hack david's joint accounts to be half.
         if account.pk in [18,19,20,21,22,23,24,25] and date < datetime.date(2018,1,19):
-            qty_delta /= 2
+            qty_delta /= 1#2
+
         previous_qty = 0
         try:
             current_holding = self.get(security_id=symbol, enddate=None)
