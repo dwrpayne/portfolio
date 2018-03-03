@@ -231,10 +231,19 @@ class Security(models.Model):
         data = get_data_from_sources(self.datasources.all(), start, end)
 
         with transaction.atomic():
-            for day, price in data:
-                if price < 0.1:
-                    print('ALERT... UPDATING {} to {}'.format(day, price))
-                self.prices.update_or_create(day=day, defaults={'price': price})
+            query = self.prices.select_for_update().filter(day__range=(data.index[0], data.index[-1]))
+            for p in query:
+                new_price = data.ix[p.day]
+                if new_price.priority >= p.priority:
+                    if new_price.price < 0.1:
+                        print('ALERT... UPDATING {} to {}'.format(p.day, new_price.price))
+                    p.priority = new_price.priority
+                    p.price = new_price.price
+                    p.save()
+                data = data.drop(p.day)
+            for series in data.itertuples():
+                self.prices.get_or_create(day=series.Index, defaults={'price': series.price,
+                                                                      'priority': series.priority})
             self.last_sync_time = timezone.now()
             self.save(update_fields=['last_sync_time'])
 
@@ -282,6 +291,7 @@ class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='prices')
     day = models.DateField(default=datetime.date.today)
     price = models.DecimalField(max_digits=19, decimal_places=6)
+    priority = models.IntegerField()
 
     objects = SecurityPriceQuerySet.as_manager()
 
@@ -295,7 +305,7 @@ class SecurityPrice(models.Model):
         ]
 
     def __str__(self):
-        return "{} {} {}".format(self.security, self.day, self.price)
+        return "{} {} {} {}".format(self.security, self.day, self.price, self.priority)
 
 
 class SecurityPriceDetail(models.Model):
