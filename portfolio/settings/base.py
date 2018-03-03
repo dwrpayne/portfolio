@@ -57,14 +57,16 @@ PREREQ_APPS = [
 
 INSTALLED_APPS = PROJECT_APPS + PREREQ_APPS
 
+# Middleware runs top down for requests, and bottom up for responses
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'django.middleware.cache.UpdateCacheMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',
 ]
 
 ROOT_URLCONF = 'portfolio.urls'
@@ -95,6 +97,10 @@ CACHES = {
         }
     }
 }
+
+CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_SECONDS = 5*60
+CACHE_MIDDLEWARE_KEY_PREFIX = ''
 
 WSGI_APPLICATION = 'portfolio.wsgi.application'
 
