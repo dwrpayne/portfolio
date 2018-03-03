@@ -17,10 +17,10 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
     A mixin class for retrieving data in a well-defined format.
     Just need to override a function that grabs the data.
     """
-    PRIORITY_HIGH = 30
-    PRIORITY_MEDIUM = 20
+    PRIORITY_REALTIME = 30
+    PRIORITY_DAILY = 20
     PRIORITY_LOW = 10
-    priority = models.IntegerField(default=PRIORITY_MEDIUM)
+    priority = models.IntegerField(default=PRIORITY_DAILY)
 
     def _Retrieve(self, start, end):
         """
@@ -36,7 +36,7 @@ class ConstantDataSource(DataSourceMixin):
         return "Constant value of {}".format(self.value)
 
     def __repr__(self):
-        return "FakeDataSource<{}>".format(self.value)
+        return "FakeDataSource<{},{}>".format(self.value, self.priority)
 
     def _Retrieve(self, start, end):
         return pandas.Series([self.value], index=pandas.date_range(start, end))
@@ -57,10 +57,10 @@ class PandasDataSource(DataSourceMixin):
         return cls.objects.create(symbol=symbol, source='google', column='Close')
 
     def __str__(self):
-        return "Pandas {} for {}".format(self.source, self.symbol)
+        return "Pandas {} for {} ({})".format(self.source, self.symbol, self.priority)
 
     def __repr__(self):
-        return "PandasDataSource<{},{},{}>".format(self.symbol, self.source, self.column)
+        return "PandasDataSource<{},{},{},{}>".format(self.symbol, self.source, self.column, self.priority)
 
     def _Retrieve(self, start, end):
         import warnings
@@ -77,10 +77,10 @@ class AlphaVantageStockSource(DataSourceMixin):
     symbol = models.CharField(max_length=32)
 
     def __str__(self):
-        return "AlphaVantageStock source for {}".format(self.symbol)
+        return "AlphaVantageStock source for {} ({})".format(self.symbol, self.priority)
 
     def __repr__(self):
-        return "AlphaVantageStockSource<{}>".format(self.symbol)
+        return "AlphaVantageStockSource<{},{}>".format(self.symbol, self.priority)
 
     def validate_symbol(self):
         """Go through our list of possible symbol transformations to find one that has data in the last week"""
@@ -120,10 +120,10 @@ class AlphaVantageCurrencySource(DataSourceMixin):
     to_symbol = models.CharField(max_length=32, default='CAD')
 
     def __str__(self):
-        return "AlphaVantageCurrency source for {} to {}".format(self.from_symbol, self.to_symbol)
+        return "AlphaVantageCurrency source for {} to {} ({})".format(self.from_symbol, self.to_symbol, self.priority)
 
     def __repr__(self):
-        return "AlphaVantageCurrencySource<{},{}>".format(self.from_symbol, self.to_symbol)
+        return "AlphaVantageCurrencySource<{},{},{}>".format(self.from_symbol, self.to_symbol, self.priority)
 
     @rate_limited(1,2)
     def _Retrieve(self, start, end):
@@ -148,10 +148,10 @@ class MorningstarDataSource(DataSourceMixin):
     symbol = models.CharField(max_length=32, default=None)
 
     def __str__(self):
-        return "Morningstar {}".format(self.symbol)
+        return "Morningstar {} ({})".format(self.symbol, self.priority)
 
     def __repr__(self):
-        return "MorningstarDataSource<{}>".format(self.symbol)
+        return "MorningstarDataSource<{},{}>".format(self.symbol, self.priority)
 
     def _Retrieve(self, start, end):
         url = self.raw_url.format(self.symbol, str(start), str(end))
@@ -170,12 +170,12 @@ class InterpolatedDataSource(DataSourceMixin):
     end_val = models.DecimalField(max_digits=19, decimal_places=6)
 
     def __str__(self):
-        return "interpolated data from {} {} to {} {}".format(
-            self.start_day, self.start_val, self.end_day, self.end_val)
+        return "interpolated data from {} {} to {} {} ({})".format(
+            self.start_day, self.start_val, self.end_day, self.end_val, self.priority)
 
     def __repr__(self):
-        return "InterpolatedDataSource<{},{},{},{}>".format(
-            self.start_day, self.start_val, self.end_day, self.end_val)
+        return "InterpolatedDataSource<{},{},{},{},{}>".format(
+            self.start_day, self.start_val, self.end_day, self.end_val, self.priority)
 
     def _Retrieve(self, start, end):
         series = pandas.Series(index=pandas.date_range(self.start_day, self.end_day))

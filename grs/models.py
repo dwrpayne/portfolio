@@ -31,7 +31,8 @@ class GrsRawActivity(BaseRawActivity):
                                            defaults={'currency':'CAD'})
         if created:
             security.add_datasource(GrsDataSource.objects.get_or_create(
-                symbol=self.symbol, client=self.account.client))
+                symbol=self.symbol, client=self.account.client,
+                priority=GrsDataSource.PRIORITY_DAILY))
 
         total_cost = self.qty * self.price
         Activity.objects.create_with_deposit(account=self.account, trade_date=self.day, security=security,
@@ -118,10 +119,10 @@ class GrsAccount(BaseAccount):
     activitySyncDateRange = 360
 
     def __str__(self):
-        return '{} {} {}'.format(self.client, self.account_id, self.type)
+        return '{} {} {} ({})'.format(self.client, self.account_id, self.type, self.priority)
 
     def __repr__(self):
-        return 'GrsAccount<{},{},{}>'.format(self.client, self.account_id, self.type)
+        return 'GrsAccount<{},{},{},{}>'.format(self.client, self.account_id, self.type, self.priority)
 
     def CreateActivities(self, start, end):
         with self.client as client:

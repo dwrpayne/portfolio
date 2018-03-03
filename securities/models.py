@@ -155,7 +155,7 @@ class Security(models.Model):
         objs = []
         if self.type == self.Type.Stock:
             obj, created = AlphaVantageStockSource.objects.get_or_create(symbol=self.symbol,
-                                                                         priority=AlphaVantageStockSource.PRIORITY_HIGH)
+                                                                         priority=AlphaVantageStockSource.PRIORITY_REALTIME)
             objs.append(obj)
             obj, created = PandasDataSource.create_stock(self.symbol)
             objs.append(obj)

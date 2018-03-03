@@ -264,10 +264,10 @@ class QuestradeOptionDataSource(DataSourceMixin):
     client = models.ForeignKey(QuestradeClient, on_delete=models.CASCADE)
 
     def __str__(self):
-        return "Questrade Client {} for option {}".format(self.client, self.symbol)
+        return "Questrade Client {} for option {} ({})".format(self.client, self.symbol, self.priority)
 
     def __repr__(self):
-        return "QuestradeOptionDataSource<{},{}>".format(self.symbol, self.client)
+        return "QuestradeOptionDataSource<{},{},{}>".format(self.symbol, self.client, self.priority)
 
     @classmethod
     def create_from_option(cls, option, client):
@@ -275,7 +275,8 @@ class QuestradeOptionDataSource(DataSourceMixin):
             underlying_id = c.GetSymbolId(option.underlying)
             optionid = c.GetOptionId(underlying_id, option.expiry, 'call' if option.is_call else 'put', option.strike)
 
-        return cls.objects.create(symbol=option.symbol, optionid=optionid, client=client)
+        return cls.objects.create(symbol=option.symbol, optionid=optionid, client=client,
+                priority=cls.PRIORITY_REALTIME)
 
     def _Retrieve(self, start, end):
         try:
