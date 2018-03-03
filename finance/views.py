@@ -25,7 +25,8 @@ from .forms import UserForm, AllocationForm, AllocationFormSet
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, Holding
 from .services import RefreshButtonHandlerMixin, check_for_missing_securities
 from .tasks import HandleCsvUpload
-from charts.views import GrowthChart, DailyChangeChart
+from charts.models import GrowthChart, DailyChangeChart
+from charts.views import HighChartMixin
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):
@@ -400,8 +401,11 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
     return context
 
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 
-class PortfolioView(LoginRequiredMixin, TemplateView):
+@method_decorator(never_cache, 'dispatch')
+class PortfolioView(LoginRequiredMixin, HighChartMixin, TemplateView):
     template_name = 'finance/portfolio.html'
 
     def get_context_data(self, **kwargs):
@@ -412,12 +416,6 @@ class PortfolioView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         self.growthchart = GrowthChart(self.request.user.userprofile)
         self.changechart = DailyChangeChart(self.request.user.userprofile)
-        if request.is_ajax():
-            chart_type = request.GET.get('chart', '')
-            for chart in [self.growthchart, self.changechart]:
-                if chart_type == chart.data_param:
-                    return chart.get_data()
-
         return super().get(request, *args, **kwargs)
 
 

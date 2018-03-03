@@ -4,20 +4,18 @@
 {% block title %} {{security.symbol}} {% endblock title %}
 {% block content %}  
 <div class="row" align="center">
-<div id="securitycontainer"></div>
+<div id="{{ view.securitychart.container_name }}"></div>
 </div>
 <div class="row">
     <div class="col-sm-12">
         {% include "finance/activity_table.html" with show_account=True show_security=False %}
     </div>
 </div>
-
 {% endblock content %}
+
 {% block footer_javascript_page %}
     {% include "highcharts.html" %}
-    <script src="https://code.highcharts.com/modules/data.js"></script>
-    <script src="https://code.highcharts.com/stock/indicators/indicators.js"></script>
-
+    {{ view.securitychart.get_javascript | safe}}
     <script>
         $(document).ready(function() {
             $('#activities-table').DataTable( {
@@ -25,55 +23,5 @@
                 "searching": false
             } );
         } );
-    </script>
-    <script>
-    $.get("{% url 'finance:securitychart' security %}", function(series) {
-        Highcharts.StockChart({
-            boost: {
-                useGPUTranslations: true
-            },
-            chart: {
-                renderTo: "securitycontainer",
-                width: 1000,
-                height: 500,
-                type: 'line',
-                zoomType: 'x'
-            },
-            credits: {
-                enabled: false
-            },
-            legend: {
-                enabled: true,
-            },
-            plotOptions: {
-                series: {
-                    dataGrouping: {
-                        units: [
-                            ['day', [1]],
-                            ['week', [1]],
-                            ['month', [1]]
-                        ],
-                        approximation: function (arr){
-                            return Math.max(...arr);
-                        },
-                        enabled:true,
-                        groupPixelWidth:5
-                    },
-                    tooltip: {
-                        valueDecimals: 2
-                    }
-                }
-            },
-            series: series,
-            title: {
-                text: '{{ security.symbol }}'
-            },
-            tooltip: {
-                split: false,
-                shared: true,
-                xDateFormat: '%A, %b %e, %Y'
-            }
-        });
-    });
     </script>
 {% endblock footer_javascript_page %}
