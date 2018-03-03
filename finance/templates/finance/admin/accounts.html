@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 {% load mytags %}
 
 {% block content %}
@@ -27,4 +28,8 @@
             </tr>
         {% endfor %}
     </table>
+{% endblock %}
+
+{% block footer_javascript_page %}
+    <script src="{% static "finance/refresh_button.js" %}"></script>
 {% endblock %}
