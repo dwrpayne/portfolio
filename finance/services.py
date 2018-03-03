@@ -31,6 +31,13 @@ class RefreshButtonHandlerMixin:
 
 
 def get_growth_data(userprofile):
+    """
+    returns a tuple lists of portfolio value data (days, values, deposits, growth)
+    days: a list of days that correspond to the other lists
+    values: portfolio values on that date
+    deposits: total $ deposited to date
+    growth: total profit to date.
+    """
     days, values = list(zip(*userprofile.GetHoldingDetails().total_values()))
     dep_days, dep_amounts = map(list, list(zip(*userprofile.GetActivities().get_all_deposits())))
     next_dep = 0
@@ -43,5 +50,6 @@ def get_growth_data(userprofile):
             deposits.append(next_dep)
 
     growth = [val - dep for val, dep in zip(values, deposits)]
-    return days, values, deposits, growth
+    ret_list = (days, values, deposits, growth)
+    return ret_list
 

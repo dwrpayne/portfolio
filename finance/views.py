@@ -410,10 +410,8 @@ class PortfolioView(LoginRequiredMixin, TemplateView):
         return context
 
     def get(self, request, *args, **kwargs):
-        self.growthchart = GrowthChart(self.request.path,
-                                       self.request.user.userprofile)
-        self.changechart = DailyChangeChart(self.request.path,
-                                            self.request.user.userprofile)
+        self.growthchart = GrowthChart(self.request.user.userprofile)
+        self.changechart = DailyChangeChart(self.request.user.userprofile)
         if request.is_ajax():
             chart_type = request.GET.get('chart', '')
             for chart in [self.growthchart, self.changechart]:

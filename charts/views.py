@@ -10,7 +10,7 @@ class GrowthChart(LoginRequiredMixin, View):
     <script src="https://code.highcharts.com/modules/data.js"></script>
     <script src="https://code.highcharts.com/stock/indicators/indicators.js"></script>
     <script>
-    $.get("$url?chart=$data_param", function(data) {
+    $.get("?chart=$data_param", function(data) {
         Highcharts.StockChart({
             boost: {
                 useGPUTranslations: true
@@ -78,16 +78,14 @@ class GrowthChart(LoginRequiredMixin, View):
     });
     '''
 
-    def __init__(self, url, userprofile):
-        self.url = url
+    def __init__(self, userprofile):
         self.userprofile = userprofile
 
     @property
     def javascript(self):
         from string import Template
         s = Template(self._JAVASCRIPT_TEMPLATE)
-        return s.safe_substitute({'url': self.url,
-                                  'data_param': self.data_param,
+        return s.safe_substitute({'data_param': self.data_param,
                                   'container_name': self.container_name})
 
     def get_data(self):
@@ -100,7 +98,7 @@ class DailyChangeChart(LoginRequiredMixin, View):
     container_name = 'change-div'
     data_param = 'change'
     _JAVASCRIPT_TEMPLATE = '''
-    $.get("$url?chart=$data_param", function(data) {
+    $.get("?chart=$data_param", function(data) {
        Highcharts.StockChart({
            boost: {
                useGPUTranslations: true
@@ -185,16 +183,14 @@ class DailyChangeChart(LoginRequiredMixin, View):
     </script>
     '''
 
-    def __init__(self, url, userprofile):
-        self.url = url
+    def __init__(self, userprofile):
         self.userprofile = userprofile
 
     @property
     def javascript(self):
         from string import Template
         s = Template(self._JAVASCRIPT_TEMPLATE)
-        return s.safe_substitute({'url': self.url,
-                                  'data_param': self.data_param,
+        return s.safe_substitute({'data_param': self.data_param,
                                   'container_name': self.container_name})
 
     def get_data(self):

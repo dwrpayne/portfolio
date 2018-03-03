@@ -13,6 +13,7 @@
     </div>
 {% endblock content %}
 {% block footer_javascript_page %}
+    {% include "highcharts.html" %}
     {{ view.growthchart.javascript | safe}}
     {{ view.changechart.javascript | safe}}
 {% endblock footer_javascript_page %}
