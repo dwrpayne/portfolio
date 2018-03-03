@@ -22,6 +22,12 @@ class DataSourceMixin(ShowFieldTypeAndContent, PolymorphicModel):
     PRIORITY_LOW = 10
     priority = models.IntegerField(default=PRIORITY_DAILY)
 
+    @classmethod
+    def is_higher_priority(cls, old, new):
+        if new == cls.PRIORITY_REALTIME:
+            return True
+        return new >= old
+
     def _Retrieve(self, start, end):
         """
         Given datetime.date 'start' and 'end', return a pandas series of price values.

@@ -229,12 +229,14 @@ class Security(models.Model):
             return []
 
         data = get_data_from_sources(self.datasources.all(), start, end)
+        if data.empty:
+            return
 
         with transaction.atomic():
             query = self.prices.select_for_update().filter(day__range=(data.index[0], data.index[-1]))
             for p in query:
                 new_price = data.ix[p.day]
-                if new_price.priority >= p.priority:
+                if DataSourceMixin.is_higher_priority(p.priority, new_price.priority):
                     if new_price.price < 0.1:
                         print('ALERT... UPDATING {} to {}'.format(p.day, new_price.price))
                     p.priority = new_price.priority
