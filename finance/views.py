@@ -377,10 +377,24 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         account_data[(h.security_id, h.account_id)] -= h
     account_data = account_data.values()
 
+    costbases_by_security_account = userprofile.get_costbasis_by_security_account()
+
     holding_data = []
     for security, holdings in groupby(account_data, lambda h: h.security):
         h = sum(holdings)
         h.account_data = [d for d in account_data if d.security == security]
+        h.book_value = 0
+        for account_datum in h.account_data:
+            try:
+                account_datum.book_value = costbases_by_security_account[security.symbol][account_datum.account.id].acb_total
+                account_datum.total_value_gain = account_datum.value - account_datum.book_value
+                h.book_value += account_datum.book_value
+            except KeyError:
+                continue
+        if h.book_value:
+            h.total_value_gain = h.value - h.book_value
+        else:
+            h.book_value = None
         holding_data.append(h)
 
     # Sort by currency first, then symbol. Keep cash at the end (currency = '')

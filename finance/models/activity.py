@@ -121,10 +121,6 @@ class ActivityManager(models.Manager):
         if 'cash_id' in kwargs and not kwargs['cash_id']:
             kwargs['cash_id'] = None
 
-        # These types don't affect cash balance.
-        if kwargs['type'] in [Activity.Type.Expiry, Activity.Type.Journal]:
-            kwargs['cash_id'] = None
-
         if kwargs['type'] == Activity.Type.Dividend:
             kwargs['qty'] = 0
 
@@ -178,8 +174,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
                                      Activity.Type.Transfer])
 
     def transactions(self):
-        return self.filter(type__in=[Activity.Type.Buy,
-                                     Activity.Type.Sell])
+        return self.exclude(security=None).exclude(qty=0)
 
     def dividends(self):
         return self.filter(type=Activity.Type.Dividend)
@@ -276,3 +271,91 @@ class Activity(models.Model):
         if self.security and self.type != Activity.Type.Dividend:
             effects[self.security.symbol] = self.qty
         return effects
+
+
+
+
+
+from itertools import groupby
+class CostBasis2Manager(models.Manager):
+    def _finalize(self, queryset, separate_by_account=False):
+        groupby_fn = lambda a: a.security_id
+        if separate_by_account:
+            queryset = queryset.order_by('security', 'account', 'trade_date')
+            groupby_fn = lambda a: (a.account_id, a.security_id)
+
+        for security, activities in groupby(queryset, groupby_fn):
+            if security:
+                prev_costbasis = CostBasis2.create_null()
+                for act in activities:
+                    act.post_initialize(prev_costbasis)
+                    prev_costbasis = act
+        queryset.model = self.model
+        return queryset
+
+    def create(self, **kwargs):
+        assert False, "Don't create a CostBasis!"
+
+    def get_queryset(self):
+        return super().get_queryset().transactions().with_exchange_rates()
+
+    def get_costbasis(self, user, security):
+        bases = list(self._finalize(self.get_queryset().for_user(user).for_security(security)))
+        basis = bases[-1]
+        return basis
+
+    def get_all_costbases_by_account(self, user, securities):
+        table = self._finalize(self.get_queryset().for_user(user).for_securities(securities), separate_by_account=True)
+        latest = {}
+        for basis in table:
+            latest[(basis.account_id, basis.security)] = basis
+        return (v for v in latest.values() if v.qty_total > 0)
+
+    def get_capgains_table(self, user):
+        return self._finalize(self.get_queryset().for_user(user).taxable())
+
+
+class CostBasis2(Activity):
+    objects = CostBasis2Manager.from_queryset(ActivityQuerySet)()
+
+    class Meta:
+        ordering = ['security', 'trade_date']
+        get_latest_by = 'trade_date'
+        proxy = True
+
+    def __str__(self):
+        return "{} shares of {}, book value {:.2f}".format(self.qty_total, self.security_id, self.acb_total)
+
+    def __repr__(self):
+        return "CostBasis2<{},{},{:.2f}".format(self.qty_total, self.security_id, self.acb_total)
+
+    @classmethod
+    def create_null(cls):
+        basis = cls()
+        basis.qty_total = 0
+        basis.acb_per_share = 0
+        basis.acb_total = 0
+        return basis
+
+    def post_initialize(self, previous_costbasis):
+        self.cad_commission = self.commission * self.exch
+        self.cad_price_per_share = self.price * self.exch
+        if not self.cad_price_per_share:
+            self.cad_price_per_share = self.security.prices.get(day=self.trade_date).price * self.exch
+        self.total_cad_value = self.qty * self.cad_price_per_share - self.cad_commission
+
+        is_buying = self.qty > 0
+        is_selling = self.qty < 0
+        is_long = previous_costbasis.qty_total > 0
+        is_short = previous_costbasis.qty_total < 0
+
+        if (is_short and is_buying) or (is_long and is_selling):
+            self.capital_gain = self.qty * (previous_costbasis.acb_per_share - self.cad_price_per_share) + self.cad_commission
+            self.acb_change = self.qty * previous_costbasis.acb_per_share
+        else:
+            self.capital_gain = 0
+            self.acb_change = self.total_cad_value
+
+        self.qty_total = previous_costbasis.qty_total + self.qty
+        self.acb_total = max(0, previous_costbasis.acb_total + self.acb_change)
+        self.acb_per_share = self.acb_total / self.qty_total if self.qty_total else 0
