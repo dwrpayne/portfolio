@@ -100,7 +100,7 @@ class AlphaVantageStockSource(DataSourceMixin):
                 return
         self.symbol = 'NO VALID LOOKUP FOR {}'.format(original_symbol)
 
-    @rate_limited(1,2)
+    @rate_limited(1, 2)
     def _Retrieve(self, start, end):
         params = {'function': 'TIME_SERIES_DAILY', 'apikey': self.api_key,
                   'symbol': self.symbol}
@@ -132,7 +132,7 @@ class AlphaVantageCurrencySource(DataSourceMixin):
     def __repr__(self):
         return "AlphaVantageCurrencySource<{},{},{}>".format(self.from_symbol, self.to_symbol, self.priority)
 
-    @rate_limited(1,2)
+    @rate_limited(1, 2)
     def _Retrieve(self, start, end):
         params = {'function': 'CURRENCY_EXCHANGE_RATE', 'apikey': self.api_key,
                   'from_currency': self.from_symbol, 'to_currency': self.to_symbol}
@@ -151,7 +151,8 @@ class AlphaVantageCurrencySource(DataSourceMixin):
 
 
 class MorningstarDataSource(DataSourceMixin):
-    raw_url = models.CharField(max_length=1000, default='https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}')
+    raw_url = models.CharField(max_length=1000,
+                               default='https://api.morningstar.com/service/mf/Price/Mstarid/{}?format=json&username=morningstar&password=ForDebug&startdate={}&enddate={}')
     symbol = models.CharField(max_length=32, default=None)
 
     def __str__(self):
@@ -166,7 +167,7 @@ class MorningstarDataSource(DataSourceMixin):
         json = r.json()
         if 'data' in json and 'Prices' in json['data']:
             return pandas.Series({parser.parse(item['d']).date(): Decimal(item['v'])
-                                   for item in json['data']['Prices']})
+                                  for item in json['data']['Prices']})
         return pandas.Series()
 
 

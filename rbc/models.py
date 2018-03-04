@@ -40,7 +40,7 @@ class RbcRawActivity(BaseRawActivity):
         # TODO: This is broken if the security was just created - we assume it's the base currency.
         # TODO: How to fix?
         if 'EXCHANGE RATE' in self.description:
-            print (self.description)
+            print(self.description)
             rate = Decimal(self.description.split()[-1])
             settle_currency = self.currency
             self.currency = security.currency
@@ -57,7 +57,6 @@ class RbcRawActivity(BaseRawActivity):
         commission = 0
         if self.type in [Activity.Type.Buy, Activity.Type.Sell]:
             commission = self.qty * self.price + self.net_amount
-
 
         Activity.objects.create(account=self.account, trade_date=self.day, security=security,
                                 description=self.description, cash_id=self.currency, qty=self.qty,
@@ -76,7 +75,8 @@ class RbcAccount(BaseAccount):
 
     def import_from_csv(self, csv_file):
         csv_file.open('r')
-        fields = ['day', 'type', 'symbol', 'qty', 'price', 'SettlementDate', 'Account', 'net_amount', 'currency', 'description']
+        fields = ['day', 'type', 'symbol', 'qty', 'price', 'SettlementDate',
+                  'Account', 'net_amount', 'currency', 'description']
         reader = csv.DictReader(csv_file, fieldnames=fields)
         for line in reader:
             try:

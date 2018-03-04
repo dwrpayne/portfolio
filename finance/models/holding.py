@@ -12,8 +12,8 @@ from .account import BaseAccount
 class HoldingManager(models.Manager):
     def add_effect(self, account, symbol, qty_delta, date):
         # Hack david's joint accounts to be half.
-        if account.pk in [18,19,20,21,22,23,24,25] and date < datetime.date(2018,1,19):
-            qty_delta /= 1#2
+        if account.pk in [18, 19, 20, 21, 22, 23, 24, 25] and date < datetime.date(2018, 1, 19):
+            qty_delta /= 1  # 2
 
         previous_qty = 0
         try:
@@ -26,7 +26,8 @@ class HoldingManager(models.Manager):
                 previous_qty = current_holding.qty
 
         except Holding.MultipleObjectsReturned:
-            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, symbol, date))
+            print("HoldingManager.add_effect() returned multiple holdings for query {} {} {}".format(account, symbol,
+                                                                                                     date))
             raise
         except Holding.DoesNotExist:
             pass
@@ -200,7 +201,8 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
 
     def __sub__(self, other):
         if not other:
-            price = SecurityPriceDetail.objects.get(security_id=self.security_id, day=self.day - datetime.timedelta(days=1))
+            price = SecurityPriceDetail.objects.get(security_id=self.security_id,
+                                                    day=self.day - datetime.timedelta(days=1))
             return HoldingChange.delta_from_price(price, self)
         return HoldingChange.create_delta(other, self)
 
@@ -272,12 +274,12 @@ class HoldingChange:
     def __str__(self):
         return "{} {} {}({}) {} {} {}".format(self.security, self.price,
                                               self.price_delta, self.value_percent_delta,
-                                               self.qty, self.value, self.value_delta)
+                                              self.qty, self.value, self.value_delta)
 
     def __repr__(self):
         return "{} {} {}({}) {} {} {}".format(self.security, self.price,
                                               self.price_delta, self.value_percent_delta,
-                                               self.qty, self.value, self.value_delta)
+                                              self.qty, self.value, self.value_delta)
 
     @property
     def security_type(self):

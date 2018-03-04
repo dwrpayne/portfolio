@@ -12,7 +12,7 @@ class HighChartMixin:
 
     def get(self, request, *args, **kwargs):
         for cls in self.chart_classes:
-            obj = cls(self.request.user.userprofile, **self.get_chart_kwargs(request))
+            obj = cls(request.user.userprofile, **self.get_chart_kwargs(request))
             setattr(self, cls.__name__.lower(), obj)
             self.chart_objects.append(obj)
 

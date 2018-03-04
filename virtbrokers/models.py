@@ -43,6 +43,7 @@ class VirtBrokersRawActivity(BaseRawActivity):
                                 price=self.price, net_amount=self.net_amount,
                                 commission=self.commission, type=self.type, raw=self)
 
+
 class VirtBrokersAccount(BaseAccount):
     activitySyncDateRange = 0
 

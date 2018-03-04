@@ -1,11 +1,13 @@
 from celery import shared_task
 
+
 @shared_task
 def SyncSecurityTask(live_update=False):
     from securities.models import Security
     from .models import HoldingDetail
     Security.objects.Sync(live_update)
     HoldingDetail.Refresh()
+
 
 @shared_task
 def SyncActivityTask(userprofile=None):
@@ -14,10 +16,12 @@ def SyncActivityTask(userprofile=None):
     accounts.SyncAllActivitiesAndRegenerate()
     HoldingDetail.Refresh()
 
+
 @shared_task
 def DailyUpdateAll():
     SyncActivityTask()
     SyncSecurityTask()
+
 
 @shared_task
 def HandleCsvUpload(accountcsv_id):

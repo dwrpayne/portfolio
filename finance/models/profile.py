@@ -34,7 +34,8 @@ class UserProfile(models.Model):
     def GetCapGainsSecurities(self):
         only_taxable_accounts = True
         query = Holding.objects.exclude(security__type=Security.Type.Cash
-                  ).for_user(self.user).values_list('security_id', flat=True).distinct().order_by('security__symbol')
+                                        ).for_user(self.user).values_list('security_id', flat=True).distinct().order_by(
+            'security__symbol')
         if only_taxable_accounts:
             query = query.filter(account__taxable=True)
         return query
@@ -67,7 +68,7 @@ class UserProfile(models.Model):
         ).order_by().values('year').annotate(c=Sum('commission')).values_list('year', 'c'))
 
     def RateOfReturn(self, start, end, annualized=True):
-        deposits = self.GetActivities().between(start+datetime.timedelta(days=1), end).get_all_deposits()
+        deposits = self.GetActivities().between(start + datetime.timedelta(days=1), end).get_all_deposits()
         dates, amounts = (list(zip(*deposits))) if deposits else ([], [])
 
         start_value = sum(self.GetHoldingDetails().at_date(start)).value
@@ -99,7 +100,7 @@ class UserProfile(models.Model):
             end = min(pendulum.today().date(),
                       day.end_of(period_type_singular))
             ror = self.RateOfReturn(start, end, annualized=False)
-            print (start, end, ror)
+            print(start, end, ror)
             yield end, ror
 
     def get_capital_gain_summary(self, symbol):
@@ -110,28 +111,30 @@ class UserProfile(models.Model):
         cadprice = security.live_price_cad
         total_value = last.qty_total * cadprice
         pending_gain = cadprice * last.qty_total - last.acb_total
-        return {'cadprice' : cadprice,
+        return {'cadprice': cadprice,
                 'price': security.live_price,
                 'exchange': cadprice / security.live_price,
-                'qty' : last.qty_total,
-                'acb' : last.acb_total,
-                'acb_per_share' : last.acb_per_share,
-                'pending_gain' : pending_gain,
-                'pending_gain_per_share' : pending_gain / last.qty_total,
+                'qty': last.qty_total,
+                'acb': last.acb_total,
+                'acb_per_share': last.acb_per_share,
+                'pending_gain': pending_gain,
+                'pending_gain_per_share': pending_gain / last.qty_total,
                 'total_value': total_value,
-                'percent_gains' : pending_gain / total_value,
+                'percent_gains': pending_gain / total_value,
                 }
 
     def GetCapgainsByYear(self):
         costbases = CostBasis.objects.for_user(self.user)
         all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year + 1))
-        yearly_data = {s: [0] * len(all_years) for s in costbases.values_list('activity__security_id', flat=True).distinct()}
+        yearly_data = {s: [0] * len(all_years) for s in
+                       costbases.values_list('activity__security_id', flat=True).distinct()}
         year_offset = all_years[0]
         last_acb = {}
 
-        for (sec, year), yearly_bases in groupby(costbases, lambda c: (c.activity.security_id, c.activity.trade_date.year)):
+        for (sec, year), yearly_bases in groupby(costbases,
+                                                 lambda c: (c.activity.security_id, c.activity.trade_date.year)):
             for cb in yearly_bases:
-                yearly_data[sec][year-year_offset] += cb.capital_gain
+                yearly_data[sec][year - year_offset] += cb.capital_gain
                 last_acb[sec] = cb.acb_total
 
         pending_by_security = {}
@@ -150,7 +153,7 @@ class UserProfile(models.Model):
         allocs = self.user.allocations.all().order_by('-desired_pct')
         leftover = {'desired_pct': 100, 'current_pct': 100, 'current_amt': total_value,
                     'desired_amt': 0, 'buysell': 0,
-                    'list_securities': ', '.join(map(str,self.user.allocations.get_unallocated_securities()))}
+                    'list_securities': ', '.join(map(str, self.user.allocations.get_unallocated_securities()))}
         for alloc in allocs:
             holdingsum = sum(holdings.for_securities(alloc.securities.all()))
             alloc.current_amt = holdingsum.value if holdingsum else 0
@@ -171,4 +174,3 @@ class UserProfile(models.Model):
             leftover = None
 
         return allocs, leftover
-

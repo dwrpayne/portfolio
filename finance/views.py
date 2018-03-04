@@ -80,9 +80,11 @@ class AccountCsvUpload(LoginRequiredMixin, FormView):
         accountcsv.find_matching_account()
         accountcsv.save()
         messages.success(self.request,
-                         'Your file was successfully uploaded and will be processed shortly.'.format(os.path.basename(accountcsv.csvfile.name)))
+                         'Your file was successfully uploaded and will be processed shortly.'.format(
+                             os.path.basename(accountcsv.csvfile.name)))
         HandleCsvUpload.delay(accountcsv.pk)
         return super().form_valid(form)
+
 
 @method_decorator(never_cache, 'dispatch')
 class AdminSecurity(RefreshButtonHandlerMixin, ListView):
@@ -232,7 +234,7 @@ class CapGainsReport(LoginRequiredMixin, TemplateView):
             self.total_gains.append(sum(gains[i] for gains in self.yearly_gains.values()))
         self.total_pending = sum(self.pending_by_security.values())
         self.summary_by_security = {security: request.user.userprofile.get_capital_gain_summary(security)
-                                    for security,pending_gain in self.pending_by_security.items()}
+                                    for security, pending_gain in self.pending_by_security.items()}
         return super().get(self, request, *args, **kwargs)
 
 
@@ -247,15 +249,16 @@ class DividendReport(LoginRequiredMixin, ListView):
         years = sorted(list(dt.year for dt in dividends.dates('trade_date', 'year')))
         securities = dividends.security_list()
 
-        security_year_amounts = {s : [0]*len(years) for s in securities}
+        security_year_amounts = {s: [0] * len(years) for s in securities}
         for sec, divs in groupby(dividends.order_by('security_id', 'trade_date'), lambda div: div.security_id):
             for d in divs:
-                security_year_amounts[sec][d.trade_date.year-years[0]] += d.net_amount
+                security_year_amounts[sec][d.trade_date.year - years[0]] += d.net_amount
             security_year_amounts[sec].append(sum(security_year_amounts[sec]))
 
         context['security_year_amounts'] = sorted(security_year_amounts.items())
         context['years'] = years
-        context['yearly_totals'] = [sum(yearly_vals[i-years[0]] for yearly_vals in security_year_amounts.values()) for i in years]
+        context['yearly_totals'] = [sum(yearly_vals[i - years[0]] for yearly_vals in security_year_amounts.values())
+                                    for i in years]
         context['total'] = sum(context['yearly_totals'])
         return context
 
@@ -286,9 +289,9 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
 
     def get_day(self):
         try:
-           return datetime.datetime.strptime(super().get_day(), self.get_day_format()).date()
+            return datetime.datetime.strptime(super().get_day(), self.get_day_format()).date()
         except:
-           return datetime.date.today()
+            return datetime.date.today()
 
     def get_queryset(self):
         return self.request.user.userprofile.GetActivities().at_date(self.get_day())
@@ -308,12 +311,14 @@ class RebalanceView(LoginRequiredMixin, FormView):
         context = super().get_context_data(**kwargs)
         context['formset'] = AllocationFormSet(queryset=allocs)
         context['cashadd'] = cashadd
-        context.update( {'allocs': allocs, 'leftover': leftover} )
+        context.update({'allocs': allocs, 'leftover': leftover})
 
         total = sum(a.desired_pct for a in allocs)
         context['unassigned_pct'] = 100 - total
         if total < 100 and not leftover:
-            messages.warning(self.request, 'Your allocation percentages only total to {}. Your numbers will be inaccurate until you fix this!'.format(total))
+            messages.warning(self.request,
+                             'Your allocation percentages only total to {}. Your numbers will be inaccurate until you fix this!'.format(
+                                 total))
 
         return context
 
@@ -363,8 +368,9 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
 
     today_query = userprofile.GetHoldingDetails().at_date(as_of_date).select_related('security', 'account')
-    yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1)).select_related('security', 'account')
-    account_data = {(h.security_id, h.account_id) : 0 for h in list(today_query) + list(yesterday_query)}
+    yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1)).select_related(
+        'security', 'account')
+    account_data = {(h.security_id, h.account_id): 0 for h in list(today_query) + list(yesterday_query)}
     for h in today_query:
         account_data[(h.security_id, h.account_id)] += h
     for h in yesterday_query:
@@ -384,7 +390,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
     context = {'holding_data': holding_data,
                'cash_data': cash_data,
-               'total': sum(account_data) }
+               'total': sum(account_data)}
 
     today_balances = dict(today_query.today_account_values())
     yesterday_balances = dict(yesterday_query.yesterday_account_values())
@@ -392,10 +398,10 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
     accounts = {
         BaseAccount.objects.get(pk=id).display_name: {
-            'id' : id,
-            'cur_balance' : today_balance,
-            'cur_cash_balance' : today_cash_balances.get(id, 0),
-            'today_balance_change' : today_balance - yesterday_balances.get(id, 0)
+            'id': id,
+            'cur_balance': today_balance,
+            'cur_cash_balance': today_cash_balances.get(id, 0),
+            'today_balance_change': today_balance - yesterday_balances.get(id, 0)
         }
         for id, today_balance in today_balances.items()
     }
@@ -437,10 +443,8 @@ class HistoryDetail(LoginRequiredMixin, ListView):
         rows = table.iloc[::-1].iterrows()
 
         context = super().get_context_data(**kwargs)
-        context = {
-            'names': list(table.columns) + ['Total'],
-            'rows': ((date, vals, sum(vals)) for date, vals in rows),
-        }
+        context['names'] = list(table.columns) + ['Total']
+        context['rows'] = ((date, vals, sum(vals)) for date, vals in rows)
         return context
 
     def get_queryset(self):
@@ -453,23 +457,23 @@ class HistoryDetail(LoginRequiredMixin, ListView):
         return queryset
 
 
-
-
 def security_chart(request, symbol):
     def to_ts(d):
-        return datetime.datetime.combine(d, datetime.time.min).timestamp()*1000
+        return datetime.datetime.combine(d, datetime.time.min).timestamp() * 1000
+
     security = Security.objects.get(symbol=symbol)
     series = []
     series.append({
         'name': 'Price',
-        'data': [(to_ts(d), float(p)) for d,p in security.prices.values_list('day', 'price')],
+        'data': [(to_ts(d), float(p)) for d, p in security.prices.values_list('day', 'price')],
         'color': 'blue',
         'id': 'price'
     })
 
     userprofile = request.user.userprofile
     activities = userprofile.GetActivities().for_security(security)
-    purchase_data = activities.transactions().values('trade_date').annotate(total_qty=Sum('qty'), ).values_list('trade_date', 'total_qty', 'price')
+    purchase_data = activities.transactions().values('trade_date').annotate(total_qty=Sum('qty'), ).values_list(
+        'trade_date', 'total_qty', 'price')
     series.append({
         'name': 'Purchases',
         'type': 'flags',
@@ -506,4 +510,3 @@ def index(request):
         return render(request, 'finance/index.html', context)
     else:
         return redirect('/login/')
-

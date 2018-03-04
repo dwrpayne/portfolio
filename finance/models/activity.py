@@ -71,7 +71,7 @@ class ManualRawActivity(BaseRawActivity):
 
         ManualRawActivity.objects.create(account=account, day=day, qty=qty, price=price,
                                          description=description, symbol=symbol, currency=currency,
-                                         net_amount=-amount/exch, type='Buy')
+                                         net_amount=-amount / exch, type='Buy')
 
     @classmethod
     def CreateSell(cls, account, day, symbol, price, qty, amount, currency, exch=1, description=''):
@@ -79,19 +79,19 @@ class ManualRawActivity(BaseRawActivity):
             cls.CreateFX(account, day, 'CAD', currency, amount, exch)
 
         ManualRawActivity.objects.create(account=account, day=day, qty=-qty, price=price,
-                                         description=description, symbol='', currency=currency,
-                                         net_amount=abs(amount/exch), type='Sell')
+                                         description=description, symbol=symbol, currency=currency,
+                                         net_amount=abs(amount / exch), type='Sell')
 
     @classmethod
     def CreateDividend(cls, account, day, symbol, amount, tax=0, currency='CAD', exch=1):
         ManualRawActivity.objects.create(account=account, day=day, currency=currency,
                                          description='', symbol=symbol, qty=0, price=0,
-                                         net_amount=amount/exch, type='Dividend')
+                                         net_amount=amount / exch, type='Dividend')
         if tax:
             ManualRawActivity.objects.create(account=account, day=day, currency=currency,
-                                         description='Withholding Tax', symbol=symbol, qty=0, price=0,
-                                         net_amount=-tax/exch, type='Tax')
-        cls.CreateFX(account, day, 'CAD', currency, amount-tax, exch)
+                                             description='Withholding Tax', symbol=symbol, qty=0, price=0,
+                                             net_amount=-tax / exch, type='Tax')
+        cls.CreateFX(account, day, 'CAD', currency, amount - tax, exch)
 
     @classmethod
     def CreateFee(cls, account, day, amount, currency='CAD', desc=''):
@@ -133,16 +133,16 @@ class ActivityManager(models.Manager):
     def create_with_deposit(self, **kwargs):
         self.create(**kwargs)
 
-        kwargs.update({'security' : None, 'description' : 'Generated Deposit', 'qty' : 0,
-                      'price' : 0, 'type' : Activity.Type.Deposit})
+        kwargs.update({'security': None, 'description': 'Generated Deposit', 'qty': 0,
+                       'price': 0, 'type': Activity.Type.Deposit})
         kwargs['net_amount'] *= -1
         self.create(**kwargs)
 
     def create_with_withdrawal(self, **kwargs):
         self.create(**kwargs)
 
-        kwargs.update({'security' : None, 'description' : 'Generated Withdrawal', 'qty' : 0,
-                      'price' : 0, 'type' : Activity.Type.Withdrawal})
+        kwargs.update({'security': None, 'description': 'Generated Withdrawal', 'qty': 0,
+                       'price': 0, 'type': Activity.Type.Withdrawal})
         kwargs['net_amount'] *= -1
         self.create(**kwargs)
 
@@ -195,7 +195,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
             return []
         if running_totals:
             return self.deposits().annotate(
-                cum_total = Window(
+                cum_total=Window(
                     expression=Sum('net_amount'),
                     order_by=F('trade_date').asc(),
                     frame=RowRange(end=0)

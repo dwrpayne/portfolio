@@ -100,12 +100,12 @@ CACHES = {
 }
 
 CACHE_MIDDLEWARE_ALIAS = 'default'
-CACHE_MIDDLEWARE_SECONDS = 5*60
+CACHE_MIDDLEWARE_SECONDS = 5 * 60
 CACHE_MIDDLEWARE_KEY_PREFIX = ''
 
 WSGI_APPLICATION = 'portfolio.wsgi.application'
 
-DATABASES = {'default' : config('DATABASE_URL', cast=db_url) }
+DATABASES = {'default': config('DATABASE_URL', cast=db_url)}
 
 # Password validation
 # https://docs.djangoproject.com/en/1.11/ref/settings/#auth-password-validators
@@ -129,7 +129,6 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/finance/portfolio/'
 LOGOUT_REDIRECT_URL = '/finance/portfolio/'
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/1.11/topics/i18n/
 
@@ -144,7 +143,6 @@ USE_L10N = False
 USE_TZ = True
 
 DATE_FORMAT = 'M j, Y'
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.11/howto/static-files/
@@ -174,9 +172,9 @@ LOGGING = {
     'handlers': {
         'file': {
             'level': 'DEBUG',
-            'class':'logging.handlers.RotatingFileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, '../../debug.log'),
-            'maxBytes': 1024*1024*15, # 15MB
+            'maxBytes': 1024 * 1024 * 15,  # 15MB
             'backupCount': 10,
             'formatter': 'verbose'
         },
@@ -209,7 +207,6 @@ MESSAGE_TAGS = {
 # Session settings
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
-
 # Hijack
 HIJACK_USE_BOOTSTRAP = True
 
@@ -220,7 +217,6 @@ EMAIL_HOST = 'smtp.sendgrid.net'
 EMAIL_PORT = 587
 EMAIL_HOST_USER = 'apikey'
 EMAIL_HOST_PASSWORD = config('EMAIL_SENDGRID_APIKEY')
-
 
 # Celery configuration
 CELERY_FORKED_BY_MULTIPROCESSING = 1

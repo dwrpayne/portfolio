@@ -29,7 +29,7 @@ class GrsRawActivity(BaseRawActivity):
 
     def CreateActivity(self):
         security, created = Security.mutualfunds.get_or_create(symbol=self.symbol,
-                                           defaults={'currency':'CAD'})
+                                                               defaults={'currency': 'CAD'})
         if created:
             security.add_datasource(GrsDataSource.objects.get_or_create(
                 symbol=self.symbol, client=self.account.client,
@@ -37,9 +37,9 @@ class GrsRawActivity(BaseRawActivity):
 
         total_cost = self.qty * self.price
         Activity.objects.create_with_deposit(account=self.account, trade_date=self.day, security=security,
-                                cash_id=security.currency,
-                                description=self.description, qty=self.qty, raw=self,
-                                price=self.price, net_amount=-total_cost, type=Activity.Type.Buy)
+                                             cash_id=security.currency,
+                                             description=self.description, qty=self.qty, raw=self,
+                                             price=self.price, net_amount=-total_cost, type=Activity.Type.Buy)
 
 
 class GrsClient(models.Model):
@@ -123,7 +123,7 @@ class GrsAccount(BaseAccount):
         return '{} {} {})'.format(self.client, self.account_id, self.type)
 
     def __repr__(self):
-        return 'GrsAccount<{},{},{},{}>'.format(self.client, self.account_id, self.type)
+        return 'GrsAccount<{},{},{}>'.format(self.client, self.account_id, self.type)
 
     def CreateActivities(self, start, end):
         with self.client as client:

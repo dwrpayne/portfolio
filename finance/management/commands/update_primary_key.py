@@ -62,7 +62,7 @@ def get_back_relations(cursor, table_name):
                 backs = []
                 relations_back[to_col] = backs
             backs.append((ref_col_idx, ref_table))
-    return (backs, relations_back)
+    return backs, relations_back
 
 
 class Command(BaseCommand):

@@ -207,7 +207,7 @@ class QuestradeClient(models.Model):
 
     def GetSymbolIds(self, symbols):
         symbols += [s+'.TO' for s in symbols]
-        json = self._GetRequest('symbols', params={'names' : ','.join(symbols)})
+        json = self._GetRequest('symbols', params={'names': ','.join(symbols)})
         for entry in json['symbols']:
             yield entry['symbolId']
 
@@ -226,13 +226,13 @@ class QuestradeClient(models.Model):
         for chain in chain_json['optionChain']:
             if parser.parse(chain['expiryDate']).date() == expiry.date():
                 for root in chain['chainPerRoot']:
-                    for option in chain['chainPerRoot'][0]['chainPerStrikePrice']:
+                    for option in root['chainPerStrikePrice']:
                         if abs(option['strikePrice'] - strike) < 0.01:
                             return option[type.lower() + 'SymbolId']
         return 0
 
     def GetOptionPrice(self, option_id):
-        json = self._PostRequest('markets/quotes/options', json={'optionIds':[option_id]})
+        json = self._PostRequest('markets/quotes/options', json={'optionIds': [option_id]})
         data = json['optionQuotes'][0]
         return data['lastTradePriceTrHrs'] or data['lastTradePrice']
 
@@ -273,7 +273,7 @@ class QuestradeOptionDataSource(DataSourceMixin):
             optionid = c.GetOptionId(underlying_id, option.expiry, 'call' if option.is_call else 'put', option.strike)
 
         return cls.objects.create(symbol=option.symbol, optionid=optionid, client=client,
-                priority=cls.PRIORITY_REALTIME)
+                                  priority=cls.PRIORITY_REALTIME)
 
     def _Retrieve(self, start, end):
         try:

@@ -128,12 +128,11 @@ class TangerineAccount(BaseAccount):
         with self.client as client:
             for trans in client.GetActivities(self.account_id, start, end):
                 TangerineRawActivity.objects.get_or_create(account=self, activity_id=trans['id'],
-                    defaults={
-                        'day': parser.parse(trans['transaction_date']).date(),
-                        'description': trans['description'],
-                        'type': trans['mutual_fund']['transaction_type'],
-                        'symbol': trans['mutual_fund']['portfolio_name'],
-                        'qty': trans['mutual_fund']['units'],
-                        'price': trans['mutual_fund']['unit_price']
-                    })
-
+                                       defaults={
+                                           'day': parser.parse(trans['transaction_date']).date(),
+                                           'description': trans['description'],
+                                           'type': trans['mutual_fund']['transaction_type'],
+                                           'symbol': trans['mutual_fund']['portfolio_name'],
+                                           'qty': trans['mutual_fund']['units'],
+                                           'price': trans['mutual_fund']['unit_price']
+                                       })

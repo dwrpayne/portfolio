@@ -26,9 +26,9 @@ class Allocation(models.Model):
 
     def __repr__(self):
         repr = "Allocation<{},{},{},{},{},{}>".format(self.user, self.list_securities, self.desired_pct,
-                                             round(getattr(self, 'current_pct', 0), 1),
-                                             round(getattr(self, 'desired_amt', 0), 1),
-                                             round(getattr(self, 'current_amt', 0), 1))
+                                                      round(getattr(self, 'current_pct', 0), 1),
+                                                      round(getattr(self, 'desired_amt', 0), 1),
+                                                      round(getattr(self, 'current_amt', 0), 1))
         return repr
 
     @property

@@ -11,7 +11,8 @@ from .models import AccountCsv, UserProfile, Allocation
 class FeedbackForm(forms.Form):
     name = forms.CharField(widget=forms.HiddenInput(), max_length=100)
     email = forms.CharField(widget=forms.HiddenInput(), max_length=100)
-    feedback = forms.CharField(label='', widget=forms.Textarea(attrs={'placeholder': 'Anything you want to tell me! Is something broken? Didn\'t do what you expected? Do you want to see a report of some kind? Is something confusing or misworded? Please let me know!'}))
+    feedback = forms.CharField(label='', widget=forms.Textarea(attrs={
+        'placeholder': 'Anything you want to tell me! Is something broken? Didn\'t do what you expected? Do you want to see a report of some kind? Is something confusing or misworded? Please let me know!'}))
 
     def send_email(self):
         user_email = self.cleaned_data['email']
@@ -46,9 +47,9 @@ class AccountCsvForm(forms.ModelForm):
     class Meta:
         model = AccountCsv
         fields = ['csvfile', 'account']
-        labels = {'csvfile' : 'Please choose a file containing transaction history as downloaded from your brokerage.\n'
-                              'The supported format is CSV.',
-                  'account' : 'Select the account this file relates to, or leave blank to auto-detect:'
+        labels = {'csvfile': 'Please choose a file containing transaction history as downloaded from your brokerage.\n'
+                             'The supported format is CSV.',
+                  'account': 'Select the account this file relates to, or leave blank to auto-detect:'
                   }
 
     def __init__(self, *args, **kwargs):
@@ -63,7 +64,7 @@ class AllocationForm(forms.ModelForm):
         fields = ['securities', 'desired_pct']
         labels = {'securities': 'Select one or several securities.',
                   'desired_pct': 'The percentage of your portfolio to allocate to this group of securities: '}
-        widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width':50}),
+        widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width': 50}),
                    'securities': CheckboxSelectMultiple}
 
     def __init__(self, *args, **kwargs):
@@ -87,10 +88,10 @@ class BaseAllocationFormSet(forms.BaseModelFormSet):
             raise forms.ValidationError("Total percentages must sum to less than 100. Yours totalled {}".format(total))
 
 
-
 AllocationFormSet = modelformset_factory(Allocation,
                                          formset=BaseAllocationFormSet,
                                          fields=('desired_pct',),
-                                         widgets = {'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width':50})},
+                                         widgets={
+                                             'desired_pct': NumberInput(attrs={'min': 0, 'max': 100, 'width': 50})},
                                          extra=0,
                                          can_delete=True)
