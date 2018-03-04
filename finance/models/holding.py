@@ -287,7 +287,8 @@ class HoldingChange:
 
     def __radd__(self, other):
         if other == 0:
-            return self
+            import copy
+            return copy.copy(self)
         raise NotImplementedError()
 
     def __add__(self, other):

@@ -32,14 +32,15 @@ def colorize(amount):
 
 @register.filter()
 def currency(dollars, decimals=2):
-    if dollars == '': return ''
+    if dollars == '' or dollars is None:
+        return ''
     prefix = "" if dollars > -0.004 else "-"
     return '{}${:,.{}f}'.format(prefix, abs(dollars), decimals)
 
 
 @register.filter()
 def currencyround(dollars):
-    if dollars == '':
+    if dollars == '' or dollars is None:
         return ''
     prefix = '' if dollars > -0.004 else '-'
     return '{}${:,d}'.format(prefix, abs(round(dollars)))
