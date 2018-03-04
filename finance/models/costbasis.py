@@ -36,8 +36,12 @@ class CostBasisManager(models.Manager):
             cad_price = activity.security.prices.get(day=activity.trade_date).price * activity.exch
         total_cad_value = activity.qty * cad_price - cad_commission
 
-        if activity.qty < 0:
-            assert previous_costbasis.acb_per_share is not None, "Trying to create a Sell CostBasis with no previous holding!"
+        is_buying = activity.qty > 0
+        is_selling = activity.qty < 0
+        is_long = previous_costbasis.qty_total > 0
+        is_short = previous_costbasis.qty_total < 0
+
+        if (is_short and is_buying) or (is_long and is_selling):
             capital_gain = activity.qty * (previous_costbasis.acb_per_share - cad_price) + cad_commission
             acb_change = activity.qty * previous_costbasis.acb_per_share
         else:
