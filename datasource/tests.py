@@ -1,7 +1,10 @@
 # Create your tests here.
-from django.test import TestCase
-from datasource.models import *
 from datetime import date
+
+from django.test import TestCase
+
+from datasource.models import *
+
 
 class DataSourceMixinTestCase(TestCase):
     def test_process_basic(self):

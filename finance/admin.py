@@ -2,9 +2,10 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import BaseAccount, ManualRawActivity
 from .models import Activity, Holding, Allocation
+from .models import BaseAccount, ManualRawActivity
 from .models import UserProfile
+
 
 def MakeNormalizedFloat(field, desc):
     def display(self, obj, field=field):

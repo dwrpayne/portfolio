@@ -1,10 +1,11 @@
 from django import forms
-from django.core.mail import send_mail
-from .models import AccountCsv, UserProfile, Allocation
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.forms.models import inlineformset_factory, modelformset_factory
 from django.forms.widgets import NumberInput, CheckboxSelectMultiple
-from django.core.exceptions import ValidationError
+
+from .models import AccountCsv, UserProfile, Allocation
 
 
 class FeedbackForm(forms.Form):

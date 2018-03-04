@@ -1,10 +1,11 @@
-from django.db import models
-from django.conf import settings
 from datetime import date, timedelta
-import requests
-import pandas
 from decimal import Decimal
+
+import pandas
+import requests
 from dateutil import parser
+from django.conf import settings
+from django.db import models
 from pandas_datareader import data as pdr
 from pandas_datareader.exceptions import UnstableAPIWarning
 from polymorphic.models import PolymorphicModel

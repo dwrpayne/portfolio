@@ -1,10 +1,12 @@
 import csv
-from dateutil import parser
 from decimal import Decimal
 
+from dateutil import parser
 from django.db import models
+
 from finance.models import BaseAccount, BaseRawActivity, Activity
 from securities.models import Security
+
 
 class RbcRawActivity(BaseRawActivity):
     day = models.DateField()

@@ -7,7 +7,7 @@ from django.db import models
 from django.db.models import Sum
 from django.db.models.functions import ExtractYear
 
-from securities.models import Security, SecurityPriceDetail
+from securities.models import Security
 from utils.misc import xirr, total_return
 from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis
 

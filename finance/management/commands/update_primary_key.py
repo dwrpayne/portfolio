@@ -21,7 +21,6 @@ Usage: manage.py update_primary_key table_name column_name value_old value_new
 '''
 import logging
 
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.db.transaction import atomic

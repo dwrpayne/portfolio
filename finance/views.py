@@ -4,32 +4,31 @@ from itertools import groupby
 
 import numpy
 import pandas
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, HttpResponse, JsonResponse
 from django.db.models import Sum
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.dates import DateMixin, DayMixin
 from django.views.generic.edit import FormView, UpdateView
 
-from securities.models import Security
-from utils.misc import partition, window
-from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
-from .forms import UserForm, AllocationForm, AllocationFormSet
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, Holding
-from .services import RefreshButtonHandlerMixin, check_for_missing_securities
-from .tasks import HandleCsvUpload
 from charts.models import GrowthChart, DailyChangeChart, SecurityChart
 from charts.views import HighChartMixin
-
-from django.views.decorators.cache import never_cache
-from django.utils.decorators import method_decorator
+from securities.models import Security
+from utils.misc import partition
+from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
+from .forms import UserForm, AllocationForm, AllocationFormSet
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis
+from .services import RefreshButtonHandlerMixin, check_for_missing_securities
+from .tasks import HandleCsvUpload
 
 
 class AccountDetail(LoginRequiredMixin, DetailView):

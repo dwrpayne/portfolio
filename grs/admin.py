@@ -2,7 +2,6 @@ from django.contrib import admin
 
 from .models import GrsClient, GrsRawActivity, GrsAccount, GrsDataSource
 
-
 admin.site.register(GrsClient)
 
 

@@ -9,7 +9,6 @@ from polymorphic.showfields import ShowFieldTypeAndContent
 
 from securities.models import Security, SecurityPriceDetail
 from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
-
 from .account import BaseAccount
 
 

@@ -7,8 +7,8 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from model_utils import Choices
 
-from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource
 from datasource.models import AlphaVantageStockSource, MorningstarDataSource, InterpolatedDataSource
+from datasource.models import DataSourceMixin, ConstantDataSource, PandasDataSource
 from datasource.services import get_data_from_sources
 from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 

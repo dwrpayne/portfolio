@@ -1,7 +1,8 @@
 import json
-import requests
 from datetime import timedelta
+
 import pandas
+import requests
 
 
 def get_data_from_sources(sources, start, end):

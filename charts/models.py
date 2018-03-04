@@ -1,6 +1,9 @@
-from django.db import models
 from datetime import datetime, time
 from django.db.models import Sum
+from datetime import datetime, time
+
+from django.db.models import Sum
+
 
 class BaseHighChart:
     container_name = 'container'

@@ -1,5 +1,6 @@
-from .base import *
 from django.contrib.messages import constants as message_constants
+
+from .base import *
 
 DEBUG = True
 DEBUG_TOOLBAR_ENABLED = True

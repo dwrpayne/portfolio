@@ -1,6 +1,9 @@
 from itertools import groupby
+
 from django.db import models
+
 from .activity import Activity
+
 
 class CostBasisQuerySet(models.QuerySet, ):
     def for_security(self, security):

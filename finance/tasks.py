@@ -16,7 +16,6 @@ def SyncActivityTask(userprofile=None):
 
 @shared_task
 def DailyUpdateAll():
-    from .models import UserProfile
     SyncActivityTask()
     SyncSecurityTask()
 

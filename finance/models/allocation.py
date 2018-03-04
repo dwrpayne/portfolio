@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
+
 from securities.models import Security
+
 
 class AllocationManager(models.Manager):
     def get_unallocated_securities(self, user=None):

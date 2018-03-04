@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/1.11/ref/settings/
 """
 
 import os
+
 from decouple import config
 from dj_database_url import parse as db_url
 

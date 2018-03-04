@@ -1,17 +1,18 @@
+import re
 from decimal import Decimal
 
 import requests
 from bs4 import BeautifulSoup
-import re
-from more_itertools import split_before
 from dateutil import parser
 from django.db import models
-import utils.dates
+from fernet_fields import EncryptedTextField
+from more_itertools import split_before
 
+import utils.dates
+from datasource.models import DataSourceMixin
 from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
-from datasource.models import DataSourceMixin
-from fernet_fields import EncryptedTextField
+
 
 class GrsRawActivity(BaseRawActivity):
     day = models.DateField()

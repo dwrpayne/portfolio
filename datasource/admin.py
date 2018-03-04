@@ -1,7 +1,8 @@
 from django.contrib import admin
 
-from .models import ConstantDataSource, PandasDataSource, AlphaVantageStockSource
 from .models import AlphaVantageCurrencySource, MorningstarDataSource, InterpolatedDataSource
+from .models import ConstantDataSource, PandasDataSource, AlphaVantageStockSource
+
 
 class ConstantDataSourceAdmin(admin.ModelAdmin):
     list_display = ['value']

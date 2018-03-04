@@ -1,13 +1,13 @@
-from django.db import models
-
-import requests
-import tangerine.tangerinelib
-from dateutil import parser
 from decimal import Decimal
 
+import requests
+from dateutil import parser
+from django.db import models
+from fernet_fields import EncryptedTextField
+
+import tangerine.tangerinelib
 from finance.models import Activity, BaseAccount, BaseRawActivity
 from securities.models import Security
-from fernet_fields import EncryptedTextField
 
 
 class TangerineRawActivity(BaseRawActivity):
