@@ -119,10 +119,10 @@ class GrsAccount(BaseAccount):
     activitySyncDateRange = 360
 
     def __str__(self):
-        return '{} {} {} ({})'.format(self.client, self.account_id, self.type, self.priority)
+        return '{} {} {})'.format(self.client, self.account_id, self.type)
 
     def __repr__(self):
-        return 'GrsAccount<{},{},{},{}>'.format(self.client, self.account_id, self.type, self.priority)
+        return 'GrsAccount<{},{},{},{}>'.format(self.client, self.account_id, self.type)
 
     def CreateActivities(self, start, end):
         with self.client as client:
@@ -143,10 +143,10 @@ class GrsDataSource(DataSourceMixin):
     MAX_SYNC_DAYS = 15
 
     def __str__(self):
-        return "GRS Client {} for symbol {}".format(self.client, self.symbol)
+        return "GRS Client {} for symbol {} ({}".format(self.client, self.symbol, self.priority)
 
     def __repr__(self):
-        return "GrsDataSource<{},{}>".format(self.symbol, self.client)
+        return "GrsDataSource<{},{},{}>".format(self.symbol, self.client, self.priority)
 
     def _Retrieve(self, start, end):
         with self.client as client:
