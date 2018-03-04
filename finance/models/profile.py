@@ -113,14 +113,14 @@ class UserProfile(models.Model):
         pending_gain = cadprice * last.qty_total - last.acb_total
         return {'cadprice': cadprice,
                 'price': security.live_price,
-                'exchange': cadprice / security.live_price,
+                'exchange': cadprice / security.live_price if cadprice else 0,
                 'qty': last.qty_total,
                 'acb': last.acb_total,
                 'acb_per_share': last.acb_per_share,
                 'pending_gain': pending_gain,
                 'pending_gain_per_share': pending_gain / last.qty_total,
                 'total_value': total_value,
-                'percent_gains': pending_gain / total_value,
+                'percent_gains': pending_gain / total_value if total_value else 0,
                 }
 
     def GetCapgainsByYear(self):
@@ -174,3 +174,27 @@ class UserProfile(models.Model):
             leftover = None
 
         return allocs, leftover
+
+    def get_growth_data(self):
+        """
+        returns a tuple lists of portfolio value data (days, values, deposits, growth)
+        days: a list of days that correspond to the other lists
+        values: portfolio values on that date
+        deposits: total $ deposited to date
+        growth: total profit to date.
+        """
+        days, values = list(zip(*self.GetHoldingDetails().total_values()))
+        dep_days, dep_amounts = map(list, list(zip(*self.GetActivities().get_all_deposits())))
+        next_dep = 0
+        deposits = []
+        for day in days:
+            while dep_days and dep_days[0] == day:
+                dep_days.pop(0)
+                next_dep += dep_amounts.pop(0)
+            else:
+                deposits.append(next_dep)
+
+        growth = [val - dep for val, dep in zip(values, deposits)]
+        ret_list = (days, values, deposits, growth)
+        return ret_list
+

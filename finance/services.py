@@ -29,27 +29,3 @@ class RefreshButtonHandlerMixin:
     def ajax_request(self, request, action):
         pass
 
-
-def get_growth_data(userprofile):
-    """
-    returns a tuple lists of portfolio value data (days, values, deposits, growth)
-    days: a list of days that correspond to the other lists
-    values: portfolio values on that date
-    deposits: total $ deposited to date
-    growth: total profit to date.
-    """
-    days, values = list(zip(*userprofile.GetHoldingDetails().total_values()))
-    dep_days, dep_amounts = map(list, list(zip(*userprofile.GetActivities().get_all_deposits())))
-    next_dep = 0
-    deposits = []
-    for day in days:
-        while dep_days and dep_days[0] == day:
-            dep_days.pop(0)
-            next_dep += dep_amounts.pop(0)
-        else:
-            deposits.append(next_dep)
-
-    growth = [val - dep for val, dep in zip(values, deposits)]
-    ret_list = (days, values, deposits, growth)
-    return ret_list
-

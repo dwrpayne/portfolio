@@ -102,8 +102,8 @@ class GrowthChart(BaseHighChart):
     '''
 
     def get_data(self, **kwargs):
-        from finance.services import get_growth_data
-        return list(zip(*get_growth_data(self.userprofile)))
+        days, values, deposits, growth = self.userprofile.get_growth_data()
+        return list(zip(days, values, deposits, growth))
 
 
 class DailyChangeChart(BaseHighChart):
@@ -198,10 +198,9 @@ class DailyChangeChart(BaseHighChart):
     '''
 
     def get_data(self, **kwargs):
-        from finance.services import get_growth_data
         from utils.misc import window
 
-        days, values, deposits, growth = get_growth_data(self.userprofile)
+        days, values, deposits, growth = self.userprofile.get_growth_data()
         daily_growth = [t - y for y, t in window(growth)]
         return list(zip(days, daily_growth))
 
