@@ -310,20 +310,3 @@ class QuestradeAccount(BaseAccount):
         with self.client as client:
             for json in client.GetActivities(self.account_id, start, end):
                 QuestradeRawActivity.objects.get_or_create(account=self, jsonstr=dumps(json))
-
-    def SyncBalances(self):
-        with self.client as client:
-            try:
-                json = client.GetAccountBalances(self.account_id)
-                self.curBalanceSynced = sum([
-                    Security.cash.get(symbol=entry['currency']).live_price * Decimal(str(entry['totalEquity']))
-                    for entry in json['perCurrencyBalances']
-                ])
-                self.sodBalanceSynced = sum([
-                    Security.cash.get(symbol=entry['currency']).yesterday_price * Decimal(str(entry['totalEquity']))
-                    for entry in json['sodPerCurrencyBalances']
-                ])
-                self.save()
-            except requests.exceptions.HTTPError:
-                pass
-

@@ -12,17 +12,10 @@ from utils.misc import xirr, total_return
 from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis
 
 
-class UserProfileManager(models.Manager):
-    def refresh_graphs(self):
-        for profile in self.get_queryset():
-            profile.generate_plots()
-
 class UserProfile(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     phone = models.CharField(max_length=32, null=True, blank=True)
     country = models.CharField(max_length=32, null=True, blank=True)
-
-    objects = UserProfileManager()
 
     @property
     def username(self):
@@ -31,9 +24,6 @@ class UserProfile(models.Model):
     @property
     def current_portfolio_value(self):
         return sum(self.GetHoldingDetails().today()).value
-
-    def generate_plots(self):
-        pass
 
     def GetHeldSecurities(self):
         return Security.objects.filter(pk__in=self.GetCurrentHoldings().values_list('security'))

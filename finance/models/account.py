@@ -16,10 +16,6 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
     def for_user(self, user):
         return self.filter(user=user) if user else self
 
-    def SyncAllBalances(self):
-        for account in self:
-            account.SyncBalances()
-
     def SyncAllActivitiesAndRegenerate(self):
         for account in self:
             account.SyncAndRegenerate()
@@ -72,9 +68,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
         if last_activity:
             return last_activity + datetime.timedelta(days=1)
         return self.creation_date
-
-    def SyncBalances(self):
-        pass
 
     def import_activities(self, csv_file):
         activity_count = self.activities.all().count()

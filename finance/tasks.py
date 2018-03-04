@@ -8,16 +8,6 @@ def SyncSecurityTask(live_update=False):
     HoldingDetail.Refresh()
 
 @shared_task
-def SyncAccountBalanceTask():
-    from .models import BaseAccount
-    BaseAccount.objects.SyncAllBalances()
-
-@shared_task
-def LiveSecurityUpdateTask():
-    SyncSecurityTask(live_update=True)
-    SyncAccountBalanceTask()
-
-@shared_task
 def SyncActivityTask(userprofile=None):
     from .models import BaseAccount, HoldingDetail
     accounts = userprofile.GetAccounts() if userprofile else BaseAccount.objects.all()
@@ -29,8 +19,6 @@ def DailyUpdateAll():
     from .models import UserProfile
     SyncActivityTask()
     SyncSecurityTask()
-    SyncAccountBalanceTask()
-    UserProfile.objects.refresh_graphs()
 
 @shared_task
 def HandleCsvUpload(accountcsv_id):
