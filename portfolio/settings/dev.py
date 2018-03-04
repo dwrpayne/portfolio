@@ -11,3 +11,4 @@ if DEBUG_TOOLBAR_ENABLED:
 MESSAGE_LEVEL = message_constants.DEBUG
 
 CACHES['default']['KEY_PREFIX'] = 'devel'
+CACHE_MIDDLEWARE_SECONDS = 1
