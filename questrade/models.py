@@ -261,7 +261,7 @@ class QuestradeOptionDataSource(DataSourceMixin):
     client = models.ForeignKey(QuestradeClient, on_delete=models.CASCADE)
 
     def __str__(self):
-        return "Questrade Client {} for option {} ({})".format(self.client, self.symbol, self.priority)
+        return "Questrade Option Datasource {} for option {} ({})".format(self.client, self.symbol, self.priority)
 
     def __repr__(self):
         return "QuestradeOptionDataSource<{},{},{}>".format(self.symbol, self.client, self.priority)
