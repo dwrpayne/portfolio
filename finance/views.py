@@ -471,50 +471,6 @@ class HistoryDetail(LoginRequiredMixin, ListView):
         return queryset
 
 
-def security_chart(request, symbol):
-    def to_ts(d):
-        return datetime.datetime.combine(d, datetime.time.min).timestamp() * 1000
-
-    security = Security.objects.get(symbol=symbol)
-    series = []
-    series.append({
-        'name': 'Price',
-        'data': [(to_ts(d), float(p)) for d, p in security.prices.values_list('day', 'price')],
-        'color': 'blue',
-        'id': 'price'
-    })
-
-    userprofile = request.user.userprofile
-    activities = userprofile.GetActivities().for_security(security)
-    purchase_data = activities.transactions().values('trade_date').annotate(total_qty=Sum('qty'), ).values_list(
-        'trade_date', 'total_qty', 'price')
-    series.append({
-        'name': 'Purchases',
-        'type': 'flags',
-        'shape': 'squarepin',
-        'onSeries': 'price',
-        'allowOverlapX': True,
-        'data': [{'x': to_ts(day),
-                  'fillColor': 'GreenYellow' if qty > 0 else 'red',
-                  'title': str(int(qty)),
-                  'text': '{} {:.0f} @ {:.2f}'.format('Buy' if qty > 0 else 'Sell', qty, price),
-                  } for day, qty, price in purchase_data]
-    })
-    series.append({
-        'name': 'Dividends',
-        'type': 'flags',
-        'fillColor': 'LightCyan',
-        'shape': 'circlepin',
-        'allowOverlapX': True,
-        'data': [{'x': to_ts(day),
-                  'title': '{:.2f}'.format(price),
-                  'text': 'Dividend of ${:.2f}'.format(price),
-                  } for day, price in activities.dividends().values_list('trade_date', 'price').distinct()]
-
-    })
-    return JsonResponse(series, safe=False)
-
-
 @login_required
 def index(request):
     context = {}

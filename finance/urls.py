@@ -18,9 +18,6 @@ urlpatterns = [
     path('feedback/', views.FeedbackView.as_view(), name='feedback'),
     path('dividends/', views.DividendReport.as_view(), name='dividends'),
 
-    # AJAX chart data
-    path('securitychart/<symbol>/', views.security_chart, name='securitychart'),
-
     # Profile
     path('user/<int:pk>/', views.UserProfileView.as_view(), name='userprofile'),
     path('user/<int:pk>/password/', views.UserPasswordPost.as_view(), name='passwordchange'),
