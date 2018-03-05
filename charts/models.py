@@ -67,17 +67,22 @@ class GrowthChart(BaseHighChart):
                     }
                 }
             },
+            rangeSelector: {
+                selected: 2
+            },
             series: [{
                 name: 'Total Value',
                 color: 'blue'
             }, {
                 name: 'Total Contributions',
                 color: 'orange',
-                step: 'left'
+                step: 'left',
+                visible: false
             }, {
                 name: 'Net Growth',
                 color: 'lime',
-                negativeColor: 'red'
+                negativeColor: 'red',
+                visible: false
             }],
             title: {
                 text: 'Portfolio Value Over Time'
