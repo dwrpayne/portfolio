@@ -308,7 +308,7 @@ class CostBasis2Manager(models.Manager):
         table = self._finalize(self.get_queryset().for_user(user).for_securities(securities), separate_by_account=True)
         latest = {}
         for basis in table:
-            latest[(basis.account_id, basis.security)] = basis
+            latest[(basis.account_id, basis.security_id)] = basis
         return (v for v in latest.values() if v.qty_total > 0)
 
     def get_capgains_table(self, user):
