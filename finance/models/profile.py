@@ -207,3 +207,6 @@ class UserProfile(models.Model):
         ret_list = (days, values, deposits, growth)
         return ret_list
 
+    def get_book_value_by_account_security(self, date):
+        book_values = self.GetActivities().before(date).get_total_cad_by_group(('account', 'security'))
+        return book_values.exclude(security=None)

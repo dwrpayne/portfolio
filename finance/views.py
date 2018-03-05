@@ -367,17 +367,18 @@ class RebalanceView(LoginRequiredMixin, FormView):
 def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
 
-    today_query = userprofile.GetHoldingDetails().at_date(as_of_date).select_related('security', 'account')
-    yesterday_query = userprofile.GetHoldingDetails().at_date(as_of_date - datetime.timedelta(days=1)).select_related(
-        'security', 'account')
-    account_data = {(h.security_id, h.account_id): 0 for h in list(today_query) + list(yesterday_query)}
-    for h in today_query:
-        account_data[(h.security_id, h.account_id)] += h
-    for h in yesterday_query:
-        account_data[(h.security_id, h.account_id)] -= h
+    holdingdetails = userprofile.GetHoldingDetails().between(as_of_date - datetime.timedelta(days=1), as_of_date).select_related(
+        'security', 'account').order_by('-day', 'security')
+    account_data = {(h.security_id, h.account_id): 0 for h in holdingdetails}
+    for h in holdingdetails:
+        if h.day == as_of_date:
+            account_data[(h.security_id, h.account_id)] += h
+        else:
+            account_data[(h.security_id, h.account_id)] -= h
+
     account_data = account_data.values()
 
-    costbases_by_security_account = userprofile.get_costbasis_by_security_account()
+    book_value_list = userprofile.get_book_value_by_account_security(as_of_date)
 
     holding_data = []
     for security, holdings in groupby(account_data, lambda h: h.security):
@@ -386,15 +387,13 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         h.book_value = 0
         for account_datum in h.account_data:
             try:
-                account_datum.book_value = costbases_by_security_account[security.symbol][account_datum.account.id].acb_total
+                account_datum.book_value = next(-val for a, s, val in book_value_list if account_datum.account.id==a and account_datum.security.symbol==s)
                 account_datum.total_value_gain = account_datum.value - account_datum.book_value
                 h.book_value += account_datum.book_value
-            except KeyError:
+            except StopIteration:
                 continue
         if h.book_value:
             h.total_value_gain = h.value - h.book_value
-        else:
-            h.book_value = None
         holding_data.append(h)
 
     # Sort by currency first, then symbol. Keep cash at the end (currency = '')
@@ -405,24 +404,25 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     context = {'holding_data': holding_data,
                'cash_data': cash_data,
                'total': sum(account_data)}
+    context['total'].book_value = sum(getattr(a, 'book_value', 0) for a in account_data)
+    context['total'].total_value_gain = context['total'].value - context['total'].book_value
 
-    today_balances = dict(today_query.today_account_values())
-    yesterday_balances = dict(yesterday_query.yesterday_account_values())
-    today_cash_balances = dict(today_query.cash().today_account_values())
+    accounts = {h.account for h in holdingdetails}
 
     accounts = {
-        BaseAccount.objects.get(pk=id).display_name: {
-            'id': id,
-            'cur_balance': today_balance,
-            'cur_cash_balance': today_cash_balances.get(id, 0),
-            'today_balance_change': today_balance - yesterday_balances.get(id, 0)
+        a.display_name: {
+            'id': a.id,
+            'cur_balance': sum(h.value for h in holdingdetails if h.account == a and h.day == as_of_date),
+            'cur_cash_balance': sum(h.value for h in holdingdetails if h.account == a and h.security.symbol in cash_types),
+            'today_balance_change': sum(h.value for h in holdingdetails if h.account == a and h.day == as_of_date) - \
+                                    sum(h.value for h in holdingdetails if h.account == a and h.day < as_of_date)
         }
-        for id, today_balance in today_balances.items()
+        for a in accounts
     }
     context['accounts'] = accounts
     from collections import defaultdict
     total = defaultdict(int)
-    for acc, d in accounts.items():
+    for _, d in accounts.items():
         for key in ['cur_balance', 'cur_cash_balance', 'today_balance_change']:
             total[key] += d[key]
     context['account_total'] = total

@@ -9,7 +9,7 @@
                 <th>Price</th>
                 <th>Change</th>
                 <th>Shares</th>
-                <th>Daily Gain/Loss ($C)</th>
+                <th>Today's Gain/Loss ($C)</th>
                 <th>Book Value ($C)</th>
                 <th>Market Value ($C)</th>
                 <th>Total Gain/Loss ($C)</th>
@@ -27,7 +27,7 @@
                     {{total.value_percent_delta | percentage | parens | colorize}}</td>
                 <td>{{total.book_value | currency}}</td>
                 <td>{{total.value | currency}}</td>
-                <td>{{total.value_delta | currency | colorize}}</td>
+                <td>{{total.total_value_gain | currency | colorize}}</td>
             </tr>
 
         </tfoot>
@@ -47,7 +47,7 @@
                 <td>{{holding_detail.value_delta | currency | colorize}} {{holding_detail.value_percent_delta | percentage | parens | colorize}}</td>
                 <td>{{holding_detail.book_value | currency}}</td>
                 <td>{{holding_detail.value | currency}}</td>
-                <td>{{holding_detail.total_value_gain | currency}}</td>
+                <td>{{holding_detail.total_value_gain | currency | colorize}}</td>
             </tr>
                 {% for account in holding_detail.account_data %}
                 <tr class="collapse holdings-table-child-{{forloop.parentloop.counter}}">
@@ -62,7 +62,7 @@
                     <td>{{account.value_delta | currency | colorize}}</td>
                     <td>{{account.book_value | currency}}</td>
                     <td>{{account.value | currency}}</td>
-                    <td>{{account.total_value_gain | currency}}</td>
+                    <td>{{account.total_value_gain | currency | colorize}}}</td>
                 </tr>
                 {% endfor %}
             {% endfor %}

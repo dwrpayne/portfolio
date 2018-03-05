@@ -217,6 +217,13 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
             exch=Sum(F('cash__prices__price'))
         )
 
+    def get_total_cad_by_group(self, columns):
+        return self.order_by().filter(trade_date=F('cash__prices__day')).annotate(
+            net_amount_cad=F('net_amount') * F('cash__prices__price')
+        ).annotate(_total_cad=Sum('net_amount_cad')).values(
+            *columns, '_total_cad'
+        ).annotate(total_cad=F('_total_cad')).values_list(*columns, 'total_cad')
+
 
 class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
