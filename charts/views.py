@@ -8,17 +8,17 @@ class HighChartMixin:
     get_chart_kwargs: override this to pass extra args into get_data()
     """
     chart_classes = []
-    chart_objects = []
 
     def get(self, request, *args, **kwargs):
+        chart_objects = []
         for cls in self.chart_classes:
             obj = cls(request.user.userprofile, **self.get_chart_kwargs(request))
             setattr(self, cls.__name__.lower(), obj)
-            self.chart_objects.append(obj)
+            chart_objects.append(obj)
 
         if request.is_ajax():
             chart_type = request.GET.get('chart', '')
-            for chart in self.chart_objects:
+            for chart in chart_objects:
                 if chart_type == chart.data_param:
                     return JsonResponse(chart.get_data(), safe=False)
         return super().get(request, *args, **kwargs)
