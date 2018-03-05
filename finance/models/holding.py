@@ -272,14 +272,13 @@ class HoldingChange:
         return hc
 
     def __str__(self):
-        return "{} {} {}({}) {} {} {}".format(self.security, self.price,
-                                              self.price_delta, self.value_percent_delta,
-                                              self.qty, self.value, self.value_delta)
+        return "{} {:.1f} {}@{:.2f}({:.2f}) worth {:.0f}({:.0f}){:.2f}%".format(self.day, self.qty, self.security, self.price,
+                                                          self.price_delta, self.value, self.value_delta,
+                                                          self.value_percent_delta)
 
     def __repr__(self):
-        return "{} {} {}({}) {} {} {}".format(self.security, self.price,
-                                              self.price_delta, self.value_percent_delta,
-                                              self.qty, self.value, self.value_delta)
+        return "HoldingChange<{} {:.1f} {}@{:.2f}({:.2f}) worth {:.0f}({:.0f}){:.2f}%>".format(self.day, self.qty, self.security,
+                self.price, self.price_delta, self.value, self.value_delta, self.value_percent_delta)
 
     @property
     def security_type(self):
