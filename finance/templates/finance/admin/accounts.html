@@ -19,7 +19,7 @@
                 <td>{{ account.user.username }}</td>
                 <td>{{ account.display_name }}</td>
                 <td>{{ account.creation_date }}</td>
-                <td>{{ account.activities.newest_date }}</td>
+                <td>{{ account.newest }}</td>
                 <td>{{ account.cur_balance | currency}}</td>
                 <td>
                     <button type="submit" class="refresh" data-refresh-type="sync-{{account.pk}}">Sync Activities</button>&nbsp;&nbsp;&nbsp;

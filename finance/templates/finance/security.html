@@ -1,27 +1,32 @@
 {% extends "base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{security.symbol}} {% endblock title %}
-{% block content %}  
-<div class="row" align="center">
-<div id="{{ view.securitychart.container_name }}"></div>
-</div>
-<div class="row">
-    <div class="col-sm-12">
-        {% include "finance/activity_table.html" with show_date=True show_account=True show_security=False %}
+{% block title %} {{ security.symbol }} {% endblock title %}
+{% block content %}
+    <div class="container-fluid">
+        <br>
+        <div class="row justify-content-center">
+            <div id="{{ view.securitychart.container_name }}"></div>
+        </div>
+        <br>
+        <div class="row">
+            <div class="col">
+                <h3 align="center">Activities for {{ security.symbol }}</h3>
+                {% include "finance/activity_table.html" with show_date=True show_account=True show_security=False %}
+            </div>
+        </div>
     </div>
-</div>
 {% endblock content %}
 
 {% block footer_javascript_page %}
     {% include "highcharts.html" %}
-    {{ view.securitychart.get_javascript | safe}}
+    {{ view.securitychart.get_javascript | safe }}
     <script>
-        $(document).ready(function() {
-            $('#activities-table').DataTable( {
-                "paging":   false,
+        $(document).ready(function () {
+            $('#activities-table').DataTable({
+                "paging": false,
                 "searching": false
-            } );
-        } );
+            });
+        });
     </script>
 {% endblock footer_javascript_page %}

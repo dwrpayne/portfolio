@@ -2,6 +2,7 @@ import datetime
 
 from django.conf import settings
 from django.db import models, transaction
+from django.db.models import Max
 from django.utils.functional import cached_property
 from polymorphic.managers import PolymorphicManager
 from polymorphic.models import PolymorphicModel
@@ -19,6 +20,9 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
     def SyncAllActivitiesAndRegenerate(self):
         for account in self:
             account.SyncAndRegenerate()
+
+    def with_newest_activity(self):
+        return self.annotate(newest=Max('activities__trade_date'))
 
 
 class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):

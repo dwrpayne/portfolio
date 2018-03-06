@@ -248,6 +248,11 @@ class SecurityChart(BaseHighChart):
                         enabled:true,
                         groupPixelWidth:5
                     },
+                    events: {
+                        legendItemClick: function () {
+                            return false; 
+                        }
+                    },
                     tooltip: {
                         valueDecimals: 2
                     }
@@ -255,7 +260,10 @@ class SecurityChart(BaseHighChart):
             },
             series: series,
             title: {
-                text: '$symbol'
+                style: {
+                    fontSize: '36px'
+                },
+                text: '$symbol price history'
             },
             tooltip: {
                 split: false,

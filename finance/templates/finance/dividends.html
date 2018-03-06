@@ -1,82 +1,81 @@
 {% extends "base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{view.object.symbol}} {% endblock title %}
-{% block content %}  
-<div class="row">
-    <h2 align="center">Annual Dividend Summary</h2><br>
-    <ul>
-        <li>This is a year-by-year summary of all the dividends you have realised in taxable accounts.</li>
-        <li>All numbers are converted to Canadian dollars.</li>
-    </ul>
-</div>
-<div class="row">
-    <div class="col-sm-12">
-        <table id="dividend-table" class="display striped hover" >
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Symbol</th>
-                    {% for year in years %}
-                        <th>{{ year }}</th>
-                    {% endfor %}
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tfoot>
-                <tr>
-                    <td></td>
-                    <td>Total</td>
-                    {% for value in yearly_totals %}
-                        <td>{% if value %}{{ value | currency }}{% endif %}</td>
-                    {% endfor %}
-                    <td>{{ total | currency }}</td>
-                </tr>
-            </tfoot>
-            <tbody>
-                {% for symbol, yearly_values in security_year_amounts %}
+{% block title %} {{ view.object.symbol }} {% endblock title %}
+{% block content %}
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <h2>Annual Dividend Summary</h2>
+        </div>
+        <div class="row">
+            <ul>
+                <li>This is a year-by-year summary of all the dividends you have realised in taxable accounts.</li>
+                <li>All numbers are converted to Canadian dollars.</li>
+            </ul>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                <table id="dividend-table" class="display striped hover">
+                    <thead>
                     <tr>
-                        <td class="details-control"><div>
-                            <span class="glyphicon glyphicon-menu-right"></span>
-                        </div></td>
-                        <td>{{ symbol }}</td>
-                        {% for value in yearly_values %}
+                        <th>Symbol</th>
+                        {% for year in years %}
+                            <th>{{ year }}</th>
+                        {% endfor %}
+                        <th>Total</th>
+                    </tr>
+                    </thead>
+                    <tfoot>
+                    <tr>
+                        <td>Total</td>
+                        {% for value in yearly_totals %}
                             <td>{% if value %}{{ value | currency }}{% endif %}</td>
                         {% endfor %}
+                        <td>{{ total | currency }}</td>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </tfoot>
+                    <tbody>
+                    {% for symbol, yearly_values in security_year_amounts %}
+                        <tr>
+                            <td>{{ symbol }}</td>
+                            {% for value in yearly_values %}
+                                <td>{% if value %}{{ value | currency }}{% endif %}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-</div>
 {% endblock content %}
 
 {% block footer_javascript_page %}
     <script type="text/javascript">
-        function format ( d ) {
+        function format(d) {
             // `d` is the original data object for the row
             return '';
         };
-        $(document).ready(function() {
-            var table = $('#dividend-table').DataTable( {
-                paging:   false,
+        $(document).ready(function () {
+            var table = $('#dividend-table').DataTable({
+                paging: false,
                 searching: false,
                 info: false
-            } );
+            });
 
             // Add event listener for opening and closing details
             $('#dividend-table tbody').on('click', 'td.details-control', function () {
                 var tr = $(this).closest('tr');
-                var row = table.row( tr );
+                var row = table.row(tr);
 
-                if ( row.child.isShown() ) {
+                if (row.child.isShown()) {
                     // This row is already open - close it
                     row.child.hide();
                     tr.removeClass('shown');
                 }
                 else {
                     // Open this row
-                    row.child( format(row.data()) ).show();
+                    row.child(format(row.data())).show();
                     tr.addClass('shown');
                 }
             });

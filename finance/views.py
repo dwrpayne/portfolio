@@ -193,6 +193,9 @@ class AdminAccounts(RefreshButtonHandlerMixin, ListView):
             raise Http404('Account function does not exist!')
         return HttpResponse()
 
+    def get_queryset(self):
+        return super().get_queryset().select_related('user').with_newest_activity()
+
 
 @method_decorator(never_cache, 'dispatch')
 class FeedbackView(FormView):
