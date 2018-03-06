@@ -213,16 +213,15 @@ class FeedbackView(FormView):
 
 
 class CapGainsSecurityReport(LoginRequiredMixin, ListView):
-
     model = CostBasis
     template_name = 'finance/capgainsdetail.html'
     context_object_name = 'costbases'
 
     def get_queryset(self):
         self.symbol = self.kwargs.get('pk')
-        self.summary = self.request.user.userprofile.get_capital_gain_summary(self.symbol)
-        self.costbases = CostBasis.objects.get_activities_with_acb(self.request.user, self.symbol)
-        #self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
+        security = Security.objects.get(symbol=self.symbol)
+        self.costbases = CostBasis.objects.get_activities_with_acb(self.request.user, security)
+        self.summary = self.request.user.userprofile.get_capital_gain_summary(self.symbol, self.costbases)
         return self.costbases
 
 

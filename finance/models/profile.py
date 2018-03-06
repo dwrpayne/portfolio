@@ -99,17 +99,21 @@ class UserProfile(models.Model):
             print(start, end, ror)
             yield end, ror
 
-    def get_capital_gain_summary(self, symbol):
+    def get_capital_gain_summary(self, symbol, acb_activities):
         security = Security.objects.get(symbol=symbol)
-        last = CostBasis.objects.get_activities_with_acb(self.user, security)[-1]
+        last = acb_activities[-1]
         if last.qty_total == 0:
             return {}
         cadprice = security.live_price_cad
+        price = exch = 0
+        if not security.currency == 'CAD':
+            price = security.live_price
+            exch = cadprice / price
         total_value = last.qty_total * cadprice
         pending_gain = cadprice * last.qty_total - last.acb_total
         return {'cadprice': cadprice,
-                'price': security.live_price,
-                'exchange': cadprice / security.live_price if cadprice else 0,
+                'price': price,
+                'exchange': exch,
                 'qty': last.qty_total,
                 'acb': last.acb_total,
                 'acb_per_share': last.acb_per_share,

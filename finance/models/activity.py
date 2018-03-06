@@ -334,9 +334,9 @@ class CostBasis(Activity):
 
     def post_initialize(self, previous_costbasis):
         self.cad_commission = self.commission * self.exch
+        if not self.price:
+            self.price = self.security.prices.get(day=self.trade_date).price
         self.cad_price_per_share = self.price * self.exch
-        if not self.cad_price_per_share:
-            self.cad_price_per_share = self.security.prices.get(day=self.trade_date).price * self.exch
         self.total_cad_value = self.qty * self.cad_price_per_share - self.cad_commission
 
         is_buying = self.qty > 0
