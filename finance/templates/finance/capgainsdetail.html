@@ -1,20 +1,39 @@
 {% extends "base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{view.symbol}} {% endblock title %}
+{% block title %} {{ view.symbol }} {% endblock title %}
 {% block content %}
-    <div class="row" align="center">
-        <h2>{{view.symbol}}</h2><br />
-    </div>
-    <div class="row">
-        <div class="col-sm-12">
-            {% include "finance/capgainssummary.html" with summary=view.summary symbol=view.symbol %}
+    <div class="container-fluid">
+        <br>
+        <div class="row justify-content-center">
+            <h2>Capital Gains Details for {{ view.symbol }}</h2>
         </div>
-    </div>
-    <div class="row">
-        <div class="col-sm-12">
-            <table class="table table-striped table-hover" id="security_info-table">
-                <thead>
+        <div class="row">
+            <div class="col-sm-12">
+                {% if view.summary %}
+                    <ul>
+                        <li>In taxable accounts, you are holding {{ view.summary.qty | floatformat:0 }} shares
+                            of {{ view.symbol }} with a total value of C{{ view.summary.total_value | currency }}.
+                        </li>
+                        <li>The current value per share is C{{ view.summary.cadprice | currency }}, of which
+                            C{{ view.summary.acb_per_share | currency }} is your cost basis and
+                            C{{ view.summary.pending_gain_per_share | currency }} is
+                            pending capital {{ view.summary.pending_gain | gain_word }}.
+                        </li>
+                        <li>{{ view.summary.percent_gains | percentage }} of your holding is capital {{ view.summary.pending_gain | gain_word }}.
+                        </li>
+                    </ul>
+                {% else %}
+                    <ul>
+                        <li> You are not currently holding any shares.</li>
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                <table class="table table-striped table-hover" id="security_info-table">
+                    <thead>
                     <tr>
                         <th>Date</th>
                         <th>Action</th>
@@ -27,55 +46,53 @@
                         <th>Commission (C$)</th>
                         <th>Total (C$)</th>
                         <th>Cap Gain (C$)</th>
-                        <th>Total Units</th>
-                        <th>ACB change (C$)</th>
-                        <th>New ACB (C$)</th>
+                        <th>Total Units Owned</th>
+                        <th>Current ACB (C$)</th>
                         <th>ACB / Share (C$)</th>
                     </tr>
-                </thead>
-            {% if view.summary %}
-                <tfoot>
-                    <tr>
-                        <td>{% now "DATE_FORMAT"%}</td>
-                        <td>Total</td>
-                        <td></td>
-                        {% ifnotequal costbases.0.activity.cash_id "CAD" %}
-                            <td>{{ view.summary.price | floatformat:4 }}</td>
-                            <td>{{ view.summary.exchange | floatformat:4 }}</td>
-                        {% endifnotequal %}
-                        <td>{{ view.summary.cadprice | floatformat:4 }}</td>
-                        <td></td>
-                        <td></td>
-                        <td>Pending: {{ view.summary.pending_gain | currency}}</td>
-                        <td>{{ view.summary.qty | floatformat:0 }}</td>
-                        <td></td>
-                        <td>{{ view.summary.acb | currency }}</td>
-                        <td>{{ view.summary.acb_per_share | currency }}</td>
-                    </tr>
-                </tfoot>
-            {% endif %}
-                <tbody>
-                {% for costbasis in costbases %}
-                    <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
-                        <td>{{costbasis.activity.trade_date}}</td>
-                        <td>{{costbasis.activity.type}}</td>
-                        <td>{{costbasis.activity.qty | floatformat:0}}</td>
-                        {% ifnotequal costbases.0.activity.cash_id "CAD" %}
-                            <td>{{costbasis.activity.price | floatformat:4}}</td>
-                            <td>{{costbasis.exchange | floatformat:4}}</td>
-                        {% endifnotequal %}
-                        <td>{{costbasis.cad_price_per_share | floatformat:4}}</td>
-                        <td>{{costbasis.cad_commission | currency}}</td>
-                        <td>{{costbasis.total_cad_value | currency}}</td>
-                        <td>{% if costbasis.capital_gain %}{{costbasis.capital_gain | currency}}{% endif %}</td>
-                        <td>{{costbasis.qty_total | floatformat:0}}</td>
-                        <td>{{costbasis.acb_change | currency }}</td>
-                        <td>{{costbasis.acb_total | currency}}</td>
-                        <td>{{costbasis.acb_per_share | currency}}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    {% if view.summary %}
+                        <tfoot>
+                        <tr>
+                            <td>{% now "DATE_FORMAT" %}</td>
+                            <td>Total</td>
+                            <td></td>
+                            {% ifnotequal costbases.0.activity.cash_id "CAD" %}
+                                <td>{{ view.summary.price | floatformat:4 }}</td>
+                                <td>{{ view.summary.exchange | floatformat:4 }}</td>
+                            {% endifnotequal %}
+                            <td>{{ view.summary.cadprice | floatformat:4 }}</td>
+                            <td></td>
+                            <td></td>
+                            <td>Pending: {{ view.summary.pending_gain | currency }}</td>
+                            <td>{{ view.summary.qty | floatformat:0 }}</td>
+                            <td>{{ view.summary.acb | currency }}</td>
+                            <td>{{ view.summary.acb_per_share | currency }}</td>
+                        </tr>
+                        </tfoot>
+                    {% endif %}
+                    <tbody>
+                    {% for costbasis in costbases %}
+                        <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
+                            <td>{{ costbasis.activity.trade_date }}</td>
+                            <td>{{ costbasis.activity.type }}</td>
+                            <td>{{ costbasis.activity.qty | floatformat:0 }}</td>
+                            {% ifnotequal costbases.0.activity.cash_id "CAD" %}
+                                <td>{{ costbasis.activity.price | floatformat:4 }}</td>
+                                <td>{{ costbasis.exchange | floatformat:4 }}</td>
+                            {% endifnotequal %}
+                            <td>{{ costbasis.cad_price_per_share | floatformat:4 }}</td>
+                            <td>{{ costbasis.cad_commission | currency }}</td>
+                            <td>{{ costbasis.total_cad_value | currency }}</td>
+                            <td>{% if costbasis.capital_gain %}{{ costbasis.capital_gain | currency }}{% endif %}</td>
+                            <td>{{ costbasis.qty_total | floatformat:0 }}</td>
+                            <td>{{ costbasis.acb_total | currency }}</td>
+                            <td>{{ costbasis.acb_per_share | currency }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 {% endblock content %}

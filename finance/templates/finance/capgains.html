@@ -1,72 +1,83 @@
 {% extends "base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{view.symbol}} {% endblock title %}
+{% block title %} {{ view.symbol }} {% endblock title %}
 {% block content %}
-<div class="row" align="center">
-    <h2>Annual Capital Gains Summary</h2>
-</div>
-<div class="row">
-<ul>
-    <li>This is a year-by-year summary of all the capital gains and losses you have realised in taxable accounts.</li>
-    <li>All numbers are converted to Canadian dollars.</li>
-    <li>These numbers should match what you have reported on your income tax returns.</li>
-    <li>Click on each stock symbol to see a detailed breakdown of how the numbers were calculated.</li>
-    <li>The "Pending Gain/Loss" column indicates the potential gain or loss if you were to sell your entire holding right now.</li>
-    <li>The "Gain Percentage" column is calculated as (Pending Gain / Market Value).
-        <ul><li>If you need to liquidate some cash, and want to minimize your capital gain, sell the stocks with the lowest "Gain Percentage".</li></ul>
-    </li>
-</ul></div>
-<div class="row">
-    <div class="col-sm-12">
-        <table class="table table-hover table-bordered text-center">
-          <colgroup>
-            <col class="bg-success"></col>
-            <col span="{{ view.total_gains | length }}" class="bg-info"></col>
-            <col span="1" class="bg-danger"></col>
-            <col span="3" class="bg-warning"></col>
-          </colgroup>
-            <thead >
-                <tr>
-                    <th class="text-center">Security</th>
-                    {% for year in view.years %}
-                        <th class="text-center">{{ year }}</th>
+    <div class="container-fluid">
+        <div class="row justify-content-center">
+            <h2>Annual Capital Gains Summary</h2>
+        </div>
+        <div class="row">
+            <ul>
+                <li>This is a year-by-year summary of all the capital gains and losses you have realised in taxable
+                    accounts.
+                </li>
+                <li>All numbers are converted to Canadian dollars.</li>
+                <li>These numbers should match what you have reported on your income tax returns.</li>
+                <li>Click on each stock symbol to see a detailed breakdown of how the numbers were calculated.</li>
+                <li>The "Pending Gain/Loss" column indicates the potential gain or loss if you were to sell your entire
+                    holding right now.
+                </li>
+                <li>The "Gain Percentage" column is calculated as (Pending Gain / Market Value).
+                    <ul>
+                        <li>If you need to liquidate some cash, and want to minimize your capital gain, sell the stocks
+                            with the lowest "Gain Percentage".
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        <div class="row">
+            <div class="col-sm-12">
+                <table class="table table-hover table-bordered text-center">
+                    <colgroup>
+                        <col></col>
+                        <col span="{{ view.total_gains | length }}" class="bg-success"></col>
+                        <col span="1" class="bg-danger"></col>
+                        <col span="3"></col>
+                    </colgroup>
+                    <thead>
+                    <tr>
+                        <th class="text-center">Security</th>
+                        {% for year in view.years %}
+                            <th class="text-center">{{ year }}</th>
+                        {% endfor %}
+                        <th class="text-center">Pending Gain/Loss</th>
+                        <th class="text-center">Shares</th>
+                        <th class="text-center">Market Value</th>
+                        <th class="text-center">Gain Percentage</th>
+                    </tr>
+                    </thead>
+                    <tfoot>
+                    <tr>
+                        <td>Total</td>
+                        {% for value in view.total_gains %}
+                            <td>{% if value %}{{ value | currency }}{% endif %}</td>
+                        {% endfor %}
+                        <td>{{ view.total_pending | currency }}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                    </tfoot>
+                    <tbody>
+                    {% for security, yearly_values in view.yearly_gains.items %}
+                        <tr>
+                            <td><a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a></td>
+                            {% for value in yearly_values %}
+                                <td>{% if value %}{{ value | currency }}{% endif %}</td>
+                            {% endfor %}
+                            <td>{{ view.pending_by_security | lookup:security | currency }}</td>
+                            {% with summary=view.summary_by_security|lookup:security %}
+                                <td>{{ summary.qty | floatformat:2 }}</td>
+                                <td>{{ summary.total_value | currency }}</td>
+                                <td>{{ summary.percent_gains | percentage }}</td>
+                            {% endwith %}
+                        </tr>
                     {% endfor %}
-                    <th class="text-center">Pending Gain/Loss</th>
-                    <th class="text-center">Shares</th>
-                    <th class="text-center">Market Value</th>
-                    <th class="text-center">Gain Percentage</th>
-                </tr>
-            </thead>
-            <tfoot>
-                <tr>
-                    <td>Total</td>
-                    {% for value in view.total_gains %}
-                        <td>{% if value %}{{ value | currency}}{% endif %}</td>
-                    {% endfor %}
-                    <td>{{ view.total_pending | currency}}</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                </tr>
-            </tfoot>
-            <tbody>
-            {% for security, yearly_values in view.yearly_gains.items %}
-                <tr>
-                    <td><a href="{% url 'finance:capgainssec' security %}">{{security}}</a></td>
-                    {% for value in yearly_values %}
-                        <td>{% if value %}{{ value | currency}}{% endif %}</td>
-                    {% endfor %}
-                    <td>{{ view.pending_by_security | lookup:security | currency}}</td>
-                    {% with summary=view.summary_by_security|lookup:security %}
-                            <td>{{ summary.qty | floatformat:2}}</td>
-                            <td>{{ summary.total_value | currency}}</td>
-                            <td>{{ summary.percent_gains | percentage}}</td>
-                    {% endwith %}
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-</div>
 {% endblock content %}
