@@ -285,6 +285,8 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(GetHoldingsContext(self.request.user.userprofile, self.get_day()))
+        context['activity_days'] = self.request.user.userprofile.GetActivities().values_list(
+            'trade_date', flat=True).distinct()
         return context
 
     def get_day(self):
@@ -399,7 +401,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     # Sort by currency first, then symbol. Keep cash at the end (currency = '')
     holding_data = sorted(holding_data, key=lambda h: (h.security.currency or 'ZZZ', h.security.symbol))
     cash_types = Security.cash.values_list('symbol', flat=True)
-    holding_data, cash_data = partition(lambda h: h.security in cash_types, holding_data)
+    holding_data, cash_data = partition(lambda h: h.security.symbol in cash_types, holding_data)
 
     context = {'holding_data': holding_data,
                'cash_data': cash_data,

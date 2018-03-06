@@ -2,8 +2,10 @@
 <table class="display striped hover" id="activities-table">
     <thead>
         <tr>
-            <th>Date</th>
-            <th>Type</th>
+            {% if show_date %}
+                <th>Date</th>
+            {% endif %}
+            <th>Transaction</th>
             {% if show_security %}
                 <th>Security</th>
             {% endif %}
@@ -20,7 +22,9 @@
     <tbody>
     {% for activity in activities %}
         <tr>
-            <td>{{activity.trade_date}}</td>
+            {% if show_date %}
+                <td>{{ activity.trade_date}}</td>
+            {% endif %}
             <td>{{activity.type}}</td>
             {% if show_security %}
                 <td>{{activity.security_id}}</td>

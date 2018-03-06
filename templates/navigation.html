@@ -1,110 +1,110 @@
 ﻿{% load base_extras %}
-<nav class="navbar navbar-default">
-    <div class="container-fluid">
-        <div class="navbar-header">
-            <a class="navbar-brand" href="#">Financial Analysis</a>
-        </div>
-        <ul class="nav navbar-nav">                        
-            <li class="{% navactive request 'finance:portfolio' %}">
-                <a href="{% url 'finance:portfolio' %}">Portfolio</a></li>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand" href="#">Portfolio Tool</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+<div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
 
-            <li class="dropdown {% navactive request 'finance:history' %}
-                        dropdown {% navactive request 'finance:snapshot' %}">
-                <a class="dropdown-toggle" data-toggle="dropdown" href="#">History
-                <span class="caret"></span></a>
-                <ul class="dropdown-menu">
-                    <li><a href="{% url 'finance:history' period='year'%}">Year-end Values</a></li>
-                    <li><a href="{% url 'finance:history' period='month'%}">Month-end Values</a></li>
-                    <li><a href="{% url 'finance:history' period='day'%}">Daily Values</a></li>
-                    <li><a href="{% url 'finance:snapshot' %}">Portfolio Glimpse</a></li>
-                </ul>
+            <li class="nav-item {% navactive request 'finance:portfolio' %}">
+                <a class="nav-link" href="{% url 'finance:portfolio' %}">Portfolio</a>
             </li>
 
-            <li class="{% navactive request 'finance:rebalance' %}">
-                <a href="{% url 'finance:rebalance' %}">Rebalance</a></li>
+            <li class="nav-item dropdown {% navactive request 'finance:history' %}
+                        {% navactive request 'finance:snapshot' %}">
+                <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">History</a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="{% url 'finance:history' period='year' %}">Year-end Values</a>
+                    <a class="dropdown-item" href="{% url 'finance:history' period='month' %}">Month-end Values</a>
+                    <a class="dropdown-item" href="{% url 'finance:history' period='day' %}">Daily Values</a>
+                    <a class="dropdown-item" href="{% url 'finance:snapshot' %}">Portfolio Glimpse</a>
+                </div>
+            </li>
 
-            <li class="dropdown {% navactive request 'finance:capgains' %}">
-                <a class="dropdown-toggle" data-toggle="dropdown" href="#">Capital Gains
-                <span class="caret"></span></a>
-                <ul class="dropdown-menu">
-                    <li><a href="{% url 'finance:capgains' %}">Yearly Report</a></li>
+            <li class="nav-item {% navactive request 'finance:rebalance' %}">
+                <a class="nav-link" href="{% url 'finance:rebalance' %}">Rebalance</a>
+            </li>
+
+            <li class="nav-item dropdown {% navactive request 'finance:capgains' %}">
+                <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">Capital Gains</a>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="{% url 'finance:capgains' %}">Yearly Report</a>
                     {% for security in request.user.userprofile.GetCapGainsSecurities %}
-                    <li><a href="{% url 'finance:capgainssec' security %}">{{security}}</a></li>
+                        <a class="dropdown-item" href="{% url 'finance:capgainssec' security %}">{{ security }}</a>
                     {% endfor %}
-                </ul>
+                </div>
             </li>
 
-            <li class="{% navactive request 'finance:dividends' %}">
-                <a href="{% url 'finance:dividends' %}">Dividends</a></li>
+            <li class="nav-item {% navactive request 'finance:dividends' %}">
+                <a class="nav-link" href="{% url 'finance:dividends' %}">Dividends</a></li>
 
-            <li class="dropdown {% navactive request 'finance:securitydetail' %}">
-                <a class="dropdown-toggle" data-toggle="dropdown" href="#">Security Details
-                <span class="caret"></span></a>
-                <ul class="dropdown-menu">
+            <li class="nav-item dropdown {% navactive request 'finance:securitydetail' %}">
+                <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">Security Details</a>
+                <div class="dropdown-menu">
                     {% for security in request.user.userprofile.GetHeldSecurities %}
-                    <li><a href="{% url 'finance:securitydetail' security %}">{{security}}</a></li>
+                        <a class="dropdown-item" href="{% url 'finance:securitydetail' security %}">{{ security }}</a>
                     {% endfor %}
-                </ul>
+                </div>
             </li>
 
-            <li class="dropdown {% navactive request 'finance:accountdetail' %}">
-                <a class="dropdown-toggle" data-toggle="dropdown" href="#">
-                    Account Details<span class="caret"></span>
-                </a>
-                <ul class="dropdown-menu">
+            <li class="nav-item dropdown {% navactive request 'finance:accountdetail' %}">
+                <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">Account Details</a>
+                <div class="dropdown-menu">
                     {% for account in request.user.userprofile.GetAccounts %}
-                    <li><a href="{% url 'finance:accountdetail' account.pk %}">{{account.display_name}}</a></li>
+                        <a class="dropdown-item"
+                           href="{% url 'finance:accountdetail' account.pk %}">{{ account.display_name }}</a>
                     {% endfor %}
-                </ul>
+                </div>
             </li>
 
-            <li class="{% navactive request 'finance:feedback' %}">
-                <a href="{% url 'finance:feedback' %}">Feedback</a></li>
-
+            <li class="nav-item {% navactive request 'finance:feedback' %}">
+                <a class="nav-link" href="{% url 'finance:feedback' %}">Feedback</a>
+            </li>
         </ul>
-        <ul class="nav navbar-nav navbar-right">
-             {% if user.is_staff %}
-                <li class="dropdown {% navactive request 'finance:status' %}">
-                    <a class="dropdown-toggle" data-toggle="dropdown" href="#">
-                        Admin Panel<span class="caret"></span>
-                    </a>
-                    <ul class="dropdown-menu">
-                        <li><a href="{% url 'finance:admin_security' %}">Security Sync Status</a></li>
+        <ul class="navbar-nav ml-auto">
+
+            {% if user.is_staff %}
+                <li class="nav-item dropdown {% navactive request 'finance:status' %}">
+                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">Admin Panel</a>
+                    <ul class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="{% url 'finance:admin_security' %}">Security Sync Status</a>
                         {% if user.is_superuser %}
-                            <li><a href="{% url 'finance:admin_accounts' %}">Account Status</a></li>
-                            <li><a href="{% url 'finance:admin_users' %}">User Status</a></li>
+                            <a class="dropdown-item" href="{% url 'finance:admin_accounts' %}">Account Status</a>
+                            <a class="dropdown-item" href="{% url 'finance:admin_users' %}">User Status</a>
                         {% endif %}
                     </ul>
                 </li>
             {% endif %}
-        
+
             {% if user.is_authenticated %}
-            <li class="dropdown">
-                <a class="dropdown-toggle" data-toggle="dropdown" href="#">
-                    Logged in as {{ request.user }}<span class="caret"></span>
-                </a>
-                <ul class="dropdown-menu">
-                    <li><a href="{% url 'finance:userprofile' user.pk %}">Profile</a></li>
-                    <li><a href="{% url 'password_change' %}">Change Password</a></li>
-                    <li><a href="{% url 'finance:uploadcsv' %}">Upload Account Data</a></li>
-                    <li><a href="{% url 'logout' %}">Logout</a></li>
-                    {% if user.is_superuser %}
-                        {% with 'amie sean emily derrill guest' as users %}
-                            {% for name in users.split %}
-                                <li class="dropdown-item">
-                                    <form action="/hijack/username/{{ name }}/" method="post">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-link">Hijack {{ name }}</button>
-                                    </form>
-                                </li>
-                            {% endfor %}
-                        {% endwith %}
-                    {% endif %}
-                </ul>
-            </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">{{ request.user }}</a>
+                    <ul class="dropdown-menu dropdown-menu-right">
+                        <a class="dropdown-item" href="{% url 'finance:userprofile' user.pk %}">Profile</a>
+                        <a class="dropdown-item" href="{% url 'password_change' %}">Change Password</a>
+                        <a class="dropdown-item" href="{% url 'finance:uploadcsv' %}">Upload Account Data</a>
+                        <a class="dropdown-item" href="{% url 'logout' %}">Logout</a>
+                        {% if user.is_superuser %}
+                            {% with 'amie sean emily derrill guest' as users %}
+                                {% for name in users.split %}
+                                    <li class="dropdown-item">
+                                        <form action="/hijack/username/{{ name }}/" method="post">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn-sm btn-outline-secondarys">
+                                                Hijack {{ name }}
+                                            </button>
+                                        </form>
+                                    </li>
+                                {% endfor %}
+                            {% endwith %}
+                        {% endif %}
+                    </ul>
+                </li>
             {% else %}
-                <li><a href="{% url 'login' %}">Login</a></li>
+                <a class="nav-link" href="{% url 'login' %}">Login</a>
             {% endif %}
         </ul>
-    </div>
+</div>
 </nav>

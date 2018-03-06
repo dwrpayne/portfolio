@@ -1,42 +1,61 @@
 {% extends "base.html" %}
 {% load mytags %}
 {% load static %}
-{% block title %} {{request.user.username}} {% endblock title %}
+{% block title %} {{ request.user.username }} {% endblock title %}
+
+{% block head_css_page %}
+    <style>
+		.date-highlight .ui-state-default {
+			background-color: orangered;
+			border-color: orangered;
+		}
+	</style>
+{% endblock head_css_page %}
 {% block content %}
-<div class="row">
-    <div class="col-sm-10" align="center">
-        <h2>
-            {% if view.prev_day %}
-                <a href="{% url 'finance:snapshot' %}?day={{ view.prev_day }}"><<<</a>
-            {% endif %}
-            Portfolio view as of {{ view.get_day }}
-            {% if view.next_day %}
-                <a href="{% url 'finance:snapshot' %}?day={{ view.next_day }}">>>></a>
-            {% endif %}
-        </h2>
-        {% include "finance/holdings.html" %}
+    <br>
+    <div class="row">
+        <div class="col-sm-9" align="center">
+            <h2>
+                {% if view.prev_day %}
+                    <a href="{% url 'finance:snapshot' %}?day={{ view.prev_day }}"><i
+                            class="fas fa-angle-double-left"></i></a>
+                {% endif %}
+                Portfolio view as of {{ view.get_day }}
+                {% if view.next_day %}
+                    <a href="{% url 'finance:snapshot' %}?day={{ view.next_day }}"><i
+                            class="fas fa-angle-double-right"></i></a>
+                {% endif %}
+            </h2>
+            {% include "finance/holdings.html" %}
+        </div>
+        <div class="col-sm-2">
+            <h3>Jump to date:<br/></h3>
+            <div type="text" id="datepicker"></div>
+        </div>
     </div>
-    <div class="col-sm-2">
-        <h3>Jump to date:<br/></h3>
-        <div type="text" id="datepicker"></div>
+    <br>
+    <div class="row">
+        <div class="col-sm-12">
+            <h2 align="center">Activities on this day</h2>
+            {% include "finance/activity_table.html" with show_date=False show_account=True show_security=True %}
+        </div>
     </div>
-</div>
-<div class="row">
-    <div class="col-sm-12">
-        <h2>Activities on this day</h2>
-        {% include "finance/activity_table.html" with show_account=True show_security=True %}
-    </div>
-</div>
 {% endblock content %}
 {% block footer_javascript_page %}
     <script type="text/javascript">
-        $(document).ready(function() {
-            $('#activities-table').DataTable( {
-                "paging":   false,
+        $(document).ready(function () {
+            $('#activities-table').DataTable({
+                "paging": false,
                 "searching": false
-            } );
-        } );
+            });
+        });
+
         $(function () {
+            var activedates = {};
+            {% for activity_day in activity_days %}
+                activedates[new Date('{{ activity_day}}')] = 1;
+            {% endfor %}
+
             $('#datepicker').datepicker({
                 dateFormat: "yy-mm-dd",
                 changeMonth: true,
@@ -47,8 +66,16 @@
                 minDate: -{{ view.inception_days_ago }},
                 maxDate: 0,
                 defaultDate: "{{ view.get_day.isoformat }}",
-                onSelect: function(date) {
+                onSelect: function (date) {
                     window.location.href = window.location.href.split('?')[0] + '?day=' + date;
+                },
+                beforeShowDay: function (date) {
+                    if (activedates[date] && (date.getTime() != new Date('{{ view.get_day }}').getTime())) {
+                        return [true, "date-highlight", 'Activities'];
+                    }
+                    else {
+                        return [true, '', ''];
+                    }
                 }
             });
         });

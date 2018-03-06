@@ -2,14 +2,6 @@
     font-weight: bold;
 }
 
-.body {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 100px 1fr 50px;
-    grid-template-areas: "navbar" "content" "footer";
-
-}
-
 button[type=submit]:disabled {
     background-image:url(/static/img/syncing2.gif);
     background-position: center center;
