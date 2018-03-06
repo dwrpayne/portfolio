@@ -105,7 +105,15 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
         return HttpResponse()
 
     def get_queryset(self):
-        return self.model.objects.all().prefetch_related('activities', 'prices').order_by('-type', 'symbol')
+        securities = self.model.objects.all().prefetch_related('activities', 'prices', 'datasources').order_by('-type', 'symbol')
+        for s in securities:
+            s.earliest_have = s.prices.earliest().day
+            s.latest_price = s.prices.latest()
+            s.latest_have = s.latest_price.day
+            s.need_sync_earlier = (s.earliest_have >= s.earliest_price_needed)
+            s.need_sync_later = (s.latest_have < s.latest_price_needed)
+            s.current_price = s.latest_price.price
+        return securities
 
 
 @method_decorator(never_cache, 'dispatch')

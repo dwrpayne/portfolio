@@ -2,20 +2,20 @@
 <tr id="row-{{ security }}">
     <td>{{ security.symbol }}</td>
     <td>{{ security.type }}</td>
-    <td bgcolor="{% if security.prices.earliest.day < security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-        {{ security.prices.earliest.day }}
+    <td bgcolor="{% if security.need_sync_earlier %}tomato{% else %}lightgreen{% endif %}">
+        {{ security.earliest_have }}
     </td>
-    <td bgcolor="{% if security.prices.earliest.day < security.earliest_price_needed %}lightgreen{% else %}tomato{% endif %}">
+    <td bgcolor="{% if security.need_sync_earlier %}tomato{% else %}lightgreen{% endif %}">
         {{ security.earliest_price_needed }}
     </td>
-    <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
+    <td bgcolor="{% if security.need_sync_later %}tomato{% else %}lightgreen{% endif %}">
         {{ security.latest_price_needed }}
     </td>
-    <td bgcolor="{% if security.prices.latest.day >= security.latest_price_needed %}lightgreen{% else %}tomato{% endif %}">
-        {{ security.prices.latest.day }}
+    <td bgcolor="{% if security.need_sync_later %}tomato{% else %}lightgreen{% endif %}">
+        {{ security.latest_have }}
     </td>
     <td><button type="submit" class="refresh" data-refresh-div="row-{{ security }}" data-refresh-type="sync-{{ security.symbol }}">Sync</td>
     <td>{{ security.last_sync_time}}</td>
-    <td>{{ security.prices.latest.price | currency}}</td>
+    <td>{{ security.current_price | currency}}</td>
     <td>{{ security.datasources.all }}</td>
 </tr>

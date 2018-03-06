@@ -2,7 +2,7 @@ from celery import shared_task
 
 
 @shared_task
-def SyncSecurityTask(live_update=False):
+def SyncSecurityTask(live_update=True):
     from securities.models import Security
     from .models import HoldingDetail
     Security.objects.Sync(live_update)
