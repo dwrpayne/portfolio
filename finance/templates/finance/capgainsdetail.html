@@ -38,8 +38,8 @@
                         <th>Date</th>
                         <th>Action</th>
                         <th>Units</th>
-                        {% ifnotequal costbases.0.activity.cash_id "CAD" %}
-                            <th>Price ({{ costbases.0.activity.cash_id }})</th>
+                        {% ifnotequal costbases.0.cash_id "CAD" %}
+                            <th>Price ({{ costbases.0.cash_id }})</th>
                             <th>Exchange</th>
                         {% endifnotequal %}
                         <th>Price (C$)</th>
@@ -47,7 +47,7 @@
                         <th>Total (C$)</th>
                         <th>Cap Gain (C$)</th>
                         <th>Total Units Owned</th>
-                        <th>Current ACB (C$)</th>
+                        <th>Total ACB (C$)</th>
                         <th>ACB / Share (C$)</th>
                     </tr>
                     </thead>
@@ -57,7 +57,7 @@
                             <td>{% now "DATE_FORMAT" %}</td>
                             <td>Total</td>
                             <td></td>
-                            {% ifnotequal costbases.0.activity.cash_id "CAD" %}
+                            {% ifnotequal costbases.0.cash_id "CAD" %}
                                 <td>{{ view.summary.price | floatformat:4 }}</td>
                                 <td>{{ view.summary.exchange | floatformat:4 }}</td>
                             {% endifnotequal %}
@@ -74,12 +74,12 @@
                     <tbody>
                     {% for costbasis in costbases %}
                         <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
-                            <td>{{ costbasis.activity.trade_date }}</td>
-                            <td>{{ costbasis.activity.type }}</td>
-                            <td>{{ costbasis.activity.qty | floatformat:0 }}</td>
-                            {% ifnotequal costbases.0.activity.cash_id "CAD" %}
-                                <td>{{ costbasis.activity.price | floatformat:4 }}</td>
-                                <td>{{ costbasis.exchange | floatformat:4 }}</td>
+                            <td>{{ costbasis.trade_date }}</td>
+                            <td>{{ costbasis.type }}</td>
+                            <td>{{ costbasis.qty | floatformat:0 }}</td>
+                            {% ifnotequal costbases.0.cash_id "CAD" %}
+                                <td>{{ costbasis.price | floatformat:4 }}</td>
+                                <td>{{ costbasis.exch | floatformat:4 }}</td>
                             {% endifnotequal %}
                             <td>{{ costbasis.cad_price_per_share | floatformat:4 }}</td>
                             <td>{{ costbasis.cad_commission | currency }}</td>

@@ -6,6 +6,7 @@ from model_utils import Choices
 from polymorphic.models import PolymorphicModel
 from polymorphic.query import PolymorphicQuerySet
 from polymorphic.showfields import ShowFieldTypeAndContent
+from itertools import groupby
 
 from securities.models import Security, SecurityPriceDetail
 from utils.db import DayMixinQuerySet, SecurityMixinQuerySet
@@ -280,10 +281,6 @@ class Activity(models.Model):
         return effects
 
 
-
-
-
-from itertools import groupby
 class CostBasis2Manager(models.Manager):
     def _finalize(self, queryset, separate_by_account=False):
         groupby_fn = lambda a: a.security_id
@@ -306,17 +303,8 @@ class CostBasis2Manager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().transactions().with_exchange_rates()
 
-    def get_costbasis(self, user, security):
-        bases = list(self._finalize(self.get_queryset().for_user(user).for_security(security)))
-        basis = bases[-1]
-        return basis
-
-    def get_all_costbases_by_account(self, user, securities):
-        table = self._finalize(self.get_queryset().for_user(user).for_securities(securities), separate_by_account=True)
-        latest = {}
-        for basis in table:
-            latest[(basis.account_id, basis.security_id)] = basis
-        return (v for v in latest.values() if v.qty_total > 0)
+    def get_activities_with_acb(self, user, security):
+        return list(self._finalize(self.get_queryset().for_user(user).taxable().for_security(security)))
 
     def get_capgains_table(self, user):
         return self._finalize(self.get_queryset().for_user(user).taxable())

@@ -10,8 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.db.models import Sum
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
 from django.utils.decorators import method_decorator
@@ -26,7 +25,7 @@ from securities.models import Security
 from utils.misc import partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm, AllocationForm, AllocationFormSet
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, CostBasis2
 from .services import RefreshButtonHandlerMixin, check_for_missing_securities
 from .tasks import HandleCsvUpload
 
@@ -212,15 +211,18 @@ class FeedbackView(FormView):
         return super().form_valid(form)
 
 
+
 class CapGainsSecurityReport(LoginRequiredMixin, ListView):
-    model = CostBasis
+
+    model = CostBasis2
     template_name = 'finance/capgainsdetail.html'
     context_object_name = 'costbases'
 
     def get_queryset(self):
         self.symbol = self.kwargs.get('pk')
         self.summary = self.request.user.userprofile.get_capital_gain_summary(self.symbol)
-        self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
+        self.costbases = CostBasis2.objects.get_activities_with_acb(self.request.user, self.symbol)
+        #self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
         return self.costbases
 
 

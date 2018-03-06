@@ -105,7 +105,7 @@ class UserProfile(models.Model):
 
     def get_capital_gain_summary(self, symbol):
         security = Security.objects.get(symbol=symbol)
-        last = CostBasis2.objects.get_costbasis(self.user, security)
+        last = CostBasis2.objects.get_activities_with_acb(self.user, security)[-1]
         if last.qty_total == 0:
             return {}
         cadprice = security.live_price_cad
@@ -143,15 +143,6 @@ class UserProfile(models.Model):
                 pending_by_security[security] = value - last_acb[security]
 
         return all_years, yearly_data, pending_by_security
-
-    def get_costbasis_by_security_account(self):
-        costbases = CostBasis2.objects.get_all_costbases_by_account(self.user,
-                                                                    self.GetHeldSecurities())
-        from collections import defaultdict
-        by_security_account = defaultdict(dict)
-        for basis in costbases:
-            by_security_account[basis.security_id][basis.account_id] = basis
-        return by_security_account
 
     def GetInceptionDate(self):
         return self.GetActivities().earliest().trade_date
