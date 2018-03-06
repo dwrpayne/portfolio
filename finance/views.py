@@ -245,7 +245,8 @@ class CapGainsReport(LoginRequiredMixin, TemplateView):
         for i, year in enumerate(self.years):
             self.total_gains.append(sum(gains[i] for gains in self.yearly_gains.values()))
         self.total_pending = sum(self.pending_by_security.values())
-        self.summary_by_security = {security: request.user.userprofile.get_capital_gain_summary(security)
+        self.summary_by_security = {security: request.user.userprofile.get_capital_gain_summary(security,
+                                            CostBasis.objects.get_activities_with_acb(self.request.user, security))
                                     for security, pending_gain in self.pending_by_security.items()}
         return super().get(self, request, *args, **kwargs)
 

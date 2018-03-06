@@ -71,7 +71,7 @@
                 },
                 beforeShowDay: function (date) {
                     if (activedates[date] && (date.getTime() != new Date('{{ view.get_day }}').getTime())) {
-                        return [true, "date-highlight", 'Activities'];
+                        return [true, "date-highlight", 'Activities on this day'];
                     }
                     else {
                         return [true, '', ''];

@@ -61,7 +61,8 @@ class PandasDataSource(DataSourceMixin):
 
     @classmethod
     def create_stock(cls, symbol):
-        return cls.objects.create(symbol=symbol, source='google', column='Close')
+        obj, _ = cls.objects.get_or_create(symbol=symbol, source='google', column='Close')
+        return obj
 
     def __str__(self):
         return "Pandas {} for {} ({})".format(self.source, self.symbol, self.priority)

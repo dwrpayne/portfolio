@@ -159,10 +159,10 @@ class Security(models.Model):
     def set_default_datasources(self):
         objs = []
         if self.type == self.Type.Stock:
-            obj, created = AlphaVantageStockSource.objects.get_or_create(symbol=self.symbol,
+            obj, _ = AlphaVantageStockSource.objects.get_or_create(symbol=self.symbol,
                                                                          priority=AlphaVantageStockSource.PRIORITY_REALTIME)
             objs.append(obj)
-            obj, created = PandasDataSource.create_stock(self.symbol)
+            obj, _ = PandasDataSource.objects.get_or_create(symbol=self.symbol, source='google', column='Close')
             objs.append(obj)
 
         elif type == self.Type.Cash:
