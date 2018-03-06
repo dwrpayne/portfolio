@@ -9,7 +9,7 @@ from django.db.models.functions import ExtractYear
 
 from securities.models import Security
 from utils.misc import xirr, total_return
-from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis, CostBasis2
+from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis2
 
 
 class UserProfile(models.Model):
@@ -57,10 +57,6 @@ class UserProfile(models.Model):
         if only_taxable:
             activities = activities.taxable()
         return activities
-
-    def RegenerateCostBasis(self):
-        CostBasis.objects.for_user(self.user).delete()
-        CostBasis.objects.create_from_activities(self.GetActivities(True))
 
     def GetCommissionByYear(self):
         return dict(self.GetActivities().annotate(

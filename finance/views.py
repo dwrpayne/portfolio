@@ -25,7 +25,7 @@ from securities.models import Security
 from utils.misc import partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm, AllocationForm, AllocationFormSet
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis, CostBasis2
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis2
 from .services import RefreshButtonHandlerMixin, check_for_missing_securities
 from .tasks import HandleCsvUpload
 

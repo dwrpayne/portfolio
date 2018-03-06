@@ -104,7 +104,6 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
             for raw in self.rawactivities.all():
                 raw.CreateActivity()
         self.RegenerateHoldings()
-        self.user.userprofile.RegenerateCostBasis()
 
     def RegenerateHoldings(self):
         self.holding_set.all().delete()
