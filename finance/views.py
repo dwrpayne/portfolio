@@ -25,7 +25,7 @@ from securities.models import Security
 from utils.misc import partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
 from .forms import UserForm, AllocationForm, AllocationFormSet
-from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis2
+from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis
 from .services import RefreshButtonHandlerMixin, check_for_missing_securities
 from .tasks import HandleCsvUpload
 
@@ -214,14 +214,14 @@ class FeedbackView(FormView):
 
 class CapGainsSecurityReport(LoginRequiredMixin, ListView):
 
-    model = CostBasis2
+    model = CostBasis
     template_name = 'finance/capgainsdetail.html'
     context_object_name = 'costbases'
 
     def get_queryset(self):
         self.symbol = self.kwargs.get('pk')
         self.summary = self.request.user.userprofile.get_capital_gain_summary(self.symbol)
-        self.costbases = CostBasis2.objects.get_activities_with_acb(self.request.user, self.symbol)
+        self.costbases = CostBasis.objects.get_activities_with_acb(self.request.user, self.symbol)
         #self.costbases = super().get_queryset().for_security(self.symbol).for_user(self.request.user)
         return self.costbases
 

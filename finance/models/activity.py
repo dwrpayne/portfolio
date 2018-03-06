@@ -281,7 +281,7 @@ class Activity(models.Model):
         return effects
 
 
-class CostBasis2Manager(models.Manager):
+class CostBasisManager(models.Manager):
     def _finalize(self, queryset, separate_by_account=False):
         groupby_fn = lambda a: a.security_id
         if separate_by_account:
@@ -290,7 +290,7 @@ class CostBasis2Manager(models.Manager):
 
         for security, activities in groupby(queryset, groupby_fn):
             if security:
-                prev_costbasis = CostBasis2.create_null()
+                prev_costbasis = CostBasis.create_null()
                 for act in activities:
                     act.post_initialize(prev_costbasis)
                     prev_costbasis = act
@@ -310,8 +310,8 @@ class CostBasis2Manager(models.Manager):
         return self._finalize(self.get_queryset().for_user(user).taxable())
 
 
-class CostBasis2(Activity):
-    objects = CostBasis2Manager.from_queryset(ActivityQuerySet)()
+class CostBasis(Activity):
+    objects = CostBasisManager.from_queryset(ActivityQuerySet)()
 
     class Meta:
         ordering = ['security', 'trade_date']
@@ -322,7 +322,7 @@ class CostBasis2(Activity):
         return "{} shares of {}, book value {:.2f}".format(self.qty_total, self.security_id, self.acb_total)
 
     def __repr__(self):
-        return "CostBasis2<{},{},{:.2f}".format(self.qty_total, self.security_id, self.acb_total)
+        return "CostBasis<{},{},{:.2f}".format(self.qty_total, self.security_id, self.acb_total)
 
     @classmethod
     def create_null(cls):

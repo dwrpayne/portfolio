@@ -9,7 +9,7 @@ from django.db.models.functions import ExtractYear
 
 from securities.models import Security
 from utils.misc import xirr, total_return
-from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis2
+from . import Holding, HoldingDetail, BaseAccount, Activity, CostBasis
 
 
 class UserProfile(models.Model):
@@ -101,7 +101,7 @@ class UserProfile(models.Model):
 
     def get_capital_gain_summary(self, symbol):
         security = Security.objects.get(symbol=symbol)
-        last = CostBasis2.objects.get_activities_with_acb(self.user, security)[-1]
+        last = CostBasis.objects.get_activities_with_acb(self.user, security)[-1]
         if last.qty_total == 0:
             return {}
         cadprice = security.live_price_cad
@@ -125,7 +125,7 @@ class UserProfile(models.Model):
         year_offset = all_years[0]
         last_acb = {}
 
-        costbases = CostBasis2.objects.get_capgains_table(self.user)
+        costbases = CostBasis.objects.get_capgains_table(self.user)
         for (sec, year), yearly_bases in groupby(costbases,
                                                  lambda c: (c.security_id, c.trade_date.year)):
             for cb in yearly_bases:
