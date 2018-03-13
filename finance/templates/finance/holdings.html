@@ -7,7 +7,7 @@
             <tr>
                 <th></th>
                 <th style="width:90px">Symbol</th>
-                <th>Price</th>
+                <th class="text-right">Price</th>
                 <th class="text-right">Change</th>
                 <th class="text-right">Shares</th>
                 <th class="text-right">Today's Gain (C$)</th>
@@ -20,7 +20,7 @@
             <tr>
                 <td></td>
                 <td>Total</td>
-                <td></td>
+                <td class="text-right"></td>
                 <td class="text-right"></td>
                 <td class="text-right"></td>
                 <td class="text-right">{{total.value_delta | currency | colorize}}
@@ -42,7 +42,7 @@
                     <td><img src="{% static "flags/"|add:holding_detail.security.currency|lower|add:".png" %}">
                         <a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a>
                     </td>
-                    <td>{{holding_detail.price | floatformat:2}}</td>
+                    <td class="text-right">{{holding_detail.price | floatformat:2}}</td>
                     <td class="text-right">{{holding_detail.price_delta | floatformat:2 | prefix_plusminus | colorize}}
                         {{holding_detail.price_percent_delta | percentage | parens | colorize}}
                     </td>
