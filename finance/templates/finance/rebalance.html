@@ -38,9 +38,9 @@
             </thead>
             <tbody>
                 {% for allocform in formset %}
-                    {{ allocform.id }}
-                    {% with alloc=allocform.instance %}
-                        <tr class="alloc-row-{{ alloc.id }}">
+                    <tr>
+                        {{ allocform.id }}
+                        {% with alloc=allocform.instance %}
                             <td id="{{ alloc.id }}" class="droptarget"
                                 ondrop="drop(event)" ondragover="allowDrop(event)">
                                 {% for security in alloc.securities.all %}
@@ -52,8 +52,8 @@
                             <td>{{allocform.desired_pct}}</td>
                             {% include "finance/rebalance_allocdata.html" %}
                             <td>{{allocform.DELETE}}</td>
-                        </tr>
-                    {% endwith %}
+                        {% endwith %}
+                    </tr>
                 {% endfor %}
                 {% if leftover %}
                     <tr>
