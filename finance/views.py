@@ -425,14 +425,9 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     total_holdings.book_value = sum(getattr(a, 'book_value', 0) for a in account_data)
     total_holdings.total_value_gain = total_holdings.value - total_holdings.book_value
 
-    recent_activities = userprofile.GetActivities().after(
-                            datetime.date.today() - datetime.timedelta(days=90)
-                        ).select_related('account')
-
     context = {'holding_data': holding_data,
                'cash_data': cash_data,
-               'total': total_holdings,
-               'activities': recent_activities}
+               'total': total_holdings}
 
     accounts = {h.account for h in holdingdetails}
 
@@ -469,6 +464,9 @@ class PortfolioView(LoginRequiredMixin, HighChartMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(GetHoldingsContext(self.request.user.userprofile))
+        context['activities'] = self.request.user.userprofile.GetActivities().after(
+                            datetime.date.today() - datetime.timedelta(days=90)
+                        ).select_related('account')
         return context
 
 
