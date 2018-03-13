@@ -119,7 +119,9 @@ class Security(models.Model):
     mutualfunds = MutualFundSecurityManager().from_queryset(SecurityQuerySet)()
 
     def __str__(self):
-        return "{}".format(self.symbol)
+        if self.type == self.Type.Option:
+            return str(Option(symbol=self.symbol))
+        return self.symbol
 
     def __repr(self):
         return "Security({} ({}) {})".format(self.symbol, self.currency, self.description)
@@ -266,6 +268,13 @@ class Security(models.Model):
 class Option(Security):
     class Meta:
         proxy = True
+
+    def __str__(self):
+        return "{self.underlying} {d:%b} {d.day} {self.strike:.0f} {type}".format(
+            self=self, d=self.expiry, type='Call' if self.is_call else 'Put')
+
+    def __repr__(self):
+        return self.symbol
 
     @cached_property
     def underlying(self):

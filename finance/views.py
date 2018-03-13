@@ -410,12 +410,13 @@ def GetHoldingsContext(userprofile, as_of_date=None):
                 h.book_value += account_datum.book_value
             except StopIteration:
                 continue
+        h.account_data.sort(key=lambda d:d.value, reverse=True)
         if h.book_value:
             h.total_value_gain = h.value - h.book_value
         holding_data.append(h)
 
     # Sort by currency first, then symbol. Keep cash at the end (currency = '')
-    holding_data = sorted(holding_data, key=lambda h: (h.security.currency or 'ZZZ', h.security.symbol))
+    holding_data = sorted(holding_data, key=lambda h: (h.security.currency, h.value), reverse=True)
     cash_types = Security.cash.values_list('symbol', flat=True)
     holding_data, cash_data = partition(lambda h: h.security.symbol in cash_types, holding_data)
 
