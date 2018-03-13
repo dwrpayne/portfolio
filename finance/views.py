@@ -13,6 +13,7 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
+from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView
@@ -339,6 +340,24 @@ class RebalanceView(LoginRequiredMixin, FormView):
                                  total))
 
         return context
+
+    def get(self, request, *args, **kwargs):
+        if request.is_ajax():
+            from .models import Allocation
+            source_alloc = request.GET['source_alloc']
+            security = request.GET['security']
+            target_alloc = request.GET['target_alloc']
+            Allocation.objects.move_security(security, source_alloc, target_alloc)
+
+            html = ''
+            allocs, _ = self.get_filled_allocations()
+            for alloc in allocs:
+                if alloc.id in [int(source_alloc), int(target_alloc)]:
+                    html += render_to_string('finance/rebalance_allocdata.html', {'alloc': alloc})
+            return HttpResponse(html)
+
+
+        return super().get(request, *args, **kwargs)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

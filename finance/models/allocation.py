@@ -12,6 +12,15 @@ class AllocationManager(models.Manager):
         held = user.userprofile.GetHeldSecurities().exclude(symbol__in=allocated)
         return held
 
+    def move_security(self, security, source, target):
+        source_alloc = Allocation.objects.get(pk=source)
+        target_alloc = Allocation.objects.get(pk=target)
+        if not security in source_alloc.securities.values_list('symbol', flat=True):
+            return
+
+        source_alloc.securities.remove(security)
+        target_alloc.securities.add(security)
+
 
 class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,

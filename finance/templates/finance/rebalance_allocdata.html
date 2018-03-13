@@ -1,0 +1,5 @@
+{% load mytags %}
+<td id="{{ alloc.id }}-current_pct">{{alloc.current_pct | floatformat:1}}%</td>
+<td id="{{ alloc.id }}-desired_amt">{{alloc.desired_amt | currencyround}}</td>
+<td id="{{ alloc.id }}-current_amt">{{alloc.current_amt | currencyround}}</td>
+<td id="{{ alloc.id }}-buysell">{{alloc.buysell | currencyround | colorize}}</td>

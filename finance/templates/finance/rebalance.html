@@ -2,6 +2,21 @@
 {% load mytags %}
 {% load static %}
 {% block title %}Rebalancing Table{% endblock title %}
+
+{% block head_css_page %}
+    <style>
+    span.draggable {
+        border: 1px solid #aaaaaa;
+        border-radius: 5px;
+        padding: 5px;
+    }
+
+    .droptarget {
+    }
+
+</style>
+{% endblock %}
+
 {% block content %}  
 <br /><br />
 <div class="row">
@@ -9,7 +24,7 @@
     <form action="" method="post">
         {% csrf_token %}
         {{ formset.management_form }}
-        <table class="table table-striped table-hover" id="rebalance-table">
+        <table class="display striped hover" id="rebalance-table">
             <thead>
                 <tr>
                     <th>Symbols</th>
@@ -24,15 +39,21 @@
             <tbody>
                 {% for allocform in formset %}
                     {{ allocform.id }}
-                <tr>
-                    <td>{{allocform.instance.list_securities}}</td>
-                    <td>{{allocform.desired_pct}}</td>
-                    <td>{{allocform.instance.current_pct | floatformat:1}}%</td>
-                    <td>{{allocform.instance.desired_amt | currencyround}}</td>
-                    <td>{{allocform.instance.current_amt | currencyround}}</td>
-                    <td>{{allocform.instance.buysell | currencyround | colorize}}</td>
-                    <td>{{allocform.DELETE}}</td>
-                </tr>
+                    {% with alloc=allocform.instance %}
+                        <tr class="alloc-row-{{ alloc.id }}">
+                            <td id="{{ alloc.id }}" class="droptarget"
+                                ondrop="drop(event)" ondragover="allowDrop(event)">
+                                {% for security in alloc.securities.all %}
+                                    <span class="draggable" id="{{ security.symbol }}" draggable="true"
+                                         ondragstart="drag(event)">
+                                        {{ security }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>{{allocform.desired_pct}}</td>
+                            {% include "finance/rebalance_allocdata.html" %}
+                            <td>{{allocform.DELETE}}</td>
+                        </tr>
+                    {% endwith %}
                 {% endfor %}
                 {% if leftover %}
                     <tr>
@@ -72,3 +93,63 @@
     </div>
 </div>
 {% endblock content %}
+
+{% block footer_javascript_page %}
+    <script>
+    $(document).ready(function () {
+        $('#rebalance-table').DataTable({
+            columns: [
+                {data: 'Symbols'},
+                {data: 'Desired_P'},
+                {data: 'Current_P'},
+                {data: 'Desired_D'},
+                {data: 'Current_D'},
+                {data: 'BuySell'},
+                {data: 'Delete'},
+            ],
+            order: [[1, 'desc']],
+            paging: false,
+            searching: false,
+        });
+    });
+
+    function allowDrop(ev) {
+        ev.preventDefault();
+    }
+
+    function drag(ev) {
+        ev.dataTransfer.setData("source_alloc", ev.target.parentElement.id);
+        ev.dataTransfer.setData("security", ev.target.id);
+        ev.dataTransfer.setData("dragtag", ev.target.id);
+    }
+
+    function drop(ev) {
+        ev.preventDefault();
+        var data = ev.dataTransfer.getData("dragtag");
+        ev.target.appendChild(document.getElementById(data));
+
+        $.ajax({
+            url: window.location.pathname,
+            data: {
+                source_alloc: ev.dataTransfer.getData("source_alloc"),
+                security: ev.dataTransfer.getData("security"),
+                target_alloc: ev.target.id
+            },
+            context: this,
+            success: function (data) {
+                $.each($.parseHTML(data), function(i, elem) {
+                    if (elem.nodeName == "TD") {
+                        cell = document.getElementById(elem.id);
+                        $(cell).html($(elem).html());
+                    }
+                });
+            },
+            error: function (data) {
+                alert("Couldn't modify allocation!\n" + data["responseText"]);
+            },
+            complete: function (jqXHR, textStatus) {
+            }
+        });
+    }
+</script>
+{% endblock %}
