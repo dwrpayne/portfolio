@@ -420,11 +420,16 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     cash_types = Security.cash.values_list('symbol', flat=True)
     holding_data, cash_data = partition(lambda h: h.security.symbol in cash_types, holding_data)
 
+
+    total_holdings = sum(account_data)
+    total_holdings.book_value = sum(getattr(a, 'book_value', 0) for a in account_data)
+    total_holdings.total_value_gain = total_holdings.value - total_holdings.book_value
+
     context = {'holding_data': holding_data,
                'cash_data': cash_data,
-               'total': sum(account_data)}
-    context['total'].book_value = sum(getattr(a, 'book_value', 0) for a in account_data)
-    context['total'].total_value_gain = context['total'].value - context['total'].book_value
+               'total': total_holdings,
+               'activities': userprofile.GetActivities().after(datetime.date.today() - datetime.timedelta(days=90))
+               }
 
     accounts = {h.account for h in holdingdetails}
 

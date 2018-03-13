@@ -10,10 +10,10 @@
                 <th>Price</th>
                 <th class="text-right">Change</th>
                 <th class="text-right">Shares</th>
-                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Today's Gain</th>
-                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Cost Basis</th>
-                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Mkt Value</th>
-                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Gain</th>
+                <th class="text-right">Today's Gain (C$)</th>
+                <th class="text-right">Cost Basis (C$)</th>
+                <th class="text-right">Mkt Value (C$)</th>
+                <th class="text-right">Gain (C$)</th>
             </tr>
         </thead>
         <tfoot>
@@ -36,7 +36,7 @@
                 <tr>
                     <td>
                         <div data-toggle="collapse" href="#holdings-table-child-{{forloop.counter}}">
-                            <i class="far fa-caret-square-down"></i>
+                            <i class="fas fa-plus"></i>
                         </div>
                     </td>
                     <td><img src="{% static "flags/"|add:holding_detail.security.currency|lower|add:".png" %}">
@@ -63,7 +63,7 @@
                 {% for account in holding_detail.account_data %}
                     <tr >
                         <td></td>
-                        <td colspan="3">{{account.account}}</td>
+                        <td colspan="2">{{account.account}}</td>
                         <td class="text-right"></td>
                         <td class="text-right">{{account.qty | floatformat:0}}
                             {% if account.qty_delta %}
@@ -85,7 +85,7 @@
                 <tr>
                     <td>
                         <div data-toggle="collapse" data-target="#holdings-table-child-{{forloop.counter|add:"1000"}}" >
-                            <i class="far fa-caret-square-down"></i>
+                            <i class="fas fa-plus"></i>
                         </div>
                     </td>
                     <td>
@@ -95,10 +95,12 @@
                     {% if holding_detail.price != 1 %}
                         {% with today_inv=1|div:holding_detail.price yesterday=holding_detail.price|sub:holding_detail.price_delta %}
                         {% with yesterday_inv=1|div:yesterday %}
-                            <td class="text-right" colspan="2" data-toggle="tooltip"
-                                 title="{{ holding_detail.price | floatformat:6}}">
-                                {{ today_inv | floatformat:6}}
-                                {{ today_inv|sub:yesterday_inv | floatformat:6 | prefix_plusminus | colorize}}
+                            <td class="text-right" data-toggle="tooltip"
+                                 title="{{ today_inv | floatformat:6}} / {{ holding_detail.price | floatformat:6}}">
+                                {{ today_inv | floatformat:4}}
+                            </td>
+                            <td class="text-right">
+                                {{ today_inv|sub:yesterday_inv | floatformat:4 | prefix_plusminus | colorize}}
                                 {{ 0 | sub:holding_detail.price_percent_delta | percentage | parens | colorize}}
                             </td>
                         {% endwith %}
@@ -106,8 +108,9 @@
 
                     {% else %}
                         <td></td>
-                        <td class="text-right"></td>
+                        <td></td>
                     {% endif %}
+                    <td class="text-right"></td>
                     <td class="text-right"></td>
                     <td class="text-right">{{holding_detail.value_delta | currency | colorize}}</td>
                     <td class="text-right"></td>

@@ -8,8 +8,25 @@
         <div class="col-sm-7">{% include "finance/holdings.html" %}</div>
         <div class="col-sm-5" id="{{ view.growthchart.container_name }}"></div>
     </div>
+
+    <br><br>
+    <div class="row">
+        <div class="col-sm-12">
+            <h2 align="center">Transactions in the last 3 months</h2>
+            {% include "finance/activity_table.html" with show_date=True show_account=True show_security=True %}
+        </div>
+    </div>
+
 {% endblock content %}
 {% block footer_javascript_page %}
     {% include "highcharts.html" %}
     {{ view.growthchart.get_javascript | safe}}
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('#activities-table').DataTable({
+                "order": [[0, "desc"]],
+            });
+        });
+    </script>
 {% endblock footer_javascript_page %}
