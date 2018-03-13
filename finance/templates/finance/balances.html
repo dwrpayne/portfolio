@@ -4,26 +4,26 @@
         <thead>           
             <tr>
                 <th>Account</th>
-                <th>Current</th>
-                <th>Cash</th>
-                <th>Change</th>
+                <th class="text-right">Current</th>
+                <th class="text-right">Cash</th>
+                <th class="text-right">Change</th>
             </tr>
         </thead>
         <tfoot>
             <tr>
                 <td>Total</td>
-                <td>{{account_total.cur_balance | currencyround}}</td>
-                <td>{{account_total.cur_cash_balance | currencyround}}</td>
-                <td>{{account_total.today_balance_change | currency | colorize}}</td>
+                <td class="text-right">{{account_total.cur_balance | currencyround}}</td>
+                <td class="text-right">{{account_total.cur_cash_balance | currencyround}}</td>
+                <td class="text-right">{{account_total.today_balance_change | currency | colorize}}</td>
             </tr>
         </tfoot>
         <tbody>
         {% for account_name, balances in accounts.items %}
             <tr>
                 <td><a href="{% url 'finance:accountdetail' balances.id %}">{{account_name}}</a></td>
-                <td>{{balances.cur_balance | currencyround}}</td>
-                <td>{{balances.cur_cash_balance | currencyround}}</td>
-                <td>{{balances.today_balance_change | currency | colorize}}</td>
+                <td class="text-right">{{balances.cur_balance | currencyround}}</td>
+                <td class="text-right">{{balances.cur_cash_balance | currencyround}}</td>
+                <td class="text-right">{{balances.today_balance_change | currency | colorize}}</td>
             </tr>
         {% endfor %}
         </tbody>

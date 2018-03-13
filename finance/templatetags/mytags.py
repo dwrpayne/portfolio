@@ -31,19 +31,17 @@ def colorize(amount):
 
 
 @register.filter()
-def currency(dollars, decimals=2):
+def currency(dollars, symbol=''):
     if dollars == '' or dollars is None:
         return ''
-    prefix = "" if dollars > -0.004 else "-"
-    return '{}${:,.{}f}'.format(prefix, abs(dollars), decimals)
+    return '{}{}${:,.2f}'.format('-' if dollars < -0.004 else '', symbol, abs(dollars))
 
 
 @register.filter()
-def currencyround(dollars):
+def currencyround(dollars, symbol=''):
     if dollars == '' or dollars is None:
         return ''
-    prefix = '' if dollars > -0.004 else '-'
-    return '{}${:,d}'.format(prefix, abs(round(dollars)))
+    return '{}{}${:,d}'.format('-' if dollars < -0.004 else '', symbol, abs(round(dollars)))
 
 
 @register.filter()
@@ -54,6 +52,7 @@ def percentage(amount, decimals=2):
 
 
 @register.filter()
+@stringfilter
 def prefix_plusminus(num):
     if not num or float(num) < 0:
         return num
