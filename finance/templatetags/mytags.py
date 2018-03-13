@@ -52,6 +52,11 @@ def percentage(amount, decimals=2):
 
 
 @register.filter()
+def inverse(num):
+    return 1 / num
+
+
+@register.filter()
 @stringfilter
 def prefix_plusminus(num):
     if not num or float(num) < 0:

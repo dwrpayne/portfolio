@@ -1,25 +1,25 @@
 {% load mytags %}
+{% load mathfilters %}
+{% load static %}
 <div id="holdings">
     <table class="table table-hover table-responsive table-sm" id="holdings-table">
         <thead>
             <tr>
                 <th></th>
-                <th style="width:50px">Symbol</th>
-                <th>Currency</th>
+                <th style="width:90px">Symbol</th>
                 <th>Price</th>
                 <th class="text-right">Change</th>
                 <th class="text-right">Shares</th>
-                <th class="text-right">Today's Gain</th>
-                <th class="text-right">Cost Basis</th>
-                <th class="text-right">Mkt Value</th>
-                <th class="text-right">Gain</th>
+                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Today's Gain</th>
+                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Cost Basis</th>
+                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Mkt Value</th>
+                <th class="text-right" data-toggle="tooltip" title="Converted to Canadian dollars">Gain</th>
             </tr>
         </thead>
         <tfoot>
             <tr>
                 <td></td>
                 <td>Total</td>
-                <td></td>
                 <td></td>
                 <td class="text-right"></td>
                 <td class="text-right"></td>
@@ -39,10 +39,11 @@
                             <i class="far fa-caret-square-down"></i>
                         </div>
                     </td>
-                    <td><a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a></td>
-                    <td>{{ holding_detail.security.currency }}</td>
+                    <td><img src="{% static "flags/"|add:holding_detail.security.currency|lower|add:".png" %}">
+                        <a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a>
+                    </td>
                     <td>{{holding_detail.price | floatformat:2}}</td>
-                    <td class="text-right">{{holding_detail.price_delta | floatformat:2 | colorize}}
+                    <td class="text-right">{{holding_detail.price_delta | floatformat:2 | prefix_plusminus | colorize}}
                         {{holding_detail.price_percent_delta | percentage | parens | colorize}}
                     </td>
                     <td class="text-right">{{holding_detail.qty | floatformat:0}}
@@ -87,10 +88,26 @@
                             <i class="far fa-caret-square-down"></i>
                         </div>
                     </td>
-                    <td>Cash</td>
-                    <td>{{holding_detail.security}}</td>
-                    <td></td>
-                    <td class="text-right"></td>
+                    <td>
+                        <img src="{% static "flags/"|add:holding_detail.security.symbol|lower|add:".png" %}">
+                        Cash
+                    </td>
+                    {% if holding_detail.price != 1 %}
+                        {% with today_inv=1|div:holding_detail.price yesterday=holding_detail.price|sub:holding_detail.price_delta %}
+                        {% with yesterday_inv=1|div:yesterday %}
+                            <td class="text-right" colspan="2" data-toggle="tooltip"
+                                 title="{{ holding_detail.price | floatformat:6}}">
+                                {{ today_inv | floatformat:6}}
+                                {{ today_inv|sub:yesterday_inv | floatformat:6 | prefix_plusminus | colorize}}
+                                {{ 0 | sub:holding_detail.price_percent_delta | percentage | parens | colorize}}
+                            </td>
+                        {% endwith %}
+                        {% endwith %}
+
+                    {% else %}
+                        <td></td>
+                        <td class="text-right"></td>
+                    {% endif %}
                     <td class="text-right"></td>
                     <td class="text-right">{{holding_detail.value_delta | currency | colorize}}</td>
                     <td class="text-right"></td>

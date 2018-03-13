@@ -32,6 +32,7 @@ django-fernet-fields = "*"
 python-highcharts = {git = "https://github.com/dwrpayne/python-highcharts.git", ref = "master"}
 ratelimit = "*"
 django-redis = "*"
+django-mathfilters = "*"
 
 
 [dev-packages]

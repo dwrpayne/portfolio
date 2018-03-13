@@ -3,17 +3,13 @@
 {% load static %}
 {% block title %} {{ request.user.username }} {% endblock title %}
 {% block content %}
+    <br>
     <div class="row">
-        <div class="col-sm-9">{% include "finance/holdings.html" %}</div>
-        <div class="col-sm-3">{% include "finance/balances.html" %}</div>
-    </div>
-    <div class="row">
-        <div class="col-sm-6" id="{{ view.growthchart.container_name }}"></div>
-        <div class="col-sm-6" id="{{ view.dailychangechart.container_name }}"></div>
+        <div class="col-sm-7">{% include "finance/holdings.html" %}</div>
+        <div class="col-sm-5" id="{{ view.growthchart.container_name }}"></div>
     </div>
 {% endblock content %}
 {% block footer_javascript_page %}
     {% include "highcharts.html" %}
     {{ view.growthchart.get_javascript | safe}}
-    {{ view.dailychangechart.get_javascript | safe}}
 {% endblock footer_javascript_page %}

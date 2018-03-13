@@ -39,8 +39,6 @@ class GrowthChart(BaseHighChart):
             },
             chart: {
                 renderTo: "$container_name",
-                width: 700,
-                height: 500,
                 type: 'line',
                zoomType: 'x'
             },

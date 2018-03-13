@@ -54,6 +54,7 @@ PREREQ_APPS = [
     'django_celery_results',
     'django_celery_beat',
     'hijack',
+    'mathfilters',
 ]
 
 INSTALLED_APPS = PROJECT_APPS + PREREQ_APPS
