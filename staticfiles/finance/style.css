@@ -2,14 +2,6 @@
     font-weight: bold;
 }
 
-.body {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: 100px 1fr 50px;
-    grid-template-areas: "navbar" "content" "footer";
-
-}
-
 button[type=submit]:disabled {
     background-image:url(/static/img/syncing2.gif);
     background-position: center center;
@@ -20,4 +12,45 @@ button[type=submit]:disabled {
 
 .highcharts-series path {
      stroke-linecap: initial;
+}
+
+
+.bg-success {
+  background-color: #aff86f !important;
+}
+
+a.bg-success:hover, a.bg-success:focus,
+button.bg-success:hover,
+button.bg-success:focus {
+  background-color: #9fe169 !important;
+}
+
+.bg-info {
+  background-color: #50e7e9 !important;
+}
+
+a.bg-info:hover, a.bg-info:focus,
+button.bg-info:hover,
+button.bg-info:focus {
+  background-color: #4cccce !important;
+}
+
+.bg-warning {
+  background-color: #f5d313 !important;
+}
+
+a.bg-warning:hover, a.bg-warning:focus,
+button.bg-warning:hover,
+button.bg-warning:focus {
+  background-color: #d8b713 !important;
+}
+
+.bg-danger {
+  background-color: #e48031 !important;
+}
+
+a.bg-danger:hover, a.bg-danger:focus,
+button.bg-danger:hover,
+button.bg-danger:focus {
+  background-color: #bf652d !important;
 }

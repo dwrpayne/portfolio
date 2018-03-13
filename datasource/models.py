@@ -74,9 +74,12 @@ class PandasDataSource(DataSourceMixin):
         import warnings
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', category=UnstableAPIWarning, lineno=40)
-            df = pdr.DataReader(self.symbol, self.source, start, end)
+            try:
+                df = pdr.DataReader(self.symbol, self.source, start, end)
+            except:
+                return pandas.Series()
         if df.empty:
-            return []
+            return pandas.Series()
         return pandas.Series(df[self.column], df.index)
 
 
@@ -97,7 +100,7 @@ class AlphaVantageStockSource(DataSourceMixin):
 
         for symbol in possible_symbols:
             self.symbol = symbol
-            if self._Retrieve(date.today() - timedelta(days=7), date.today()):
+            if not self._Retrieve(date.today() - timedelta(days=7), date.today()).empty:
                 return
         self.symbol = 'NO VALID LOOKUP FOR {}'.format(original_symbol)
 

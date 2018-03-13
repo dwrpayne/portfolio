@@ -107,12 +107,15 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
     def get_queryset(self):
         securities = self.model.objects.all().prefetch_related('activities', 'prices', 'datasources').order_by('-type', 'symbol')
         for s in securities:
-            s.earliest_have = s.prices.earliest().day
-            s.latest_price = s.prices.latest()
-            s.latest_have = s.latest_price.day
-            s.need_sync_earlier = (s.earliest_have >= s.earliest_price_needed)
-            s.need_sync_later = (s.latest_have < s.latest_price_needed)
-            s.current_price = s.latest_price.price
+            try:
+                s.earliest_have = s.prices.earliest().day
+                s.latest_price = s.prices.latest()
+                s.latest_have = s.latest_price.day
+                s.need_sync_earlier = (s.earliest_have >= s.earliest_price_needed)
+                s.need_sync_later = (s.latest_have < s.latest_price_needed)
+                s.current_price = s.latest_price.price
+            except:
+                pass
         return securities
 
 
@@ -427,8 +430,10 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     accounts = {
         a.display_name: {
             'id': a.id,
-            'cur_balance': sum(h.value for h in holdingdetails if h.account == a and h.day == as_of_date),
-            'cur_cash_balance': sum(h.value for h in holdingdetails if h.account == a and h.security.symbol in cash_types),
+            'cur_balance': sum(h.value for h in holdingdetails
+                               if h.account == a and h.day == as_of_date),
+            'cur_cash_balance': sum(h.value for h in holdingdetails
+                                    if h.account == a and h.day == as_of_date and h.security.symbol in cash_types),
             'today_balance_change': sum(h.value for h in holdingdetails if h.account == a and h.day == as_of_date) - \
                                     sum(h.value for h in holdingdetails if h.account == a and h.day < as_of_date)
         }

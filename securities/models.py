@@ -178,9 +178,9 @@ class Security(models.Model):
     def get_datasource_list(self):
         return ', '.join(map(str,self.datasources.all()))
 
-    def set_datasources(self, datasource):
+    def set_datasources(self, datasources):
         self.datasources.clear()
-        self.datasources.add(datasource)
+        self.datasources.add(*datasources)
         self.save()
 
     def add_datasource(self, datasource):
