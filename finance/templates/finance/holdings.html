@@ -62,9 +62,7 @@
                 {% for account in holding_detail.account_data %}
                     <tr >
                         <td></td>
-                        <td>{{account.account}}</td>
-                        <td></td>
-                        <td></td>
+                        <td colspan="3">{{account.account}}</td>
                         <td class="text-right"></td>
                         <td class="text-right">{{account.qty | floatformat:0}}
                             {% if account.qty_delta %}
@@ -104,9 +102,7 @@
                 {% for account in holding_detail.account_data %}
                     <tr>
                         <td></td>
-                        <td>{{account.account}}</td>
-                        <td></td>
-                        <td></td>
+                        <td colspan="3">{{account.account}}</td>
                         <td class="text-right"></td>
                         <td class="text-right"></td>
                         <td class="text-right">{{account.value_delta | currency | colorize}}</td>
