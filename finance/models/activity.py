@@ -283,6 +283,12 @@ class Activity(models.Model):
 
 class CostBasisManager(models.Manager):
     def _finalize(self, queryset, separate_by_account=False):
+        """
+        Creates CostBasis objects from a QuerySet of Activities. Internal only.
+        :param queryset: An Activity QuerySet.
+        :param separate_by_account: Calculate each account's Cost Basis separately.
+        :return: A QuerySet of CostBasis models.
+        """
         groupby_fn = lambda a: a.security_id
         if separate_by_account:
             queryset = queryset.order_by('security', 'account', 'trade_date')
@@ -304,13 +310,34 @@ class CostBasisManager(models.Manager):
         return super().get_queryset().transactions().with_exchange_rates()
 
     def get_activities_with_acb(self, user, security):
+        """
+        Retrieves a QuerySet of filled out CostBasis models for a single security in this user's taxable accounts.
+        """
         return list(self._finalize(self.get_queryset().for_user(user).taxable().for_security(security)))
 
     def get_capgains_table(self, user):
+        """
+        Retrieves a QuerySet of filled out CostBasis models for this users taxable accounts.
+        """
         return self._finalize(self.get_queryset().for_user(user).taxable())
 
 
 class CostBasis(Activity):
+    """
+    A proxy model of Activity with the following extra fields. Create them from an
+    Activity QuerySet across all taxable accounts.
+    This model only makes sense when created using the manager utility functions.
+
+    exch: Exchange rate to CAD on the trade_date.
+    cad_commission: Commission, in CAD.
+    cad_price_per_share: Price per share in this transaction, in CAD.
+    qty_total: Total # of shares held of this security, post-transaction.
+    total_cad_value: Total value of all shares held, post-transaction, in CAD.
+    acb_total: Total ACB of this security, post-transaction, in CAD.
+    acb_per_share: ACB per share, post-transaction, in CAD.
+    capital_gain: Total unrealized capital gain of this security, post-transaction, in CAD.
+    acb_change: The effect this transaction had on the total ACB, in CAD.
+    """
     objects = CostBasisManager.from_queryset(ActivityQuerySet)()
 
     class Meta:
@@ -319,10 +346,10 @@ class CostBasis(Activity):
         proxy = True
 
     def __str__(self):
-        return "{} shares of {}, book value {:.2f}".format(self.qty_total, self.security_id, self.acb_total)
+        return "On {}, {} shares of {}, book value {:.2f}".format(self.trade_date, self.qty_total, self.security_id, self.acb_total)
 
     def __repr__(self):
-        return "CostBasis<{},{},{:.2f}".format(self.qty_total, self.security_id, self.acb_total)
+        return "CostBasis<{},{},{},{:.2f}".format(self.trade_date, self.qty_total, self.security_id, self.acb_total)
 
     @classmethod
     def create_null(cls):

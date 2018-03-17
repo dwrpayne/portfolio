@@ -9,7 +9,7 @@
         </div>
         <div class="row">
             <ul>
-                <li>This is a year-by-year summary of all the capital gains and losses you have realised in taxable
+                <li>This is a year-by-year summary of all the capital gains and losses you have ever realised in taxable
                     accounts.
                 </li>
                 <li>All numbers are converted to Canadian dollars.</li>
@@ -18,9 +18,11 @@
                 <li>The "Profit/Loss" column indicates the potential gain or loss if you were to sell your entire
                     holding right now.
                 </li>
-                <li>The "Gain Percentage" column is calculated as (Pending Gain / Market Value).
+                <li>The "Gain Percentage" column is the percentage of your holding that is taxable profit.
                     <ul>
-                        <li>If you need to liquidate some cash, and want to minimize your capital gain, sell the stocks
+                        <li>ie, a Gain Percentage of 25% means that if you sold $100 of shares, you would have a capital gain of $25.
+                        </li>
+                        <li>If you need to liquidate some cash and want to minimize your capital gain, sell the stocks
                             with the lowest "Gain Percentage".
                         </li>
                     </ul>
@@ -28,51 +30,69 @@
             </ul>
         </div>
         <div class="row">
-            <div class="col-sm-12">
+            <div class="col-sm-6">
+                <h2>Unrealized Gains and Losses</h2>
                 <table class="table table-hover table-bordered text-center">
-                    <colgroup>
-                        <col></col>
-                        <col span="{{ view.total_gains | length }}" class="bg-success"></col>
-                        <col span="1" class="bg-danger"></col>
-                        <col span="3"></col>
-                    </colgroup>
                     <thead>
-                    <tr>
-                        <th class="text-center">Security</th>
-                        {% for year in view.years %}
-                            <th class="text-center">{{ year }}</th>
-                        {% endfor %}
-                        <th class="text-center">Profit/Loss</th>
-                        <th class="text-center">Shares</th>
-                        <th class="text-center">Market Value</th>
-                        <th class="text-center">Gain Percentage</th>
-                    </tr>
+                        <tr>
+                            <th class="text-left">Security</th>
+                            <th class="text-right">Book Value</th>
+                            <th class="text-right">Market Value</th>
+                            <th class="text-right">Unrealized Gain/Loss</th>
+                            <th class="text-right">Gain %</th>
+                        </tr>
                     </thead>
                     <tfoot>
-                    <tr>
-                        <td>Total</td>
-                        {% for value in view.total_gains %}
-                            <td>{% if value %}{{ value | currency }}{% endif %}</td>
-                        {% endfor %}
-                        <td>{{ view.total_pending | currency }}</td>
-                        <td></td>
-                        <td></td>
-                        <td></td>
-                    </tr>
+                        <tr>
+                            <td class="text-left">Total</td>
+                            <td class="text-right"></td>
+                            <td class="text-right"></td>
+                            <td class="text-right">{{ view.total_pending | currency }}</td>
+                            <td class="text-right"></td>
+                        </tr>
                     </tfoot>
                     <tbody>
                     {% for security, yearly_values in view.yearly_gains.items %}
                         <tr>
-                            <td><a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a></td>
-                            {% for value in yearly_values %}
-                                <td>{% if value %}{{ value | currency }}{% endif %}</td>
-                            {% endfor %}
-                            <td>{{ view.pending_by_security | lookup:security | currency }}</td>
+                            <td class="text-left"><a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a></td>
                             {% with summary=view.summary_by_security|lookup:security %}
-                                <td>{{ summary.qty | floatformat:-2 }}</td>
-                                <td>{{ summary.total_value | currency }}</td>
-                                <td>{{ summary.percent_gains | percentage }}</td>
+                                <td class="text-right">{{ summary.book_value | currency }}</td>
+                                <td class="text-right">{{ summary.total_value | currency }}</td>
+                                <td class="text-right">{{ view.pending_by_security | lookup:security | currency }}</td>
+                                <td class="text-right">{{ summary.percent_gains | percentage }}</td>
                             {% endwith %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="col-sm-6">
+                <h2>Realized Gains and Losses</h2>
+                <table class="table table-hover table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th class="text-left">Security</th>
+                            {% for year in view.years reversed %}
+                                <th class="text-right">{{ year }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tfoot>
+                        <tr>
+                            <td class="text-left">Total</td>
+                            {% for value in view.total_gains reversed %}
+                                <td class="text-right">{% if value %}{{ value | currency }}{% endif %}</td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                    <tbody>
+                    {% for security, yearly_values in view.yearly_gains.items %}
+                        <tr>
+                            <td class="text-left"><a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a></td>
+                            {% for value in yearly_values reversed %}
+                                <td class="text-right">{% if value %}{{ value | currency }}{% endif %}</td>
+                            {% endfor %}
+
                         </tr>
                     {% endfor %}
                     </tbody>

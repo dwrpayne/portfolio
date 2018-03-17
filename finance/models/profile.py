@@ -109,6 +109,7 @@ class UserProfile(models.Model):
                 'acb_per_share': last.acb_per_share,
                 'pending_gain': pending_gain,
                 'pending_gain_per_share': pending_gain / last.qty_total,
+                'book_value': total_value - pending_gain,
                 'total_value': total_value,
                 'percent_gains': pending_gain / total_value if total_value else 0,
                 }
