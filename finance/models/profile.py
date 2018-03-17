@@ -26,7 +26,7 @@ class UserProfile(models.Model):
         return sum(self.GetHoldingDetails().today()).value
 
     def GetHeldSecurities(self):
-        return Security.objects.filter(pk__in=self.GetCurrentHoldings().values_list('security'))
+        return Security.objects.filter(pk__in=self.GetCurrentHoldings().values_list('security')).order_by('-type', 'symbol')
 
     def GetCurrentHoldings(self):
         return Holding.objects.for_user(self.user).current()
