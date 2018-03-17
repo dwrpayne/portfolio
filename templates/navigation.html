@@ -58,12 +58,12 @@
                     {% endfor %}
                 </div>
             </li>
+        </ul>
+        <ul class="navbar-nav ml-auto">
 
             <li class="nav-item {% navactive request 'finance:feedback' %}">
                 <a class="nav-link" href="{% url 'finance:feedback' %}">Feedback</a>
             </li>
-        </ul>
-        <ul class="navbar-nav ml-auto">
 
             {% if user.is_staff %}
                 <li class="nav-item dropdown {% navactive request 'finance:status' %}">
