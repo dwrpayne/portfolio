@@ -307,7 +307,7 @@ class SecurityPrice(models.Model):
     security = models.ForeignKey(Security, on_delete=models.CASCADE, related_name='prices')
     day = models.DateField(default=datetime.date.today)
     price = models.DecimalField(max_digits=19, decimal_places=6)
-    priority = models.IntegerField()
+    priority = models.IntegerField(default=0)
 
     objects = SecurityPriceQuerySet.as_manager()
 
