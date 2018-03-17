@@ -249,6 +249,12 @@ class QuestradeClient(models.Model):
         print("Get activities from source returned: " + dumps(json))
         return json
 
+    @api_response('executions')
+    def GetTodayExecutions(self, account_id):
+        json = self._GetRequest('accounts/{}/executions'.format(account_id))
+        print("Get today's executions from source returned: " + dumps(json))
+        return json
+
     def SyncAccounts(self):
         for account_json in self.GetAccounts():
             QuestradeAccount.objects.get_or_create(

@@ -5,27 +5,45 @@
 
 {% block head_css_page %}
     <style>
-    span.draggable {
-        border: 1px solid #aaaaaa;
-        border-radius: 5px;
-        padding: 5px;
-    }
+        .security {
+            border: 1px solid #aaaaaa;
+            border-radius: 5px;
+            margin: 5px;
+            padding: 5px;
+            transition-duration: 0.3s;
+            transition-property: background-color;
+        }
 
-    .droptarget {
-    }
+        .security:hover {
+            background: #afafaf;
+            color: #dddddd;
+        }
 
-</style>
+        .allocation {
+            border: 2px solid #aaaaaa;
+            margin: 5px;
+            padding: 5px;
+        }
+
+        .allocation.validtarget {
+            border-color: #50e7e9;
+            background: #dddddd;
+        }
+
+        .allocations.draghover {
+            outline: none;
+            box-shadow: 0 0 0 1px #fff, 0 0 0 3px #68b;
+        }
+
+    </style>
 {% endblock %}
 
-{% block content %}  
-<br /><br />
-<div class="row">
-    <div class="col-sm-9">
-    <form action="" method="post">
-        {% csrf_token %}
-        {{ formset.management_form }}
-        <table class="display striped hover" id="rebalance-table">
-            <thead>
+{% block content %}
+    <br/><br/>
+    <div class="row">
+        <div class="col-sm-9">
+            <table class="display striped hover" id="rebalance-table">
+                <thead>
                 <tr>
                     <th>Symbols</th>
                     <th>Desired %</th>
@@ -33,123 +51,117 @@
                     <th>Desired $</th>
                     <th>Current $</th>
                     <th><font color="green">Buy</font>/<font color="red">Sell</font></th>
-                    <th>Delete</th>
                 </tr>
-            </thead>
-            <tbody>
-                {% for allocform in formset %}
+                </thead>
+                <tbody>
+                {% for alloc in allocs %}
                     <tr>
-                        {{ allocform.id }}
-                        {% with alloc=allocform.instance %}
-                            <td id="{{ alloc.id }}" class="droptarget"
-                                ondrop="drop(event)" ondragover="allowDrop(event)">
-                                {% for security in alloc.securities.all %}
-                                    <span class="draggable" id="{{ security.symbol }}" draggable="true"
-                                         ondragstart="drag(event)">
-                                        {{ security }}</span>
-                                {% endfor %}
-                            </td>
-                            <td>{{allocform.desired_pct}}</td>
-                            {% include "finance/rebalance_allocdata.html" %}
-                            <td>{{allocform.DELETE}}</td>
-                        {% endwith %}
+                        <td id="{{ alloc.id }}" class="allocation">
+                            {% for security in alloc.securities.all %}
+                                <span class="security" id="{{ security.symbol }}">
+                                {{ security }}
+                            </span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <input type="number" value="{{alloc.desired_pct}}" min="0" max="100" width="40" step="0.1" id="{{ alloc.id }}-desired_pct" />
+                        </td>
+                        <td id="{{ alloc.id }}-current_pct">{{alloc.current_pct | floatformat:1}}%</td>
+                        <td id="{{ alloc.id }}-desired_amt">{{alloc.desired_amt | currencyround}}</td>
+                        <td id="{{ alloc.id }}-current_amt">{{alloc.current_amt | currencyround}}</td>
+                        <td id="{{ alloc.id }}-buysell">{{alloc.buysell | currencyround | colorize}}</td>
                     </tr>
                 {% endfor %}
                 {% if leftover %}
-                    <tr>
-                        <td>{{leftover.list_securities}}</td>
-                        <td>{{leftover.desired_pct | floatformat:1}}% (Inferred)</td>
-                        <td>{{leftover.current_pct | floatformat:1}}%</td>
-                        <td>{{leftover.desired_amt | currencyround}}</td>
-                        <td>{{leftover.current_amt | currencyround}}</td>
-                        <td>{{leftover.buysell | currencyround | colorize}}</td>
-                        <td></td>
+                    <tr id="row-{{ alloc.leftover }}">
+                        <td class="allocation">
+                            {% for security in leftover.securities %}
+                                <span class="security" id="{{ security.symbol }}">
+                                    {{ security }}
+                                </span>
+                            {% endfor %}
+                        </td>
+                        <td>{{ leftover.desired_pct | floatformat:1 }}% (Inferred)</td>
+                        <td>{{ leftover.current_pct | floatformat:1 }}%</td>
+                        <td>{{ leftover.desired_amt | currencyround }}</td>
+                        <td>{{ leftover.current_amt | currencyround }}</td>
+                        <td>{{ leftover.buysell | currencyround | colorize }}</td>
                     </tr>
-               {% endif %}
-            </tbody>
-        </table>
-        <input type="submit" name="formset-modify" value="Modify allocations" />
-    </form>
-    {% if leftover %}
-        <br><br>
-            <b>You have not specified an allocation percentage for the following securities you hold. You can set a target allocation for a group of securities.</b><br>
-            <b>You have {{ unassigned_pct }}% remaining to assign.</b>
-        <form action="" method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <input type="submit" name="form-add" value="Add new allocation" />
-        </form>
-    {% endif %}
+                {% endif %}
+                <tr>
+                    <td class="allocation" id="new"></td>
+                    <td>New</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                </tbody>
+            </table>
 
-    </div>
-    <div class="col-sm-2">
-        <div class="form-group">
-            <form action="" id="date-submit-form" method="get">
-                <label for="cashadd">Additional cash to invest:</label>
-                <input type="number" class="form-control" required id="cashadd" name="cashadd" placeholder="{{ cashadd }}">
-                <button type="submit">Submit</button>
-            </form>
+        </div>
+        <div class="col-sm-2">
+            <div class="form-group">
+                <form action="" id="date-submit-form" method="get">
+                    <label for="cashadd">Additional cash to invest:</label>
+                    <input type="number" class="form-control" required id="cashadd" name="cashadd"
+                           placeholder="{{ cashadd }}">
+                    <button type="submit">Submit</button>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 {% endblock content %}
 
 {% block footer_javascript_page %}
     <script>
-    $(document).ready(function () {
-        $('#rebalance-table').DataTable({
-            columns: [
-                {data: 'Symbols'},
-                {data: 'Desired_P'},
-                {data: 'Current_P'},
-                {data: 'Desired_D'},
-                {data: 'Current_D'},
-                {data: 'BuySell'},
-                {data: 'Delete'},
-            ],
-            order: [[1, 'desc']],
-            paging: false,
-            searching: false,
+        var table;
+        $(document).ready(function () {
+            table = $('#rebalance-table').DataTable({
+                columns: [
+                    {data: 'Symbols'},
+                    {data: 'Desired_P'},
+                    {data: 'Current_P'},
+                    {data: 'Desired_D'},
+                    {data: 'Current_D'},
+                    {data: 'BuySell'},
+                ],
+                order: [[1, 'desc']],
+                paging: false,
+                searching: false,
+            });
         });
-    });
 
-    function allowDrop(ev) {
-        ev.preventDefault();
-    }
-
-    function drag(ev) {
-        ev.dataTransfer.setData("source_alloc", ev.target.parentElement.id);
-        ev.dataTransfer.setData("security", ev.target.id);
-        ev.dataTransfer.setData("dragtag", ev.target.id);
-    }
-
-    function drop(ev) {
-        ev.preventDefault();
-        var data = ev.dataTransfer.getData("dragtag");
-        ev.target.appendChild(document.getElementById(data));
-
-        $.ajax({
-            url: window.location.pathname,
-            data: {
-                source_alloc: ev.dataTransfer.getData("source_alloc"),
-                security: ev.dataTransfer.getData("security"),
-                target_alloc: ev.target.id
-            },
-            context: this,
-            success: function (data) {
-                $.each($.parseHTML(data), function(i, elem) {
-                    if (elem.nodeName == "TD") {
-                        cell = document.getElementById(elem.id);
-                        $(cell).html($(elem).html());
-                    }
-                });
-            },
-            error: function (data) {
-                alert("Couldn't modify allocation!\n" + data["responseText"]);
-            },
-            complete: function (jqXHR, textStatus) {
-            }
+        $(function () {
+            $(".allocation").sortable({
+                connectWith: ".allocation",
+                receive: function (event, ui) {
+                    $.ajax({
+                        url: window.location.pathname,
+                        data: {
+                            source_alloc: ui.sender.attr('id'),
+                            security: ui.item.attr('id'),
+                            target_alloc: event.target.id
+                        },
+                        context: this,
+                        success: function (data) {
+                            $.each($.parseHTML(data), function (i, elem) {
+                                if (elem.nodeName == "TD") {
+                                    table.row.remove()
+                                    cell = document.getElementById(elem.id);
+                                    $(cell).html($(elem).html());
+                                }
+                            });
+                        },
+                        error: function (data) {
+                            alert("Couldn't modify allocation!\n" + data["responseText"]);
+                        },
+                        complete: function (jqXHR, textStatus) {
+                        }
+                    });
+                }
+            }).disableSelection();
         });
-    }
-</script>
+
+    </script>
 {% endblock %}

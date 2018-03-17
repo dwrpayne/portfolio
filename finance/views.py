@@ -344,16 +344,24 @@ class RebalanceView(LoginRequiredMixin, FormView):
     def get(self, request, *args, **kwargs):
         if request.is_ajax():
             from .models import Allocation
-            source_alloc = request.GET['source_alloc']
+            source_alloc = request.GET.get('source_alloc', '')
             security = request.GET['security']
             target_alloc = request.GET['target_alloc']
-            Allocation.objects.move_security(security, source_alloc, target_alloc)
+
+            if not source_alloc and target_alloc == 'new':
+                alloc = Allocation.objects.create(user=request.user)
+                alloc.securities.add(security)
+                target_alloc = alloc.id
+            else:
+                Allocation.objects.move_security(security, source_alloc, target_alloc)
 
             html = ''
-            allocs, _ = self.get_filled_allocations()
+            allocs, leftover = self.get_filled_allocations()
             for alloc in allocs:
                 if alloc.id in [int(source_alloc), int(target_alloc)]:
                     html += render_to_string('finance/rebalance_allocdata.html', {'alloc': alloc})
+            if not source_alloc:
+                html += render_to_string('finance/rebalance_allocdata.html', {'alloc': leftover})
             return HttpResponse(html)
 
 

@@ -26,7 +26,7 @@ class Allocation(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL,
                              on_delete=models.CASCADE, related_name='allocations')
     securities = models.ManyToManyField(Security)
-    desired_pct = models.DecimalField(max_digits=4, decimal_places=1)
+    desired_pct = models.DecimalField(max_digits=4, decimal_places=1, default=0)
 
     objects = AllocationManager()
 

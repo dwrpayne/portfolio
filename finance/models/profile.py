@@ -153,7 +153,7 @@ class UserProfile(models.Model):
         allocs = self.user.allocations.all().order_by('-desired_pct')
         leftover = {'desired_pct': 100, 'current_pct': 100, 'current_amt': total_value,
                     'desired_amt': 0, 'buysell': 0,
-                    'list_securities': ', '.join(map(str, self.user.allocations.get_unallocated_securities()))}
+                    'securities': self.user.allocations.get_unallocated_securities()}
         for alloc in allocs:
             holdingsum = sum(holdings.for_securities(alloc.securities.all()))
             alloc.current_amt = holdingsum.value if holdingsum else 0
@@ -170,7 +170,7 @@ class UserProfile(models.Model):
             leftover['desired_amt'] += alloc.desired_amt
             leftover['buysell'] += alloc.buysell
 
-        if not leftover['list_securities']:
+        if not leftover['securities']:
             leftover = None
 
         return allocs, leftover
