@@ -5,13 +5,16 @@ when you run "manage.py test".
 Replace this with more appropriate tests for your application.
 """
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 from .urls import urlpatterns
 
 from datetime import date, timedelta
+from decimal import Decimal
 from .models import HoldingDetail, BaseAccount
 from securities.models import Security, SecurityPriceDetail
+
+from .templatetags import mytags
 
 
 def setUpModule():
@@ -214,8 +217,71 @@ class HoldingChangeTestCase(TestCase):
         self.assertEqual(total_change.value_delta, change.value_delta+change2.value_delta+change3.value_delta)
 
 
+class TemplateTagTestCase(SimpleTestCase):
+    def test_normalize_1(self):
+        self.assertEqual(mytags.normalize(Decimal('1.35'), 0, 2), '1.35')
+
+    def test_normalize_2(self):
+        self.assertEqual(mytags.normalize(Decimal('1.36'), 0, 1), '1.4')
+
+    def test_normalize_3(self):
+        self.assertEqual(mytags.normalize(Decimal('1.3'), 2, 4), '1.30')
+
+    def test_normalize_4(self):
+        self.assertEqual(mytags.normalize('1.23456', 2, 4), '1.2346')
+
+    def test_normalize_5(self):
+        self.assertEqual(mytags.normalize('1.23456', 0, 2), '1.23')
+
+    def test_normalize_6(self):
+        self.assertEqual(mytags.normalize(Decimal('1'), 0, 2), '1')
+
+    def test_normalize_7(self):
+        self.assertEqual(mytags.normalize(Decimal('0.01'), 0, 1), '0')
+
+    def test_normalize_8(self):
+        self.assertEqual(mytags.normalize(Decimal('12.1'), 0, 0), '12')
+
+    def test_normalize_9(self):
+        self.assertEqual(mytags.normalize(1.2, 4, 6), '1.2000')
+
+    def test_drop_trailing_1(self):
+        self.assertEqual(mytags.drop_trailing(Decimal('1.35'), 2), '1.35')
+
+    def test_drop_trailing_2(self):
+        self.assertEqual(mytags.drop_trailing(Decimal('1.36'), 1), '1.36')
+
+    def test_drop_trailing_3(self):
+        self.assertEqual(mytags.drop_trailing(Decimal('1.3'), 2), '1.30')
+
+    def test_drop_trailing_4(self):
+        self.assertEqual(mytags.drop_trailing('1.23456', 4), '1.23456')
+
+    def test_drop_trailing_5(self):
+        self.assertEqual(mytags.drop_trailing('1.23400', 4), '1.2340')
+
+    def test_drop_trailing_6(self):
+        self.assertEqual(mytags.drop_trailing(Decimal('1'), 0), '1')
+
+    def test_drop_trailing_7(self):
+        self.assertEqual(mytags.drop_trailing(Decimal('1.000'), 1), '1.0')
+
+    def test_drop_trailing_8(self):
+        self.assertEqual(mytags.drop_trailing(Decimal('1.000'), 0), '1')
+
+    def test_drop_trailing_9(self):
+        self.assertEqual(mytags.drop_trailing(40, 2), '40.00')
+
+    def test_drop_trailing_10(self):
+        self.assertEqual(mytags.drop_trailing(40, 0), '40')
+
+    def test_drop_trailing_11(self):
+        self.assertEqual(mytags.drop_trailing(4000, 0), '4000')
+
+
 class UrlTestCase(TestCase):
     def test_responses(self):
-        for url in urlpatterns:
-            response = self.client.get(reverse('finance:' + url.name))
-            self.assertEqual(response.status_code, 200)
+        for i, url in enumerate(urlpatterns):
+            with self.subTest(i=i):
+                response = self.client.get(reverse('finance:' + url.name))
+                self.assertEqual(response.status_code, 200)

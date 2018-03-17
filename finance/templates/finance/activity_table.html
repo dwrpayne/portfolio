@@ -33,7 +33,7 @@
                 <td>{{activity.account.display_name}}</td>
             {% endif %}
             <td>{{activity.cash_id}}</td>
-            <td>{{activity.qty | floatformat:-2}}</td>
+            <td>{{activity.qty | floatformat:-4}}</td>
             <td>{{activity.price | currency}}</td>
             <td>{{activity.net_amount | currency}}</td>
             <td>{{activity.description}}</td>

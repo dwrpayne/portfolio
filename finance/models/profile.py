@@ -139,14 +139,13 @@ class UserProfile(models.Model):
 
     def GetRebalanceInfo(self, cashadd=0):
         holdings = self.GetHoldingDetails().today().select_related('account', 'security')
-        total_value = sum(holdings).value + cashadd
+        total_value = sum(h.value for h in holdings) + cashadd
         allocs = self.user.allocations.all().order_by('-desired_pct')
         leftover = {'desired_pct': 100, 'current_pct': 100, 'current_amt': total_value,
                     'desired_amt': 0, 'buysell': 0,
                     'securities': self.user.allocations.get_unallocated_securities()}
         for alloc in allocs:
-            holdingsum = sum(holdings.for_securities(alloc.securities.all()))
-            alloc.current_amt = holdingsum.value if holdingsum else 0
+            alloc.current_amt = sum(h.value for h in holdings.for_securities(alloc.securities.all()))
             if alloc.securities.filter(symbol='CAD'):
                 alloc.current_amt += cashadd
 

@@ -58,14 +58,14 @@
                             <td>Total</td>
                             <td></td>
                             {% ifnotequal costbases.0.cash_id "CAD" %}
-                                <td>{{ view.summary.price | floatformat:-4 }}</td>
-                                <td>{{ view.summary.exchange | floatformat:-4 }}</td>
+                                <td>{{ view.summary.price | floatformat:2}}</td>
+                                <td>{{ view.summary.exchange | floatformat:4 }}</td>
                             {% endifnotequal %}
-                            <td>{{ view.summary.cadprice | floatformat:-4 }}</td>
+                            <td>{% normalize view.summary.cadprice 2 4 %}</td>
                             <td></td>
                             <td></td>
                             <td>Pending: {{ view.summary.pending_gain | currency }}</td>
-                            <td>{{ view.summary.qty | floatformat:-2 }}</td>
+                            <td>{{ view.summary.qty | floatformat:-4 }}</td>
                             <td>{{ view.summary.acb | currency }}</td>
                             <td>{{ view.summary.acb_per_share | currency }}</td>
                         </tr>
@@ -76,16 +76,16 @@
                         <tr {% if costbasis.capital_gain %}style="font-weight:bold"{% endif %}>
                             <td>{{ costbasis.trade_date }}</td>
                             <td>{{ costbasis.type }}</td>
-                            <td>{{ costbasis.qty | floatformat:0 }}</td>
+                            <td>{{ costbasis.qty | floatformat:-4 }}</td>
                             {% ifnotequal costbases.0.cash_id "CAD" %}
-                                <td>{{ costbasis.price | floatformat:-4 }}</td>
-                                <td>{{ costbasis.exch | floatformat:-4 }}</td>
+                                <td>{{ costbasis.price | floatformat:2 }}</td>
+                                <td>{{ costbasis.exch | floatformat:4 }}</td>
                             {% endifnotequal %}
-                            <td>{{ costbasis.cad_price_per_share | floatformat:-4 }}</td>
+                            <td>{% normalize costbasis.cad_price_per_share 2 4 %}</td>
                             <td>{{ costbasis.cad_commission | currency }}</td>
                             <td>{{ costbasis.total_cad_value | currency }}</td>
                             <td>{% if costbasis.capital_gain %}{{ costbasis.capital_gain | currency }}{% endif %}</td>
-                            <td>{{ costbasis.qty_total | floatformat:-2 }}</td>
+                            <td>{{ costbasis.qty_total | floatformat:-4 }}</td>
                             <td>{{ costbasis.acb_total | currency }}</td>
                             <td>{{ costbasis.acb_per_share | currency }}</td>
                         </tr>
