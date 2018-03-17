@@ -46,9 +46,9 @@
                     <td class="text-right">{{holding_detail.price_delta | floatformat:2 | prefix_plusminus | colorize}}
                         {{holding_detail.price_percent_delta | percentage | parens | colorize}}
                     </td>
-                    <td class="text-right">{{holding_detail.qty | floatformat:0}}
+                    <td class="text-right">{{holding_detail.qty | floatformat:-2}}
                         {% if holding_detail.qty_delta %}
-                            {{holding_detail.qty_delta | floatformat:0 | prefix_plusminus | parens}}
+                            {{holding_detail.qty_delta | floatformat:-2 | prefix_plusminus | parens}}
                         {% endif %}
                     </td>
                     <td class="text-right">{{holding_detail.value_delta | currency | colorize}}
@@ -65,9 +65,9 @@
                         <td></td>
                         <td colspan="2">{{account.account}}</td>
                         <td class="text-right"></td>
-                        <td class="text-right">{{account.qty | floatformat:0}}
+                        <td class="text-right">{{account.qty | floatformat:-2}}
                             {% if account.qty_delta %}
-                                {{account.qty_delta | floatformat:0 | prefix_plusminus | parens}}
+                                {{account.qty_delta | floatformat:-2 | prefix_plusminus | parens}}
                             {% endif %}
                         </td>
                         <td class="text-right">{{account.value_delta | currency | colorize}}

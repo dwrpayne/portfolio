@@ -32,25 +32,15 @@ class UserProfile(models.Model):
         return Holding.objects.for_user(self.user).current()
 
     def GetCapGainsSecurities(self):
-        only_taxable_accounts = True
-        query = Holding.objects.exclude(security__type=Security.Type.Cash
-                                        ).for_user(self.user).values_list('security_id', flat=True).distinct().order_by(
-            'security__symbol')
-        if only_taxable_accounts:
-            query = query.filter(account__taxable=True)
-        return query
+        return Holding.objects.for_user(self.user).exclude(security__type=Security.Type.Cash
+                    ).values_list('security_id', flat=True).distinct().order_by('security__symbol'
+                    ).filter(account__taxable=True)
 
     def GetHoldingDetails(self):
         return HoldingDetail.objects.for_user(self.user)
 
-    def GetTaxableHoldingDetails(self):
-        return self.GetHoldingDetails().taxable()
-
     def GetAccounts(self):
         return BaseAccount.objects.for_user(self.user)
-
-    def GetAccount(self, account_id):
-        return self.GetAccounts().get(id=account_id)
 
     def GetActivities(self, only_taxable=False):
         activities = Activity.objects.for_user(self.user)
@@ -138,7 +128,7 @@ class UserProfile(models.Model):
                     last_acb[sec] = cb.acb_total
 
         pending_by_security = {}
-        for security, value in self.GetTaxableHoldingDetails().today_security_values():
+        for security, value in self.GetHoldingDetails().taxable().today_security_values():
             if security in last_acb:
                 pending_by_security[security] = value - last_acb[security]
 

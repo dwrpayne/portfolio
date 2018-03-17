@@ -6,6 +6,9 @@ Replace this with more appropriate tests for your application.
 """
 
 from django.test import TestCase
+from django.urls import reverse
+from .urls import urlpatterns
+
 from datetime import date, timedelta
 from .models import HoldingDetail, BaseAccount
 from securities.models import Security, SecurityPriceDetail
@@ -209,3 +212,10 @@ class HoldingChangeTestCase(TestCase):
 
         self.assertEqual(total_change.value, change.value+change2.value+change3.value)
         self.assertEqual(total_change.value_delta, change.value_delta+change2.value_delta+change3.value_delta)
+
+
+class UrlTestCase(TestCase):
+    def test_responses(self):
+        for url in urlpatterns:
+            response = self.client.get(reverse('finance:' + url.name))
+            self.assertEqual(response.status_code, 200)

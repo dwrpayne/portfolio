@@ -5,22 +5,14 @@
             aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
     </button>
-<div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
 
             <li class="nav-item {% navactive request 'finance:portfolio' %}">
                 <a class="nav-link" href="{% url 'finance:portfolio' %}">Portfolio</a>
             </li>
-
-            <li class="nav-item dropdown {% navactive request 'finance:history' %}
-                        {% navactive request 'finance:snapshot' %}">
-                <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">History</a>
-                <div class="dropdown-menu">
-                    <a class="dropdown-item" href="{% url 'finance:history' period='year' %}">Year-end Values</a>
-                    <a class="dropdown-item" href="{% url 'finance:history' period='month' %}">Month-end Values</a>
-                    <a class="dropdown-item" href="{% url 'finance:history' period='day' %}">Daily Values</a>
-                    <a class="dropdown-item" href="{% url 'finance:snapshot' %}">Portfolio Glimpse</a>
-                </div>
+            <li class="nav-item {% navactive request 'finance:snapshot' %}">
+                <a class="nav-link" href="{% url 'finance:snapshot' %}">History</a>
             </li>
 
             <li class="nav-item {% navactive request 'finance:rebalance' %}">
@@ -49,9 +41,13 @@
                 </div>
             </li>
 
-            <li class="nav-item dropdown {% navactive request 'finance:accountdetail' %}">
+            <li class="nav-item dropdown {% navactive request 'finance:history' %}
+                                        {% navactive request 'finance:accountdetail' %}">
                 <a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">Account Details</a>
                 <div class="dropdown-menu">
+                    <a class="dropdown-item" href="{% url 'finance:history' period='year' %}">Year-end Values</a>
+                    <a class="dropdown-item" href="{% url 'finance:history' period='month' %}">Month-end Values</a>
+                    <a class="dropdown-item" href="{% url 'finance:history' period='day' %}">Daily Values</a>
                     {% for account in request.user.userprofile.GetAccounts %}
                         <a class="dropdown-item"
                            href="{% url 'finance:accountdetail' account.pk %}">{{ account.display_name }}</a>
@@ -106,5 +102,5 @@
                 <a class="nav-link" href="{% url 'login' %}">Login</a>
             {% endif %}
         </ul>
-</div>
+    </div>
 </nav>
