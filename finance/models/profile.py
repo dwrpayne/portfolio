@@ -1,5 +1,4 @@
 import datetime
-from itertools import groupby
 
 import pendulum
 from django.conf import settings
@@ -148,13 +147,7 @@ class UserProfile(models.Model):
                     'desired_amt': 0, 'buysell': 0,
                     'securities': self.user.allocations.get_unallocated_securities()}
         for alloc in allocs:
-            alloc.current_amt = sum(h.value for h in holdings.for_securities(alloc.securities.all()))
-            if alloc.securities.filter(symbol='CAD'):
-                alloc.current_amt += cashadd
-
-            alloc.current_pct = alloc.current_amt / total_value * 100
-            alloc.desired_amt = alloc.desired_pct * total_value / 100
-            alloc.buysell = alloc.desired_amt - alloc.current_amt
+            alloc.fill_allocation(cashadd, holdings, total_value)
 
             leftover['desired_pct'] -= alloc.desired_pct
             leftover['current_pct'] -= alloc.current_pct

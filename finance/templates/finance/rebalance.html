@@ -55,25 +55,22 @@
                 </thead>
                 <tbody>
                 {% for alloc in allocs %}
-                    <tr>
+                    <tr id="row-{{ alloc.id }}">
                         <td id="{{ alloc.id }}" class="allocation">
                             {% for security in alloc.securities.all %}
                                 <span class="security" id="{{ security.symbol }}">
-                                {{ security }}
-                            </span>
-                            {% endfor %}
+                                    {{ security }}
+                                </span>                            {% endfor %}
                         </td>
-                        <td>
-                            <input type="number" value="{{alloc.desired_pct}}" min="0" max="100" width="40" step="0.1" id="{{ alloc.id }}-desired_pct" />
-                        </td>
-                        <td id="{{ alloc.id }}-current_pct">{{alloc.current_pct | floatformat:1}}%</td>
-                        <td id="{{ alloc.id }}-desired_amt">{{alloc.desired_amt | currencyround}}</td>
-                        <td id="{{ alloc.id }}-current_amt">{{alloc.current_amt | currencyround}}</td>
-                        <td id="{{ alloc.id }}-buysell">{{alloc.buysell | currencyround | colorize}}</td>
+                        <td id="{{ alloc.id }}-desired_pct">{{ alloc.desired_pct }}</td>
+                        <td id="{{ alloc.id }}-current_pct">{{ alloc.current_pct }}</td>
+                        <td id="{{ alloc.id }}-desired_amt">{{ alloc.desired_amt }}</td>
+                        <td id="{{ alloc.id }}-current_amt">{{ alloc.current_amt }}</td>
+                        <td id="{{ alloc.id }}-buysell">{{ alloc.buysell }}</td>
                     </tr>
                 {% endfor %}
                 {% if leftover %}
-                    <tr id="row-{{ alloc.leftover }}">
+                    <tr id="row-leftover">
                         <td class="allocation">
                             {% for security in leftover.securities %}
                                 <span class="security" id="{{ security.symbol }}">
@@ -81,25 +78,31 @@
                                 </span>
                             {% endfor %}
                         </td>
-                        <td>{{ leftover.desired_pct | floatformat:1 }}% (Inferred)</td>
-                        <td>{{ leftover.current_pct | floatformat:1 }}%</td>
-                        <td>{{ leftover.desired_amt | currencyround }}</td>
-                        <td>{{ leftover.current_amt | currencyround }}</td>
-                        <td>{{ leftover.buysell | currencyround | colorize }}</td>
+                        <td id="leftover-desired_pct">{{ leftover.desired_pct | floatformat:1 }}% (Inferred)</td>
+                        <td id="leftover-current_pct">{{ leftover.current_pct | floatformat:1 }}%</td>
+                        <td id="leftover-desired_amt">{{ leftover.desired_amt | currencyround }}</td>
+                        <td id="leftover-current_amt">{{ leftover.current_amt | currencyround }}</td>
+                        <td id="leftover-buysell">{{ leftover.buysell | currencyround | colorize }}</td>
                     </tr>
                 {% endif %}
-                <tr>
-                    <td class="allocation" id="new"></td>
-                    <td>New</td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
+                <tr id="row-newrow">
+                    <td class="allocation" id="newrow"></td>
+                    <td id="newrow-desired_pct"></td>
+                    <td id="newrow-current_pct"></td>
+                    <td id="newrow-desired_amt"></td>
+                    <td id="newrow-current_amt"></td>
+                    <td id="newrow-buysell"></td>
                 </tr>
                 </tbody>
             </table>
 
         </div>
+        <div class="col-sm-3">
+            <h3>Insert a pie chart here.</h3>
+        </div>
+
+    </div>
+    <div class="row">
         <div class="col-sm-2">
             <div class="form-group">
                 <form action="" id="date-submit-form" method="get">
@@ -111,20 +114,72 @@
             </div>
         </div>
     </div>
+    {% csrf_token %}
 {% endblock content %}
 
 {% block footer_javascript_page %}
     <script>
+        // CSRF Boilerplate
+        // TODO: Move this to another include somewhere.
+        var csrftoken = jQuery("[name=csrfmiddlewaretoken]").val();
+
+        function csrfSafeMethod(method) {
+            // these HTTP methods do not require CSRF protection
+            return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+        }
+
+        $.ajaxSetup({
+            beforeSend: function (xhr, settings) {
+                if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", csrftoken);
+                }
+            }
+        });
+        // END CSRF Boilerplate
+
         var table;
+        var newrow_template;
+
         $(document).ready(function () {
+            newrow_template = $('#row-newrow').clone();
             table = $('#rebalance-table').DataTable({
                 columns: [
                     {data: 'Symbols'},
-                    {data: 'Desired_P'},
-                    {data: 'Current_P'},
-                    {data: 'Desired_D'},
-                    {data: 'Current_D'},
-                    {data: 'BuySell'},
+                    {
+                        data: 'Desired_P',
+                        render: function (data, type, row) {
+                            num = Math.round(data).toFixed(1);
+                            id = row.DT_RowId.split('-')[1];
+                            return '<input class="desired-pct" type="number" value="' + num +
+                                '" min="0" max="100" width="30" step="0.1" id="' + id + '-desired_pct">';
+                        }
+                    },
+                    {
+                        data: 'Current_P',
+                        render: function (data, type, row) {
+                            return Math.round(data).toFixed(1) + "%";
+                        }
+                    },
+                    {
+                        data: 'Desired_D',
+                        render: function (data, type, row) {
+                            return "$" + Math.round(data).toLocaleString();
+                        }
+                    },
+                    {
+                        data: 'Current_D',
+                        render: function (data, type, row) {
+                            return "$" + Math.round(data).toLocaleString();
+                        }
+                    },
+                    {
+                        data: 'BuySell',
+                        render: function (data, type, row) {
+                            color = data < 0 ? 'green' : 'red';
+                            dollars = Math.round(data).toLocaleString();
+                            return "<font color=" + color + ">" + dollars + "</font>";
+                        }
+                    },
                 ],
                 order: [[1, 'desc']],
                 paging: false,
@@ -132,12 +187,30 @@
             });
         });
 
+        function rename_row_ids(row, oldstr, newstr) {
+            $(row).children().each(function () {
+                var newid = $(this).attr('id').replace(oldstr, newstr);
+                $(this).attr('id', newid);
+            });
+            var newid = $(row).attr('id').replace(oldstr, newstr);
+            $(row).attr('id', newid);
+        };
+
         $(function () {
             $(".allocation").sortable({
                 connectWith: ".allocation",
                 receive: function (event, ui) {
+                    if (event.target.id == "newrow") {
+                        var row = event.target.parentElement;
+                        var newrow = newrow_template.clone();
+                        rename_row_ids(row, "newrow", "updaterow");
+                        table.row.add(newrow);
+                        table.rows("#row-newrow, #row-updaterow").invalidate().draw();
+                        console.log(table.rows().ids());
+                    }
                     $.ajax({
                         url: window.location.pathname,
+                        type: "POST",
                         data: {
                             source_alloc: ui.sender.attr('id'),
                             security: ui.item.attr('id'),
@@ -145,13 +218,22 @@
                         },
                         context: this,
                         success: function (data) {
-                            $.each($.parseHTML(data), function (i, elem) {
-                                if (elem.nodeName == "TD") {
-                                    table.row.remove()
-                                    cell = document.getElementById(elem.id);
-                                    $(cell).html($(elem).html());
-                                }
-                            });
+                            if ("updaterow" in data) {
+                                var row = document.getElementById("row-updaterow");
+                                var new_id = data["updaterow"];
+                                rename_row_ids(row, "updaterow", new_id);
+                                table.row("#row-" + new_id).invalidate("dom");
+                            }
+                            if ("delete-id" in data) {
+                                var id = data["delete-id"];
+                                table.row("#row-" + id).remove();
+                            }
+                            for (id in data["new-cells"]) {
+                                var cell = table.cell('#' + id);
+                                cell.data(data["new-cells"][id]);
+                                cell.invalidate();
+                            }
+                            table.draw();
                         },
                         error: function (data) {
                             alert("Couldn't modify allocation!\n" + data["responseText"]);
@@ -161,6 +243,25 @@
                     });
                 }
             }).disableSelection();
+        });
+
+        $("body").on("change ", "input", function () {
+            $.ajax({
+                url: window.location.pathname,
+                type: "POST",
+                data: {
+                    desired_pct: $(this).val(),
+                    alloc_id: this.id.split('-')[0]
+                },
+                success: function (data) {
+                    for (id in data["new-cells"]) {
+                        var cell = table.cell('#' + id);
+                        cell.data(data["new-cells"][id]);
+                        cell.invalidate();
+                    }
+                    table.draw();
+                }
+            });
         });
 
     </script>

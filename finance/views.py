@@ -10,7 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
 from django.template.loader import render_to_string
@@ -315,9 +315,8 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
         return self.request.user.userprofile.GetActivities().at_date(self.get_day())
 
 
-class RebalanceView(LoginRequiredMixin, FormView):
+class RebalanceView(LoginRequiredMixin, TemplateView):
     template_name = 'finance/rebalance.html'
-    form_class = AllocationForm
 
     def get_filled_allocations(self, cashadd=0):
         return self.request.user.userprofile.GetRebalanceInfo(cashadd)
@@ -327,7 +326,6 @@ class RebalanceView(LoginRequiredMixin, FormView):
         allocs, leftover = self.get_filled_allocations(cashadd)
 
         context = super().get_context_data(**kwargs)
-        context['formset'] = AllocationFormSet(queryset=allocs)
         context['cashadd'] = cashadd
         context.update({'allocs': allocs, 'leftover': leftover})
 
@@ -340,72 +338,58 @@ class RebalanceView(LoginRequiredMixin, FormView):
 
         return context
 
-    def get(self, request, *args, **kwargs):
-        if request.is_ajax():
-            from .models import Allocation
-            source_alloc = request.GET.get('source_alloc', '')
-            security = request.GET['security']
-            target_alloc = request.GET['target_alloc']
+    # TODO: This is super ugly, refactor this
+    @staticmethod
+    def add_to_ret_dict(ret_dict, id, obj):
+        ret_dict.setdefault('new-cells', dict())
+        ret_dict['new-cells']['{}-current_pct'.format(id)] = obj.current_pct
+        ret_dict['new-cells']['{}-desired_amt'.format(id)] = obj.desired_amt
+        ret_dict['new-cells']['{}-current_amt'.format(id)] = obj.current_amt
+        ret_dict['new-cells']['{}-buysell'.format(id)] = obj.buysell
 
-            if not source_alloc and target_alloc == 'new':
-                alloc = Allocation.objects.create(user=request.user)
-                alloc.securities.add(security)
-                target_alloc = alloc.id
-            else:
-                Allocation.objects.move_security(security, source_alloc, target_alloc)
+    def handle_desired_pct_change(self, alloc_id, desired_pct):
+        from .models import Allocation
+        Allocation.objects.filter(pk=alloc_id).update(desired_pct=desired_pct)
+        allocs, leftover = self.get_filled_allocations()
+        alloc = next(a for a in allocs if str(a.id) == alloc_id)
+        ret_dict = {}
+        self.add_to_ret_dict(ret_dict, alloc.id, alloc)
+        return JsonResponse(ret_dict)
 
-            html = ''
-            allocs, leftover = self.get_filled_allocations()
-            for alloc in allocs:
-                if alloc.id in [int(source_alloc), int(target_alloc)]:
-                    html += render_to_string('finance/rebalance_allocdata.html', {'alloc': alloc})
-            if not source_alloc:
-                html += render_to_string('finance/rebalance_allocdata.html', {'alloc': leftover})
-            return HttpResponse(html)
+    def handle_security_move(self, source_alloc, security, target_alloc):
+        from .models import Allocation
+        ret_dict = {}
+        if target_alloc == 'updaterow':
+            alloc = Allocation.objects.create(user=self.request.user)
+            target_alloc = alloc.id
+            ret_dict['updaterow'] = alloc.id
+        source_count = Allocation.objects.move_security(security, source_alloc, target_alloc)
+        if source_count == 0:
+            Allocation.objects.get(pk=source_alloc).delete()
+            ret_dict['delete-id'] = source_alloc
+        allocs, leftover = self.get_filled_allocations()
 
+        for alloc in allocs:
+            if alloc.id in [int(source_alloc), int(target_alloc)]:
+                self.add_to_ret_dict(ret_dict, alloc.id, alloc)
+        if not source_alloc:
+            self.add_to_ret_dict(ret_dict, "leftover", leftover)
+        return JsonResponse(ret_dict)
 
-        return super().get(request, *args, **kwargs)
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        if 'form-add' not in self.request.POST:
-            kwargs['empty_permitted'] = True
-        return kwargs
 
     def post(self, request, *args, **kwargs):
-        if 'form-add' in request.POST:
-            return super().post(request, *args, **kwargs)
-        else:
-            form = AllocationFormSet(self.request.POST)
-            if form.is_valid():
-                return self.formset_valid(form)
+        if request.is_ajax():
+            if 'desired_pct' in request.POST:
+                desired_pct = request.POST['desired_pct']
+                alloc_id = request.POST['alloc_id']
+                return self.handle_desired_pct_change(alloc_id, desired_pct)
             else:
-                return self.form_invalid(form)
+                source_alloc = request.POST.get('source_alloc', '')
+                security = request.POST['security']
+                target_alloc = request.POST['target_alloc']
+                return self.handle_security_move(source_alloc, security, target_alloc)
 
-    def form_invalid(self, form):
-        if 'formset-modify' in self.request.POST:
-            for error in form.non_form_errors():
-                messages.error(self.request, error)
-            for errorlist in form.errors:
-                for error in errorlist:
-                    messages.error(self.request, error)
-        else:
-            for error in form.errors:
-                messages.error(self.request, error)
-
-        return render(self.request, self.template_name, self.get_context_data())
-
-    def formset_valid(self, form):
-        form.save()
-        return render(self.request, self.template_name, self.get_context_data())
-
-    def form_valid(self, form):
-        allocationform = form.save(commit=False)
-        allocationform.user = self.request.user
-        allocationform.save()
-        form.save_m2m()
-        return render(self.request, self.template_name, self.get_context_data())
+        return super().get(request, *args, **kwargs)
 
 
 def GetHoldingsContext(userprofile, as_of_date=None):

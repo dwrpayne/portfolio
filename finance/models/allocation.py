@@ -13,6 +13,13 @@ class AllocationManager(models.Manager):
         return held
 
     def move_security(self, security, source, target):
+        """
+        Moves a security from one allocation to another. If not present in source, does nothing.
+        :param security: The security (or symbol) to move
+        :param source: The id of the source allocation.
+        :param target: The id of the target allocation.
+        :return: The count of securities still in the source allocation
+        """
         source_alloc = Allocation.objects.get(pk=source)
         target_alloc = Allocation.objects.get(pk=target)
         if not security in source_alloc.securities.values_list('symbol', flat=True):
@@ -20,6 +27,7 @@ class AllocationManager(models.Manager):
 
         source_alloc.securities.remove(security)
         target_alloc.securities.add(security)
+        return source_alloc.securities.count()
 
 
 class Allocation(models.Model):
@@ -45,3 +53,12 @@ class Allocation(models.Model):
         if any(s.symbol == 'CAD' for s in self.securities.all()):
             return 'Cash'
         return ', '.join([s.symbol for s in self.securities.all()])
+
+
+    def fill_allocation(self, cashadd, holdings, total_value):
+        self.current_amt = sum(h.value for h in holdings.for_securities(self.securities.all()))
+        if self.securities.filter(symbol='CAD'):
+            self.current_amt += cashadd
+        self.current_pct = self.current_amt / total_value * 100
+        self.desired_amt = self.desired_pct * total_value / 100
+        self.buysell = self.desired_amt - self.current_amt
