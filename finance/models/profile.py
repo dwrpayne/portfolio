@@ -114,26 +114,28 @@ class UserProfile(models.Model):
                 'percent_gains': pending_gain / total_value if total_value else 0,
                 }
 
-    def GetCapgainsByYear(self):
-        all_years = list(range(self.GetInceptionDate().year, datetime.date.today().year + 1))
-        yearly_data = {s: [0] * len(all_years) for s in self.GetCapGainsSecurities()}
-        year_offset = all_years[0]
+    def get_capgains_summary(self):
+        """
+        :return: A pandas.DataFrame containing a capital gains summary by security and year.
+        """
+        all_years = {year: 0 for year in range(self.GetInceptionDate().year, datetime.date.today().year + 1)}
+        realized_by_security_year = {s: dict(all_years) for s in self.GetCapGainsSecurities()}
         last_acb = {}
 
-        costbases = CostBasis.objects.get_capgains_table(self.user)
-        for (sec, year), yearly_bases in groupby(costbases,
-                                                 lambda c: (c.security_id, c.trade_date.year)):
-            for cb in yearly_bases:
-                if sec:
-                    yearly_data[sec][year - year_offset] += cb.capital_gain
-                    last_acb[sec] = cb.acb_total
+        import pandas
+        df = pandas.DataFrame(((c.security_id, c.trade_date.year, c.capital_gain, c.acb_total)
+                               for c in CostBasis.objects.get_capgains_table(self.user)))
 
-        pending_by_security = {}
-        for security, value in self.GetHoldingDetails().taxable().today_security_values():
-            if security in last_acb:
-                pending_by_security[security] = value - last_acb[security]
+        pt = df.pivot_table(index=0, columns=1, values=2, aggfunc=sum, fill_value=0,
+                            dropna=True, margins=True, margins_name='Total')
+        pt.insert(0, 'Cost Basis', df.groupby(0).last()[3])
+        pt.insert(1, 'Market Value', pandas.Series(dict(self.GetHoldingDetails().taxable().today_security_values())))
+        pt.insert(2, 'Unrealized Gain/Loss', pt['Market Value'] - pt['Cost Basis'])
+        pt.loc['Total'] = pt.sum(skipna=True)
+        pt.insert(3, 'Gain Percentage', pt['Unrealized Gain/Loss'].divide(pt['Market Value']))
+        pt.fillna(0, inplace=True)
 
-        return all_years, yearly_data, pending_by_security
+        return pt
 
     def GetInceptionDate(self):
         return self.GetActivities().earliest().trade_date

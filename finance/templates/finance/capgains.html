@@ -20,7 +20,8 @@
                 </li>
                 <li>The "Gain Percentage" column is the percentage of your holding that is taxable profit.
                     <ul>
-                        <li>ie, a Gain Percentage of 25% means that if you sold $100 of shares, you would have a capital gain of $25.
+                        <li>ie, a Gain Percentage of 25% means that if you sold $100 of shares, you would have a capital
+                            gain of $25.
                         </li>
                         <li>If you need to liquidate some cash and want to minimize your capital gain, sell the stocks
                             with the lowest "Gain Percentage".
@@ -30,69 +31,53 @@
             </ul>
         </div>
         <div class="row">
-            <div class="col-sm-6">
-                <h2>Unrealized Gains and Losses</h2>
+            <div class="col-sm-10">
                 <table class="table table-hover table-bordered text-center">
                     <thead>
-                        <tr>
-                            <th class="text-left">Security</th>
-                            <th class="text-right">Book Value</th>
-                            <th class="text-right">Market Value</th>
-                            <th class="text-right">Unrealized Gain/Loss</th>
-                            <th class="text-right">Gain %</th>
-                        </tr>
+                    <tr>
+                        <th></th>
+                        <th colspan="4" class="bg-info">Current Holdings</th>
+                        <th colspan="999" class="bg-warning">Realized Gains and Losses</th>
+                    </tr>
+                    <tr>
+                        <th class="text-left">Security</th>
+                        {% for colname in columns %}
+                            <th class="text-right">{{ colname }}</th>
+                        {% endfor %}
+                    </tr>
                     </thead>
                     <tfoot>
-                        <tr>
-                            <td class="text-left">Total</td>
-                            <td class="text-right"></td>
-                            <td class="text-right"></td>
-                            <td class="text-right">{{ view.total_pending | currency }}</td>
-                            <td class="text-right"></td>
-                        </tr>
+                    <tr>
+                        <td class="text-left">Total</td>
+                        {% for header, val in totals.items %}
+                                <td class="text-right">
+                                    {% if header == "Gain Percentage" %}
+                                        {{ val | percentage }}
+                                    {% else %}
+                                        {{ val | currency }}
+                                    {% endif %}
+                                </td>
+                        {% endfor %}
+                    </tr>
                     </tfoot>
-                    <tbody>
-                    {% for security, yearly_values in view.yearly_gains.items %}
-                        <tr>
-                            <td class="text-left"><a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a></td>
-                            {% with summary=view.summary_by_security|lookup:security %}
-                                <td class="text-right">{{ summary.book_value | currency }}</td>
-                                <td class="text-right">{{ summary.total_value | currency }}</td>
-                                <td class="text-right">{{ view.pending_by_security | lookup:security | currency }}</td>
-                                <td class="text-right">{{ summary.percent_gains | percentage }}</td>
-                            {% endwith %}
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="col-sm-6">
-                <h2>Realized Gains and Losses</h2>
-                <table class="table table-hover table-bordered text-center">
-                    <thead>
-                        <tr>
-                            <th class="text-left">Security</th>
-                            {% for year in view.years reversed %}
-                                <th class="text-right">{{ year }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tfoot>
-                        <tr>
-                            <td class="text-left">Total</td>
-                            {% for value in view.total_gains reversed %}
-                                <td class="text-right">{% if value %}{{ value | currency }}{% endif %}</td>
-                            {% endfor %}
-                        </tr>
-                    </tfoot>
-                    <tbody>
-                    {% for security, yearly_values in view.yearly_gains.items %}
-                        <tr>
-                            <td class="text-left"><a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a></td>
-                            {% for value in yearly_values reversed %}
-                                <td class="text-right">{% if value %}{{ value | currency }}{% endif %}</td>
-                            {% endfor %}
 
+                    <tbody>
+                    {% for security, row_dict in dataframe_dict.items %}
+                        <tr>
+                            <td class="text-left">
+                                <a href="{% url 'finance:capgainssec' security %}"><b>{{ security }}</b></a>
+                            </td>
+                            {% for header, val in row_dict.items %}
+                                <td class="text-right">
+                                    {% if val != 0 %}
+                                        {% if header == "Gain Percentage" %}
+                                            {{ val | percentage }}
+                                        {% else %}
+                                            {{ val | currency }}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
                         </tr>
                     {% endfor %}
                     </tbody>

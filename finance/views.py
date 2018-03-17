@@ -243,16 +243,15 @@ class CapGainsSecurityReport(LoginRequiredMixin, ListView):
 class CapGainsReport(LoginRequiredMixin, TemplateView):
     template_name = 'finance/capgains.html'
 
-    def get(self, request, *args, **kwargs):
-        self.years, self.yearly_gains, self.pending_by_security = request.user.userprofile.GetCapgainsByYear()
-        self.total_gains = []
-        for i, year in enumerate(self.years):
-            self.total_gains.append(sum(gains[i] for gains in self.yearly_gains.values()))
-        self.total_pending = sum(self.pending_by_security.values())
-        self.summary_by_security = {security: request.user.userprofile.get_capital_gain_summary(security,
-                                            CostBasis.objects.get_activities_with_acb(self.request.user, security))
-                                    for security, pending_gain in self.pending_by_security.items()}
-        return super().get(self, request, *args, **kwargs)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        dataframe = self.request.user.userprofile.get_capgains_summary()
+        context['totals'] = dataframe.ix['Total']
+        dataframe = dataframe.drop('Total')
+        context['columns'] = dataframe.columns
+        context['dataframe_dict'] = dataframe.to_dict('i')
+
+        return context
 
 
 class DividendReport(LoginRequiredMixin, ListView):
