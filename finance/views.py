@@ -413,15 +413,21 @@ def GetHoldingsContext(userprofile, as_of_date=None):
     as_of_date = as_of_date or datetime.date.today()
 
     holdingdetails = userprofile.GetHoldingDetails().between(as_of_date - datetime.timedelta(days=1), as_of_date).select_related(
-        'security', 'account').order_by('-day', 'security')
-    account_data = {(h.security_id, h.account_id): 0 for h in holdingdetails}
-    for h in holdingdetails:
-        if h.day == as_of_date:
-            account_data[(h.security_id, h.account_id)] += h
-        else:
-            account_data[(h.security_id, h.account_id)] -= h
+        'security', 'account').order_by('security', 'account', '-day')
 
-    account_data = account_data.values()
+    account_data = []
+    for (account, security), holdings in groupby(holdingdetails, lambda h: (h.account, h.security)):
+        holdings = list(holdings)
+        if len(holdings) == 2:
+            account_data.append(holdings[0] - holdings[1])
+        elif holdings[0].day == as_of_date:
+            account_data.append(holdings[0] - 0)
+        elif holdings[0].day == as_of_date - datetime.timedelta(days=1):
+            account_data.append(0 - holdings[0])
+        else:
+            raise HoldingDetail.MultipleObjectsReturned
+            #messages.error('Database corruption error code 126.')
+            #messages.debug('Failed to calculate a holding change for {} {}'.format(account, security))
 
     book_value_list = userprofile.get_book_value_by_account_security(as_of_date)
 

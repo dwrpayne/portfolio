@@ -188,16 +188,12 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
             self.account_id, self.day, self.security_id, self.qty,
             self.price, self.exch, self.cad, self.value)
 
-    def __radd__(self, other):
-        if other == 0:
-            return HoldingChange.create_from_detail(self)
-        raise NotImplementedError()
-
-    def __add__(self, other):
-        return HoldingChange.create_from_detail(self) + HoldingChange.create_from_detail(other)
-
     def __rsub__(self, other):
-        return HoldingChange.create_delta(self, other)
+        if not other:
+            price = SecurityPriceDetail.objects.get(security_id=self.security_id,
+                                                    day=self.day + datetime.timedelta(days=1))
+            return HoldingChange.delta_to_price(self, price)
+        return NotImplemented
 
     def __sub__(self, other):
         if not other:
@@ -224,21 +220,11 @@ class HoldingChange:
         self.exch = exch
 
     @staticmethod
-    def create_from_detail(detail):
-        assert isinstance(detail, HoldingDetail)
-
-        hc = HoldingChange(account=detail.account, security=detail.security, qty=detail.qty,
-                           value=detail.value, price=detail.price, day=detail.day, exch=detail.exch
-                           )
-        return hc
-
-    @staticmethod
     def delta_from_price(price, holding):
         hc = HoldingChange(account=holding.account, security=holding.security,
                            qty=holding.qty, value=holding.value, price=holding.price,
                            day=holding.day, exch=holding.exch)
-        hc.day_from = price.day
-        hc.price_delta = holding.price - holding.price
+        hc.price_delta = holding.price - price.price
         hc.price_percent_delta = hc.price_delta / price.price
         hc.value_delta = holding.value
         hc.value_percent_delta = 0
@@ -246,16 +232,19 @@ class HoldingChange:
         return hc
 
     @staticmethod
-    def create_delta(previous, current):
-        if not current:
-            current = HoldingChange(account=previous.account, security=previous.security,
-                                    price=previous.price, exch=previous.exch,
-                                    day=previous.day + datetime.timedelta(days=1))
-        if not previous:
-            previous = HoldingChange(account=current.account, security=current.security,
-                                     price=current.price, exch=current.exch,
-                                     day=current.day - datetime.timedelta(days=1))
+    def delta_to_price(holding, price):
+        hc = HoldingChange(account=holding.account, security=holding.security,
+                           qty=0, value=0, price=price.price,
+                           day=price.day, exch=price.exch)
+        hc.price_delta = price.price - holding.price
+        hc.price_percent_delta = hc.price_delta / holding.price
+        hc.value_delta = -holding.value
+        hc.value_percent_delta = -100
+        hc.qty_delta = -holding.qty
+        return hc
 
+    @staticmethod
+    def create_delta(previous, current):
         assert previous.account == current.account
         assert previous.security == current.security
         assert previous.day < current.day
@@ -280,19 +269,13 @@ class HoldingChange:
         return "HoldingChange<{} {:.1f} {}@{:.2f}({:.2f}) worth {:.0f}({:.0f}){:.2f}%>".format(self.day, self.qty, self.security,
                 self.price, self.price_delta, self.value, self.value_delta, self.value_percent_delta)
 
-    @property
-    def security_type(self):
-        return self.security.type
-
     def __radd__(self, other):
         if other == 0:
-            import copy
-            return copy.copy(self)
-        raise NotImplementedError()
+            other = HoldingChange(account=self.account, security=self.security, day=self.day)
+            return self + other
+        return NotImplemented
 
     def __add__(self, other):
-        if isinstance(other, HoldingDetail):
-            other = HoldingChange.create_from_detail(other)
         assert isinstance(other, HoldingChange)
         assert self.day == other.day
 
@@ -307,9 +290,11 @@ class HoldingChange:
             ret.qty_delta = self.qty_delta + other.qty_delta
             ret.price = self.price
             ret.price_delta = self.price_delta
-            ret.price_percent_delta = ret.price_delta / (ret.price - ret.price_delta)
+            if ret.price_delta:
+                ret.price_percent_delta = ret.price_delta / (ret.price - ret.price_delta)
 
         ret.value_delta = self.value_delta + other.value_delta
-        ret.value_percent_delta = ret.value_delta / (ret.value - ret.value_delta)
+        if ret.value != ret.value_delta:
+            ret.value_percent_delta = ret.value_delta / (ret.value - ret.value_delta)
 
         return ret
