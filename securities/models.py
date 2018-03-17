@@ -147,6 +147,11 @@ class Security(models.Model):
     @cached_property
     def latest_price_needed(self):
         if not self.activities.exists() or self.holdings.current().exists():
+            # At 12:01 we no longer have prices for the current day and everything breaks.
+            # "Fix" this by requesting tomorrow's data 10 minutes early. The datasource fills
+            # the price list forward to the requested date.
+            if datetime.datetime.now().hour == 23 and datetime.datetime.now().minute >= 49:
+                return datetime.date.today() + datetime.timedelta(days=1)
             return datetime.date.today()
         return self.activities.latest().trade_date
 
