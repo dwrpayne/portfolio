@@ -25,16 +25,6 @@
             padding: 5px;
         }
 
-        .allocation.validtarget {
-            border-color: #50e7e9;
-            background: #dddddd;
-        }
-
-        .allocations.draghover {
-            outline: none;
-            box-shadow: 0 0 0 1px #fff, 0 0 0 3px #68b;
-        }
-
     </style>
 {% endblock %}
 
@@ -78,11 +68,15 @@
                                 </span>
                             {% endfor %}
                         </td>
-                        <td class="text-right" id="leftover-desired_pct">{{ leftover.desired_pct | floatformat:1 }}% (Inferred)</td>
-                        <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct | floatformat:1 }}%</td>
+                        <td class="text-right" id="leftover-desired_pct">{{ leftover.desired_pct | floatformat:1 }}%
+                            (Inferred)
+                        </td>
+                        <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct | floatformat:1 }}%
+                        </td>
                         <td class="text-right" id="leftover-desired_amt">{{ leftover.desired_amt | currencyround }}</td>
                         <td class="text-right" id="leftover-current_amt">{{ leftover.current_amt | currencyround }}</td>
-                        <td class="text-right" id="leftover-buysell">{{ leftover.buysell | currencyround | colorize }}</td>
+                        <td class="text-right"
+                            id="leftover-buysell">{{ leftover.buysell | currencyround | colorize }}</td>
                     </tr>
                 {% endif %}
                 <tr id="row-newrow" class="newallocation-class">
@@ -97,9 +91,9 @@
                 </tr>
                 </tbody>
             </table>
-        <br>
-        Enter additional cash to invest:
-        <input type="number" min="0" step="1" id="cashadd">
+            <br>
+            Enter additional cash to invest:
+            <input type="number" min="0" step="1" id="cashadd">
         </div>
         <div class="col-sm-5">
             <h3>Insert a pie chart here.</h3>
@@ -131,7 +125,7 @@
 
         // Do a substr replace for an allocation row and its elements' ids.
         function rename_row_ids(row, oldstr, newstr) {
-            $(row).find('*').each(function () {
+            $(row).find("[id*='" + oldstr + "']").each(function () {
                 var newid = $(this).attr('id').replace(oldstr, newstr);
                 $(this).attr('id', newid);
             });
@@ -213,7 +207,7 @@
                     {
                         data: 'Current_P',
                         render: function (data, type, row) {
-                            return (Math.round(data*100)/100).toFixed(2) + "%";
+                            return (Math.round(data * 100) / 100).toFixed(2) + "%";
                         }
                     },
                     {
@@ -238,7 +232,7 @@
                     },
                 ],
                 bInfo: false,
-                order: [[1, 'desc']],
+                order: [[2, 'desc']],
                 paging: false,
                 searching: false,
             });

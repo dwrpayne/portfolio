@@ -1,5 +1,6 @@
 import datetime
 import os
+from decimal import Decimal
 from itertools import groupby
 
 import numpy
@@ -13,7 +14,6 @@ from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
-from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView
@@ -25,7 +25,7 @@ from charts.views import HighChartMixin
 from securities.models import Security
 from utils.misc import partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
-from .forms import UserForm, AllocationForm, AllocationFormSet
+from .forms import UserForm
 from .models import BaseAccount, Activity, UserProfile, HoldingDetail, CostBasis
 from .services import RefreshButtonHandlerMixin, check_for_missing_securities
 from .tasks import HandleCsvUpload
@@ -365,7 +365,7 @@ class RebalanceView(LoginRequiredMixin, TemplateView):
         self.add_to_ret_dict(ret_dict, alloc.id, alloc)
         if alloc.securities.count() == 0 and desired_pct==0:
             alloc.delete()
-            ret_dict['delete-id'] = alloc.ids
+            ret_dict['delete-id'] = alloc.id
         return JsonResponse(ret_dict)
 
     def handle_security_move(self, source_allocid, security, target_allocid):
@@ -393,12 +393,12 @@ class RebalanceView(LoginRequiredMixin, TemplateView):
         if request.is_ajax():
             input_id = request.POST.get('input_id', '')
             if input_id:
-                input_val = request.POST['input_val']
+                input_val = request.POST['input_val'] or 0
                 if input_id == 'cashadd':
                     return self.handle_cashadd(int(input_val))
                 else:
                     alloc_id = input_id.split('-')[0]
-                    return self.handle_desired_pct_change(alloc_id, input_val)
+                    return self.handle_desired_pct_change(alloc_id, Decimal(input_val))
             else:
                 source_alloc = request.POST.get('source_alloc', '')
                 security = request.POST['security']
