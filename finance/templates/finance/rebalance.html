@@ -32,6 +32,7 @@
     <br/><br/>
     <div class="row">
         <div class="col-sm-7">
+        <form>
             <table class="display striped hover" id="rebalance-table">
                 <thead>
                 <tr>
@@ -68,22 +69,19 @@
                                 </span>
                             {% endfor %}
                         </td>
-                        <td class="text-right" id="leftover-desired_pct">{{ leftover.desired_pct | floatformat:1 }}%
-                            (Inferred)
-                        </td>
-                        <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct | floatformat:1 }}%
-                        </td>
-                        <td class="text-right" id="leftover-desired_amt">{{ leftover.desired_amt | currencyround }}</td>
-                        <td class="text-right" id="leftover-current_amt">{{ leftover.current_amt | currencyround }}</td>
+                        <td class="text-right" id="leftover-desired_pct">0</td>
+                        <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct }}</td>
+                        <td class="text-right" id="leftover-desired_amt">{{ leftover.desired_amt }}</td>
+                        <td class="text-right" id="leftover-current_amt">{{ leftover.current_amt }}</td>
                         <td class="text-right"
-                            id="leftover-buysell">{{ leftover.buysell | currencyround | colorize }}</td>
+                            id="leftover-buysell">{{ leftover.buysell }}</td>
                     </tr>
                 {% endif %}
                 <tr id="row-newrow" class="newallocation-class">
                     <td class="allocation" id="newrow">
                         <span id="newalloc-info">Drag a security here to create a new allocation.</span>
                     </td>
-                    <td class="text-right" id="newrow-desired_pct"></td>
+                    <td class="text-right" id="newrow-desired_pct">{{ leftover.desired_pct }}</td>
                     <td class="text-right" id="newrow-current_pct"></td>
                     <td class="text-right" id="newrow-desired_amt"></td>
                     <td class="text-right" id="newrow-current_amt"></td>
@@ -94,6 +92,7 @@
             <br>
             Enter additional cash to invest:
             <input type="number" min="0" step="1" id="cashadd">
+        </form>
         </div>
         <div class="col-sm-5">
             <h3>Insert a pie chart here.</h3>
@@ -141,18 +140,18 @@
                 table.row(row).invalidate("dom");
                 $(row).removeClass("newallocation-class");
                 $(row).find('input').attr('disabled', false);
-                table.row.add(newrow_template.clone());
-            }
-            if ("delete-id" in data) {
-                var id = data["delete-id"];
-                table.row("#row-" + id).remove();
+                table.row.add(newrow_template.clone()).draw();
             }
             for (id in data["new-cells"]) {
                 var cell = table.cell('#' + id);
                 cell.data(data["new-cells"][id]);
                 cell.invalidate();
             }
-            table.draw();
+            if ("delete-id" in data) {
+                var id = data["delete-id"];
+                table.row("#row-" + id).remove().draw();
+            }
+            table.draw('page');
         }
 
         // Create sortable security buckets
@@ -197,11 +196,12 @@
                     {
                         data: 'Desired_P',
                         render: function (data, type, row) {
-                            num = Math.round(data).toFixed(1);
+                            num = (Math.round(data * 10) / 10).toFixed(1);
                             id = row.DT_RowId.split('-')[1];
                             disabled = (id == "newrow" ? "disabled " : "");
-                            return '<input type="number" ' + disabled +
-                                'value="' + num + '" min="0" max="100" step="0.1" id="' + id + '-desired_pct-input">';
+                            klass = (id == "newrow") ? "" : ' class="summable-pct" ';
+                            return '<input type="number" ' + disabled + klass +
+                                'value="' + num + '" min="0" max="100" step="1" id="' + id + '-desired_pct-input">';
                         }
                     },
                     {
@@ -232,7 +232,7 @@
                     },
                 ],
                 bInfo: false,
-                order: [[2, 'desc']],
+                order: [[1, 'desc']],
                 paging: false,
                 searching: false,
             });
@@ -249,6 +249,5 @@
                 success: update_table_from_ajax
             });
         });
-
     </script>
 {% endblock %}

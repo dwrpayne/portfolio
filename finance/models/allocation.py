@@ -12,22 +12,26 @@ class AllocationManager(models.Manager):
         held = user.userprofile.GetHeldSecurities().exclude(symbol__in=allocated)
         return held
 
-    def move_security(self, security, source, target):
+    def reallocate_security(self, security, sourceid=None, targetid=None, user=None):
         """
-        Moves a security from one allocation to another. If not present in source, does nothing.
+        Removes the security from source if it exists there.
+        Add the security to target if target exists.
+        Otherwise, create a new Allocation and add the security to it.
         :param security: The security (or symbol) to move
         :param source: The id of the source allocation.
         :param target: The id of the target allocation.
+        :param user: The user under which to create the allocation, if target is None.
         :return: The source and target allocations.
         """
-        source_alloc = Allocation.objects.get(pk=source)
-        target_alloc = Allocation.objects.get(pk=target)
-        if not security in source_alloc.securities.values_list('symbol', flat=True):
-            return
+        try:
+            source = Allocation.objects.get(pk=sourceid)
+            source.securities.remove(security)
+        except Allocation.DoesNotExist:
+            pass
 
-        source_alloc.securities.remove(security)
-        target_alloc.securities.add(security)
-        return source_alloc, target_alloc
+        target, created = self.get_or_create(pk=targetid, defaults={'user':user})
+        target.securities.add(security)
+        return source, target
 
 
 class Allocation(models.Model):

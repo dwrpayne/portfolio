@@ -362,29 +362,32 @@ class RebalanceView(LoginRequiredMixin, TemplateView):
         allocs, leftover = self.get_filled_allocations()
         alloc = next(a for a in allocs if str(a.id) == alloc_id)
         ret_dict = {}
-        self.add_to_ret_dict(ret_dict, alloc.id, alloc)
-        if alloc.securities.count() == 0 and desired_pct==0:
-            alloc.delete()
+        if alloc.securities.count() == 0 and desired_pct == 0:
             ret_dict['delete-id'] = alloc.id
+            alloc.delete()
+        else:
+            self.add_to_ret_dict(ret_dict, alloc.id, alloc)
+
         return JsonResponse(ret_dict)
 
-    def handle_security_move(self, source_allocid, security, target_allocid):
+    def handle_security_move(self, source_id, security, target_id):
         from .models import Allocation
         ret_dict = {}
-        if target_allocid == 'newrow':
-            alloc = Allocation.objects.create(user=self.request.user)
-            target_allocid = alloc.id
-            ret_dict['newrow'] = alloc.id
-        source_alloc, _ = Allocation.objects.move_security(security, source_allocid, target_allocid)
+        if target_id == 'newrow':
+            target_id = None
+        source_alloc, target_alloc = Allocation.objects.reallocate_security(security, source_id,
+                                                                            target_id, self.request.user)
+        if not target_id:
+            ret_dict['newrow'] = target_id = target_alloc.id
         if source_alloc.securities.count() == 0 and source_alloc.desired_pct==0:
-            Allocation.objects.get(pk=source_allocid).delete()
-            ret_dict['delete-id'] = source_allocid
+            ret_dict['delete-id'] = source_alloc.id
+            source_alloc.delete()
         allocs, leftover = self.get_filled_allocations()
 
         for alloc in allocs:
-            if alloc.id in [int(source_allocid), int(target_allocid)]:
+            if alloc.id in [int(source_id), int(target_id)]:
                 self.add_to_ret_dict(ret_dict, alloc.id, alloc)
-        if not source_allocid:
+        if not source_id:
             self.add_to_ret_dict(ret_dict, "leftover", leftover)
         return JsonResponse(ret_dict)
 
