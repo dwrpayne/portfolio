@@ -41,16 +41,16 @@
 {% block content %}
     <br/><br/>
     <div class="row">
-        <div class="col-sm-9">
+        <div class="col-sm-7">
             <table class="display striped hover" id="rebalance-table">
                 <thead>
                 <tr>
                     <th>Symbols</th>
-                    <th>Desired %</th>
-                    <th>Current %</th>
-                    <th>Desired $</th>
-                    <th>Current $</th>
-                    <th><font color="green">Buy</font>/<font color="red">Sell</font></th>
+                    <th class="text-right">Desired %</th>
+                    <th class="text-right">Current %</th>
+                    <th class="text-right">Desired $</th>
+                    <th class="text-right">Current $</th>
+                    <th class="text-right"><font color="green">Buy</font>/<font color="red">Sell</font></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -62,11 +62,11 @@
                                     {{ security }}
                                 </span>                            {% endfor %}
                         </td>
-                        <td id="{{ alloc.id }}-desired_pct">{{ alloc.desired_pct }}</td>
-                        <td id="{{ alloc.id }}-current_pct">{{ alloc.current_pct }}</td>
-                        <td id="{{ alloc.id }}-desired_amt">{{ alloc.desired_amt }}</td>
-                        <td id="{{ alloc.id }}-current_amt">{{ alloc.current_amt }}</td>
-                        <td id="{{ alloc.id }}-buysell">{{ alloc.buysell }}</td>
+                        <td class="text-right" id="{{ alloc.id }}-desired_pct">{{ alloc.desired_pct }}</td>
+                        <td class="text-right" id="{{ alloc.id }}-current_pct">{{ alloc.current_pct }}</td>
+                        <td class="text-right" id="{{ alloc.id }}-desired_amt">{{ alloc.desired_amt }}</td>
+                        <td class="text-right" id="{{ alloc.id }}-current_amt">{{ alloc.current_amt }}</td>
+                        <td class="text-right" id="{{ alloc.id }}-buysell">{{ alloc.buysell }}</td>
                     </tr>
                 {% endfor %}
                 {% if leftover %}
@@ -78,41 +78,33 @@
                                 </span>
                             {% endfor %}
                         </td>
-                        <td id="leftover-desired_pct">{{ leftover.desired_pct | floatformat:1 }}% (Inferred)</td>
-                        <td id="leftover-current_pct">{{ leftover.current_pct | floatformat:1 }}%</td>
-                        <td id="leftover-desired_amt">{{ leftover.desired_amt | currencyround }}</td>
-                        <td id="leftover-current_amt">{{ leftover.current_amt | currencyround }}</td>
-                        <td id="leftover-buysell">{{ leftover.buysell | currencyround | colorize }}</td>
+                        <td class="text-right" id="leftover-desired_pct">{{ leftover.desired_pct | floatformat:1 }}% (Inferred)</td>
+                        <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct | floatformat:1 }}%</td>
+                        <td class="text-right" id="leftover-desired_amt">{{ leftover.desired_amt | currencyround }}</td>
+                        <td class="text-right" id="leftover-current_amt">{{ leftover.current_amt | currencyround }}</td>
+                        <td class="text-right" id="leftover-buysell">{{ leftover.buysell | currencyround | colorize }}</td>
                     </tr>
                 {% endif %}
-                <tr id="row-newrow">
-                    <td class="allocation" id="newrow"></td>
-                    <td id="newrow-desired_pct"></td>
-                    <td id="newrow-current_pct"></td>
-                    <td id="newrow-desired_amt"></td>
-                    <td id="newrow-current_amt"></td>
-                    <td id="newrow-buysell"></td>
+                <tr id="row-newrow" class="newallocation-class">
+                    <td class="allocation" id="newrow">
+                        <span id="newalloc-info">Drag a security here to create a new allocation.</span>
+                    </td>
+                    <td class="text-right" id="newrow-desired_pct"></td>
+                    <td class="text-right" id="newrow-current_pct"></td>
+                    <td class="text-right" id="newrow-desired_amt"></td>
+                    <td class="text-right" id="newrow-current_amt"></td>
+                    <td class="text-right" id="newrow-buysell"></td>
                 </tr>
                 </tbody>
             </table>
-
+        <br>
+        Enter additional cash to invest:
+        <input type="number" min="0" step="1" id="cashadd">
         </div>
-        <div class="col-sm-3">
+        <div class="col-sm-5">
             <h3>Insert a pie chart here.</h3>
         </div>
 
-    </div>
-    <div class="row">
-        <div class="col-sm-2">
-            <div class="form-group">
-                <form action="" id="date-submit-form" method="get">
-                    <label for="cashadd">Additional cash to invest:</label>
-                    <input type="number" class="form-control" required id="cashadd" name="cashadd"
-                           placeholder="{{ cashadd }}">
-                    <button type="submit">Submit</button>
-                </form>
-            </div>
-        </div>
     </div>
     {% csrf_token %}
 {% endblock content %}
@@ -137,27 +129,91 @@
         });
         // END CSRF Boilerplate
 
+        // Do a substr replace for an allocation row and its elements' ids.
+        function rename_row_ids(row, oldstr, newstr) {
+            $(row).find('*').each(function () {
+                var newid = $(this).attr('id').replace(oldstr, newstr);
+                $(this).attr('id', newid);
+            });
+            var newid = $(row).attr('id').replace(oldstr, newstr);
+            $(row).attr('id', newid);
+        };
+
+        function update_table_from_ajax(data) {
+            if ("newrow" in data) {
+                var row = document.getElementById("row-newrow");
+                var new_id = data["newrow"];
+                rename_row_ids(row, "newrow", new_id);
+                table.row(row).invalidate("dom");
+                $(row).removeClass("newallocation-class");
+                $(row).find('input').attr('disabled', false);
+                table.row.add(newrow_template.clone());
+            }
+            if ("delete-id" in data) {
+                var id = data["delete-id"];
+                table.row("#row-" + id).remove();
+            }
+            for (id in data["new-cells"]) {
+                var cell = table.cell('#' + id);
+                cell.data(data["new-cells"][id]);
+                cell.invalidate();
+            }
+            table.draw();
+        }
+
+        // Create sortable security buckets
+        function on_drop_security(event, ui) {
+            if (event.target.id == "newrow") {
+                $(event.target).find('#newalloc-info').remove();
+            }
+            $.ajax({
+                url: window.location.pathname,
+                type: "POST",
+                data: {
+                    source_alloc: ui.sender.attr('id'),
+                    security: ui.item.attr('id'),
+                    target_alloc: event.target.id
+                },
+                context: this,
+                success: update_table_from_ajax,
+                error: function (data) {
+                    alert("Couldn't modify allocation!\n" + data["responseText"]);
+                },
+                complete: function (jqXHR, textStatus) {
+                }
+            });
+        }
+
+        // Create DataTable
         var table;
         var newrow_template;
-
         $(document).ready(function () {
             newrow_template = $('#row-newrow').clone();
             table = $('#rebalance-table').DataTable({
                 columns: [
-                    {data: 'Symbols'},
+                    {
+                        data: 'Symbols',
+                        createdCell: function (td, cellData, rowData, row, col) {
+                            $(td).sortable({
+                                connectWith: ".allocation",
+                                receive: on_drop_security
+                            }).disableSelection();
+                        },
+                    },
                     {
                         data: 'Desired_P',
                         render: function (data, type, row) {
                             num = Math.round(data).toFixed(1);
                             id = row.DT_RowId.split('-')[1];
-                            return '<input class="desired-pct" type="number" value="' + num +
-                                '" min="0" max="100" width="30" step="0.1" id="' + id + '-desired_pct">';
+                            disabled = (id == "newrow" ? "disabled " : "");
+                            return '<input type="number" ' + disabled +
+                                'value="' + num + '" min="0" max="100" step="0.1" id="' + id + '-desired_pct-input">';
                         }
                     },
                     {
                         data: 'Current_P',
                         render: function (data, type, row) {
-                            return Math.round(data).toFixed(1) + "%";
+                            return (Math.round(data*100)/100).toFixed(2) + "%";
                         }
                     },
                     {
@@ -175,92 +231,28 @@
                     {
                         data: 'BuySell',
                         render: function (data, type, row) {
-                            color = data < 0 ? 'green' : 'red';
-                            dollars = Math.round(data).toLocaleString();
-                            return "<font color=" + color + ">" + dollars + "</font>";
+                            prefix = data < 0 ? '<font color="red">-$' : '<font color="green">$';
+                            dollars = Math.abs(Math.round(data)).toLocaleString();
+                            return prefix + dollars + '</font>';
                         }
                     },
                 ],
+                bInfo: false,
                 order: [[1, 'desc']],
                 paging: false,
                 searching: false,
             });
         });
 
-        function rename_row_ids(row, oldstr, newstr) {
-            $(row).children().each(function () {
-                var newid = $(this).attr('id').replace(oldstr, newstr);
-                $(this).attr('id', newid);
-            });
-            var newid = $(row).attr('id').replace(oldstr, newstr);
-            $(row).attr('id', newid);
-        };
-
-        $(function () {
-            $(".allocation").sortable({
-                connectWith: ".allocation",
-                receive: function (event, ui) {
-                    if (event.target.id == "newrow") {
-                        var row = event.target.parentElement;
-                        var newrow = newrow_template.clone();
-                        rename_row_ids(row, "newrow", "updaterow");
-                        table.row.add(newrow);
-                        table.rows("#row-newrow, #row-updaterow").invalidate().draw();
-                        console.log(table.rows().ids());
-                    }
-                    $.ajax({
-                        url: window.location.pathname,
-                        type: "POST",
-                        data: {
-                            source_alloc: ui.sender.attr('id'),
-                            security: ui.item.attr('id'),
-                            target_alloc: event.target.id
-                        },
-                        context: this,
-                        success: function (data) {
-                            if ("updaterow" in data) {
-                                var row = document.getElementById("row-updaterow");
-                                var new_id = data["updaterow"];
-                                rename_row_ids(row, "updaterow", new_id);
-                                table.row("#row-" + new_id).invalidate("dom");
-                            }
-                            if ("delete-id" in data) {
-                                var id = data["delete-id"];
-                                table.row("#row-" + id).remove();
-                            }
-                            for (id in data["new-cells"]) {
-                                var cell = table.cell('#' + id);
-                                cell.data(data["new-cells"][id]);
-                                cell.invalidate();
-                            }
-                            table.draw();
-                        },
-                        error: function (data) {
-                            alert("Couldn't modify allocation!\n" + data["responseText"]);
-                        },
-                        complete: function (jqXHR, textStatus) {
-                        }
-                    });
-                }
-            }).disableSelection();
-        });
-
-        $("body").on("change ", "input", function () {
+        $("body").on("change keyup", "input", function () {
             $.ajax({
                 url: window.location.pathname,
                 type: "POST",
                 data: {
-                    desired_pct: $(this).val(),
-                    alloc_id: this.id.split('-')[0]
+                    input_id: this.id,
+                    input_val: $(this).val()
                 },
-                success: function (data) {
-                    for (id in data["new-cells"]) {
-                        var cell = table.cell('#' + id);
-                        cell.data(data["new-cells"][id]);
-                        cell.invalidate();
-                    }
-                    table.draw();
-                }
+                success: update_table_from_ajax
             });
         });
 

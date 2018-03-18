@@ -341,11 +341,20 @@ class RebalanceView(LoginRequiredMixin, TemplateView):
     # TODO: This is super ugly, refactor this
     @staticmethod
     def add_to_ret_dict(ret_dict, id, obj):
-        ret_dict.setdefault('new-cells', dict())
-        ret_dict['new-cells']['{}-current_pct'.format(id)] = obj.current_pct
-        ret_dict['new-cells']['{}-desired_amt'.format(id)] = obj.desired_amt
-        ret_dict['new-cells']['{}-current_amt'.format(id)] = obj.current_amt
-        ret_dict['new-cells']['{}-buysell'.format(id)] = obj.buysell
+        if obj:
+            ret_dict.setdefault('new-cells', dict())
+            ret_dict['new-cells']['{}-current_pct'.format(id)] = obj.current_pct
+            ret_dict['new-cells']['{}-desired_amt'.format(id)] = obj.desired_amt
+            ret_dict['new-cells']['{}-current_amt'.format(id)] = obj.current_amt
+            ret_dict['new-cells']['{}-buysell'.format(id)] = obj.buysell
+
+    def handle_cashadd(self, cashadd):
+        allocs, leftover = self.get_filled_allocations(cashadd)
+        ret_dict = {}
+        for alloc in allocs:
+            self.add_to_ret_dict(ret_dict, alloc.id, alloc)
+        self.add_to_ret_dict(ret_dict, "leftover", leftover)
+        return JsonResponse(ret_dict)
 
     def handle_desired_pct_change(self, alloc_id, desired_pct):
         from .models import Allocation
@@ -354,35 +363,42 @@ class RebalanceView(LoginRequiredMixin, TemplateView):
         alloc = next(a for a in allocs if str(a.id) == alloc_id)
         ret_dict = {}
         self.add_to_ret_dict(ret_dict, alloc.id, alloc)
+        if alloc.securities.count() == 0 and desired_pct==0:
+            alloc.delete()
+            ret_dict['delete-id'] = alloc.ids
         return JsonResponse(ret_dict)
 
-    def handle_security_move(self, source_alloc, security, target_alloc):
+    def handle_security_move(self, source_allocid, security, target_allocid):
         from .models import Allocation
         ret_dict = {}
-        if target_alloc == 'updaterow':
+        if target_allocid == 'newrow':
             alloc = Allocation.objects.create(user=self.request.user)
-            target_alloc = alloc.id
-            ret_dict['updaterow'] = alloc.id
-        source_count = Allocation.objects.move_security(security, source_alloc, target_alloc)
-        if source_count == 0:
-            Allocation.objects.get(pk=source_alloc).delete()
-            ret_dict['delete-id'] = source_alloc
+            target_allocid = alloc.id
+            ret_dict['newrow'] = alloc.id
+        source_alloc, _ = Allocation.objects.move_security(security, source_allocid, target_allocid)
+        if source_alloc.securities.count() == 0 and source_alloc.desired_pct==0:
+            Allocation.objects.get(pk=source_allocid).delete()
+            ret_dict['delete-id'] = source_allocid
         allocs, leftover = self.get_filled_allocations()
 
         for alloc in allocs:
-            if alloc.id in [int(source_alloc), int(target_alloc)]:
+            if alloc.id in [int(source_allocid), int(target_allocid)]:
                 self.add_to_ret_dict(ret_dict, alloc.id, alloc)
-        if not source_alloc:
+        if not source_allocid:
             self.add_to_ret_dict(ret_dict, "leftover", leftover)
         return JsonResponse(ret_dict)
 
 
     def post(self, request, *args, **kwargs):
         if request.is_ajax():
-            if 'desired_pct' in request.POST:
-                desired_pct = request.POST['desired_pct']
-                alloc_id = request.POST['alloc_id']
-                return self.handle_desired_pct_change(alloc_id, desired_pct)
+            input_id = request.POST.get('input_id', '')
+            if input_id:
+                input_val = request.POST['input_val']
+                if input_id == 'cashadd':
+                    return self.handle_cashadd(int(input_val))
+                else:
+                    alloc_id = input_id.split('-')[0]
+                    return self.handle_desired_pct_change(alloc_id, input_val)
             else:
                 source_alloc = request.POST.get('source_alloc', '')
                 security = request.POST['security']

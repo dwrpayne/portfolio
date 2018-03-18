@@ -18,7 +18,7 @@ class AllocationManager(models.Manager):
         :param security: The security (or symbol) to move
         :param source: The id of the source allocation.
         :param target: The id of the target allocation.
-        :return: The count of securities still in the source allocation
+        :return: The source and target allocations.
         """
         source_alloc = Allocation.objects.get(pk=source)
         target_alloc = Allocation.objects.get(pk=target)
@@ -27,7 +27,7 @@ class AllocationManager(models.Manager):
 
         source_alloc.securities.remove(security)
         target_alloc.securities.add(security)
-        return source_alloc.securities.count()
+        return source_alloc, target_alloc
 
 
 class Allocation(models.Model):
