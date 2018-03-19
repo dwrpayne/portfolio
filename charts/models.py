@@ -335,9 +335,6 @@ class RebalancePieChart(BaseHighChart):
             credits: {
                 enabled: false
             },
-            data: {
-                rows: data
-            },
             plotOptions: {
                 pie: {
                     allowPointSelect: true,
@@ -350,7 +347,13 @@ class RebalancePieChart(BaseHighChart):
                         }
                     }
                 }
-            }
+            },
+            series: [{
+                'name': 'Allocations',
+                'type': 'pie',
+                'colorByPoint': true,
+                'data': data
+            }]
         });
     });
     </script>
@@ -358,30 +361,25 @@ class RebalancePieChart(BaseHighChart):
 
     def get_data(self, **kwargs):
         allocs, leftover = self.userprofile.GetRebalanceInfo()
-        series = [{
-                'name': 'Allocations',
-                'type': 'pie',
-                'colorByPoint': True,
-                'data': [{
-                    'name': 'IE',
-                    'y': 56.33
-                }, {
-                    'name': 'Chrome',
-                    'y': 24.03,
-                    'sliced': True,
-                    'selected': True
-                }, {
-                    'name': 'Firefox',
-                    'y': 10.38
-                }, {
-                    'name': 'Safari',
-                    'y': 4.77
-                }, {
-                    'name': 'Opera',
-                    'y': 0.91
-                }, {
-                    'name': 'Other',
-                    'y': 0.2
-                }]
+        data = [{
+                'name': 'IE',
+                'y': 56.33
+            }, {
+                'name': 'Chrome',
+                'y': 24.03,
+                'sliced': True,
+                'selected': True
+            }, {
+                'name': 'Firefox',
+                'y': 10.38
+            }, {
+                'name': 'Safari',
+                'y': 4.77
+            }, {
+                'name': 'Opera',
+                'y': 0.91
+            }, {
+                'name': 'Other',
+                'y': 0.2
             }]
-        return series
+        return data
