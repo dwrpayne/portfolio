@@ -32,78 +32,80 @@
     <br/><br/>
     <div class="row">
         <div class="col-sm-7">
-        <form>
-            <table class="display striped hover" id="rebalance-table">
-                <thead>
-                <tr>
-                    <th>Symbols</th>
-                    <th class="text-right">Desired %</th>
-                    <th class="text-right">Current %</th>
-                    <th class="text-right">Desired $</th>
-                    <th class="text-right">Current $</th>
-                    <th class="text-right"><font color="green">Buy</font>/<font color="red">Sell</font></th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for alloc in allocs %}
-                    <tr id="row-{{ alloc.id }}">
-                        <td id="{{ alloc.id }}" class="allocation">
-                            {% for security in alloc.securities.all %}
-                                <span class="security" id="{{ security.symbol }}">
+            <form>
+                <table class="display striped hover" id="rebalance-table">
+                    <thead>
+                    <tr>
+                        <th>Symbols</th>
+                        <th class="text-right">Desired %</th>
+                        <th class="text-right">Current %</th>
+                        <th class="text-right">Desired $</th>
+                        <th class="text-right">Current $</th>
+                        <th class="text-right"><font color="green">Buy</font>/<font color="red">Sell</font></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for alloc in allocs %}
+                        <tr id="row-{{ alloc.id }}">
+                            <td id="{{ alloc.id }}" class="allocation">
+                                {% for security in alloc.securities.all %}
+                                    <span class="security" id="{{ security.symbol }}">
                                     {{ security }}
                                 </span>
-                            {% endfor %}
-                        </td>
-                        <td class="text-right" id="{{ alloc.id }}-desired_pct">{{ alloc.desired_pct }}</td>
-                        <td class="text-right" id="{{ alloc.id }}-current_pct">{{ alloc.current_pct }}</td>
-                        <td class="text-right" id="{{ alloc.id }}-desired_amt">{{ alloc.desired_amt }}</td>
-                        <td class="text-right" id="{{ alloc.id }}-current_amt">{{ alloc.current_amt }}</td>
-                        <td class="text-right" id="{{ alloc.id }}-buysell">{{ alloc.buysell }}</td>
-                    </tr>
-                {% endfor %}
-                {% if leftover %}
-                    <tr id="row-leftover">
-                        <td class="allocation">
-                            {% for security in leftover.securities %}
-                                <span class="security" id="{{ security.symbol }}">
+                                {% endfor %}
+                            </td>
+                            <td class="text-right" id="{{ alloc.id }}-desired_pct">{{ alloc.desired_pct }}</td>
+                            <td class="text-right" id="{{ alloc.id }}-current_pct">{{ alloc.current_pct }}</td>
+                            <td class="text-right" id="{{ alloc.id }}-desired_amt">{{ alloc.desired_amt }}</td>
+                            <td class="text-right" id="{{ alloc.id }}-current_amt">{{ alloc.current_amt }}</td>
+                            <td class="text-right" id="{{ alloc.id }}-buysell">{{ alloc.buysell }}</td>
+                        </tr>
+                    {% endfor %}
+                    {% if leftover %}
+                        <tr id="row-leftover">
+                            <td class="allocation">
+                                {% for security in leftover.securities %}
+                                    <span class="security" id="{{ security.symbol }}">
                                     {{ security }}
                                 </span>
-                            {% endfor %}
+                                {% endfor %}
+                            </td>
+                            <td class="text-right" id="leftover-desired_pct">0</td>
+                            <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct }}</td>
+                            <td class="text-right" id="leftover-desired_amt">{{ leftover.desired_amt }}</td>
+                            <td class="text-right" id="leftover-current_amt">{{ leftover.current_amt }}</td>
+                            <td class="text-right"
+                                id="leftover-buysell">{{ leftover.buysell }}</td>
+                        </tr>
+                    {% endif %}
+                    <tr id="row-newrow" class="newallocation-class">
+                        <td class="allocation" id="newrow">
+                            <span id="newalloc-info">Drag a security here to create a new allocation.</span>
                         </td>
-                        <td class="text-right" id="leftover-desired_pct">0</td>
-                        <td class="text-right" id="leftover-current_pct">{{ leftover.current_pct }}</td>
-                        <td class="text-right" id="leftover-desired_amt">{{ leftover.desired_amt }}</td>
-                        <td class="text-right" id="leftover-current_amt">{{ leftover.current_amt }}</td>
-                        <td class="text-right"
-                            id="leftover-buysell">{{ leftover.buysell }}</td>
+                        <td class="text-right" id="newrow-desired_pct">{{ leftover.desired_pct }}</td>
+                        <td class="text-right" id="newrow-current_pct"></td>
+                        <td class="text-right" id="newrow-desired_amt"></td>
+                        <td class="text-right" id="newrow-current_amt"></td>
+                        <td class="text-right" id="newrow-buysell"></td>
                     </tr>
-                {% endif %}
-                <tr id="row-newrow" class="newallocation-class">
-                    <td class="allocation" id="newrow">
-                        <span id="newalloc-info">Drag a security here to create a new allocation.</span>
-                    </td>
-                    <td class="text-right" id="newrow-desired_pct">{{ leftover.desired_pct }}</td>
-                    <td class="text-right" id="newrow-current_pct"></td>
-                    <td class="text-right" id="newrow-desired_amt"></td>
-                    <td class="text-right" id="newrow-current_amt"></td>
-                    <td class="text-right" id="newrow-buysell"></td>
-                </tr>
-                </tbody>
-            </table>
-            <br>
-            Enter additional cash to invest:
-            <input type="number" min="0" step="1" id="cashadd">
-        </form>
+                    </tbody>
+                </table>
+                <br>
+                Enter additional cash to invest:
+                <input type="number" min="0" step="1" id="cashadd">
+            </form>
         </div>
-        <div class="col-sm-5">
-            <h3>Insert a pie chart here.</h3>
-        </div>
+        <div class="col-sm-5" id="{{ view.rebalancepiechart.container_name }}"></div>
 
     </div>
     {% csrf_token %}
 {% endblock content %}
 
 {% block footer_javascript_page %}
+
+    {% include "highcharts.html" %}
+    {{ view.rebalancepiechart.get_javascript | safe }}
+
     <script>
         // CSRF Boilerplate
         // TODO: Move this to another include somewhere.

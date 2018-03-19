@@ -15,12 +15,13 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.shortcuts import render, HttpResponseRedirect
 from django.utils.decorators import method_decorator
+from django.utils.functional import cached_property
 from django.views.decorators.cache import never_cache
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.dates import DateMixin, DayMixin
 from django.views.generic.edit import FormView, UpdateView
 
-from charts.models import GrowthChart, DailyChangeChart, SecurityChart
+from charts.models import GrowthChart, RebalancePieChart, SecurityChart
 from charts.views import HighChartMixin
 from securities.models import Security
 from utils.misc import partition
@@ -315,8 +316,9 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
         return self.request.user.userprofile.GetActivities().at_date(self.get_day())
 
 
-class RebalanceView(LoginRequiredMixin, TemplateView):
+class RebalanceView(LoginRequiredMixin, HighChartMixin, TemplateView):
     template_name = 'finance/rebalance.html'
+    chart_classes = [RebalancePieChart]
 
     def get_filled_allocations(self, cashadd=0):
         return self.request.user.userprofile.GetRebalanceInfo(cashadd)
@@ -494,7 +496,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
 
 class PortfolioView(LoginRequiredMixin, HighChartMixin, TemplateView):
     template_name = 'finance/portfolio.html'
-    chart_classes = [GrowthChart, DailyChangeChart]
+    chart_classes = [GrowthChart]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -320,3 +320,68 @@ class SecurityChart(BaseHighChart):
         })
         return series
 
+
+class RebalancePieChart(BaseHighChart):
+    container_name = 'rebalancepie-div'
+    data_param = 'rebalancepie'
+    _JAVASCRIPT_TEMPLATE = '''
+    <script>
+    $.get("?chart=$data_param", function(data) {
+        Highcharts.StockChart({
+            chart: {
+                renderTo: "$container_name",
+                type: 'pie',
+            },
+            credits: {
+                enabled: false
+            },
+            data: {
+                rows: data
+            },
+            plotOptions: {
+                pie: {
+                    allowPointSelect: true,
+                    cursor: 'pointer',
+                    dataLabels: {
+                        enabled: true,
+                        format: '<b>{point.name}</b>: {point.percentage:.1f} %',
+                        style: {
+                            color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
+                        }
+                    }
+                }
+            }
+        });
+    });
+    </script>
+    '''
+
+    def get_data(self, **kwargs):
+        allocs, leftover = self.userprofile.GetRebalanceInfo()
+        series = [{
+                'name': 'Allocations',
+                'type': 'pie',
+                'colorByPoint': True,
+                'data': [{
+                    'name': 'IE',
+                    'y': 56.33
+                }, {
+                    'name': 'Chrome',
+                    'y': 24.03,
+                    'sliced': True,
+                    'selected': True
+                }, {
+                    'name': 'Firefox',
+                    'y': 10.38
+                }, {
+                    'name': 'Safari',
+                    'y': 4.77
+                }, {
+                    'name': 'Opera',
+                    'y': 0.91
+                }, {
+                    'name': 'Other',
+                    'y': 0.2
+                }]
+            }]
+        return series
