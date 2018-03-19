@@ -51,7 +51,8 @@
                             {% for security in alloc.securities.all %}
                                 <span class="security" id="{{ security.symbol }}">
                                     {{ security }}
-                                </span>                            {% endfor %}
+                                </span>
+                            {% endfor %}
                         </td>
                         <td class="text-right" id="{{ alloc.id }}-desired_pct">{{ alloc.desired_pct }}</td>
                         <td class="text-right" id="{{ alloc.id }}-current_pct">{{ alloc.current_pct }}</td>
@@ -201,7 +202,7 @@
                             disabled = (id == "newrow" ? "disabled " : "");
                             klass = (id == "newrow") ? "" : ' class="summable-pct" ';
                             return '<input type="number" ' + disabled + klass +
-                                'value="' + num + '" min="0" max="100" step="1" id="' + id + '-desired_pct-input">';
+                                'value="' + num + '" min="0" max="100" step="0.1" id="' + id + '-desired_pct-input">';
                         }
                     },
                     {

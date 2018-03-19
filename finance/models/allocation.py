@@ -8,7 +8,7 @@ class AllocationManager(models.Manager):
     def get_unallocated_securities(self, user=None):
         if not user:
             user = self.instance
-        allocated = self.get_queryset().filter(user=user).values_list('securities', flat=True)
+        allocated = list(self.get_queryset().filter(user=user).values_list('securities', flat=True))
         held = user.userprofile.GetHeldSecurities().exclude(symbol__in=allocated)
         return held
 
@@ -59,9 +59,9 @@ class Allocation(models.Model):
         return ', '.join([s.symbol for s in self.securities.all()])
 
 
-    def fill_allocation(self, cashadd, holdings, total_value):
-        self.current_amt = sum(h.value for h in holdings.for_securities(self.securities.all()))
-        if self.securities.filter(symbol='CAD'):
+    def fill_allocation(self, cashadd, holding_value, total_value):
+        self.current_amt = holding_value
+        if any(s.symbol=='CAD' for s in self.securities.all()):
             self.current_amt += cashadd
         self.current_pct = self.current_amt / total_value * 100
         self.desired_amt = self.desired_pct * total_value / 100

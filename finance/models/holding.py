@@ -95,13 +95,13 @@ class HoldingDetailQuerySet(SecurityPriceQuerySet):
         return self.filter(type=Security.Type.Cash)
 
     def week_end(self):
-        return self.order_by('day').filter(day__in=utils.dates.week_ends(self.earliest().day))
+        return self.order_by('day').filter(day__in=utils.dates.week_ends())
 
     def month_end(self):
-        return self.order_by('day').filter(day__in=utils.dates.month_ends(self.earliest().day))
+        return self.order_by('day').filter(day__in=utils.dates.month_ends())
 
     def year_end(self):
-        return self.order_by('day').filter(day__in=utils.dates.year_ends(self.earliest().day))
+        return self.order_by('day').filter(day__in=utils.dates.year_ends())
 
     def account_values(self):
         return self.order_by('day').values_list('account__display_name', 'day').annotate(total=Sum('value'))

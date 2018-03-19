@@ -2,22 +2,23 @@ import datetime
 
 from pendulum import Date
 
+EARLIEST_DAY = datetime.date(2008,1,1)
 
-def week_ends(start, end=None):
+def week_ends(start=EARLIEST_DAY, end=None):
     end = end or datetime.date.today()
     period = (Date.instance(start) - Date.instance(end))
     for week in period.range('weeks'):
         yield min(week.end_of('week'), Date.today())
 
 
-def month_ends(start, end=None):
+def month_ends(start=EARLIEST_DAY, end=None):
     end = end or datetime.date.today()
     period = (Date.instance(start) - Date.instance(end))
     for month in period.range('months'):
         yield min(month.end_of('month'), Date.today())
 
 
-def year_ends(start, end=None):
+def year_ends(start=EARLIEST_DAY, end=None):
     end = end or datetime.date.today()
     period = (Date.instance(start) - Date.instance(end))
     for year in period.range('years'):

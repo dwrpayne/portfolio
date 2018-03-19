@@ -47,18 +47,18 @@
                     </tr>
                     </thead>
                     <tfoot>
-                        <tr>
-                            <td class="text-left">Total</td>
-                            {% for header, val in totals.items %}
-                                    <td class="text-right">
-                                        {% if header == "Gain Percentage" %}
-                                            {{ val | percentage }}
-                                        {% else %}
-                                            {{ val | currency }}
-                                        {% endif %}
-                                    </td>
-                            {% endfor %}
-                        </tr>
+                    <tr>
+                        <td class="text-left">Total</td>
+                        {% for header, val in totals.items %}
+                            <td class="text-right">
+                                {% if header == "Gain Percentage" %}
+                                    {{ val | percentage }}
+                                {% else %}
+                                    {{ val | currency }}
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
                     </tfoot>
 
                     <tbody>

@@ -508,17 +508,19 @@ class PortfolioView(LoginRequiredMixin, HighChartMixin, TemplateView):
 class HistoryDetail(LoginRequiredMixin, ListView):
     template_name = 'finance/history.html'
     model = HoldingDetail
-    context_object_name = 'holdings'
 
     def get_context_data(self, **kwargs):
-        vals = self.get_queryset().account_values()
+        vals = self.object_list.account_values()
 
         array = numpy.rec.array(list(vals), dtype=[('account', 'U20'), ('day', 'U10'), ('val', 'f4')])
         df = pandas.DataFrame(array)
-        table = df.pivot_table(index='day', columns='account', values='val', fill_value=0)
+        table = df.pivot_table(index='day', columns='account', values='val', fill_value=0,
+                               margins=True, margins_name='Total')
+        table = table.drop('Total')
         rows = table.iloc[::-1].iterrows()
 
         context = super().get_context_data(**kwargs)
+        context['table'] = table
         context['names'] = list(table.columns) + ['Total']
         context['rows'] = ((date, vals, sum(vals)) for date, vals in rows)
         return context

@@ -34,14 +34,14 @@ def colorize(amount):
 def currency(dollars, symbol=''):
     if dollars == '' or dollars is None:
         return ''
-    return '{}{}${:,.2f}'.format('-' if dollars < -0.004 else '', symbol, abs(dollars))
+    return '{}{}${:,.2f}'.format('-' if dollars < -0.004 else '', symbol, abs(float(dollars)))
 
 
 @register.filter
 def currencyround(dollars, symbol=''):
     if dollars == '' or dollars is None:
         return ''
-    return '{}{}${:,d}'.format('-' if dollars < -0.004 else '', symbol, abs(round(dollars)))
+    return '{}{}${:,d}'.format('-' if dollars < -0.004 else '', symbol, abs(round(float(dollars))))
 
 
 @register.filter
