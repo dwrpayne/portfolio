@@ -14,8 +14,8 @@
             {% endif %}
             <th>Currency</th>
             <th>Units</th>
-            <th>Price</th>
-            <th>Total</th>
+            <th class="text-right">Price</th>
+            <th class="text-right">Total</th>
             <th>Description</th>
         </tr>
     </thead>
@@ -34,8 +34,8 @@
             {% endif %}
             <td>{{activity.cash_id}}</td>
             <td>{{activity.qty | floatformat:-4}}</td>
-            <td>{{activity.price | currency}}</td>
-            <td>{{activity.net_amount | currency}}</td>
+            <td class="text-right">{{activity.price | currency}}</td>
+            <td class="text-right">{{activity.net_amount | currency}}</td>
             <td>{{activity.description}}</td>
         </tr>
     {% endfor %}

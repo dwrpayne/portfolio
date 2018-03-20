@@ -20,18 +20,18 @@
                     <tr>
                         <th>Symbol</th>
                         {% for year in years %}
-                            <th>{{ year }}</th>
+                            <th class="text-right">{{ year }}</th>
                         {% endfor %}
-                        <th>Total</th>
+                        <th class="text-right">Total</th>
                     </tr>
                     </thead>
                     <tfoot>
                     <tr>
                         <td>Total</td>
                         {% for value in yearly_totals %}
-                            <td>{% if value %}{{ value | currency }}{% endif %}</td>
+                            <td class="text-right">{% if value %}{{ value | currency }}{% endif %}</td>
                         {% endfor %}
-                        <td>{{ total | currency }}</td>
+                        <td class="text-right">{{ total | currency }}</td>
                     </tr>
                     </tfoot>
                     <tbody>
@@ -39,7 +39,7 @@
                         <tr>
                             <td>{{ symbol }}</td>
                             {% for value in yearly_values %}
-                                <td>{% if value %}{{ value | currency }}{% endif %}</td>
+                                <td class="text-right">{% if value %}{{ value | currency }}{% endif %}</td>
                             {% endfor %}
                         </tr>
                     {% endfor %}
