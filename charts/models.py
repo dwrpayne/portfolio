@@ -327,10 +327,18 @@ class RebalancePieChart(BaseHighChart):
     _JAVASCRIPT_TEMPLATE = '''
     <script>
     $.get("?chart=$data_param", function(data) {
-        Highcharts.StockChart({
+        Highcharts.chart('$container_name', {
             chart: {
-                renderTo: "$container_name",
+                plotBackgroundColor: null,
+                plotBorderWidth: null,
+                plotShadow: false,
                 type: 'pie',
+            },
+            title: {
+                text: 'Current allocation percentages'
+            },
+            tooltip: {
+                pointFormat: '{series.name}: <b>{point.percentage:.2f}%</b>'
             },
             credits: {
                 enabled: false
@@ -341,7 +349,7 @@ class RebalancePieChart(BaseHighChart):
                     cursor: 'pointer',
                     dataLabels: {
                         enabled: true,
-                        format: '<b>{point.name}</b>: {point.percentage:.1f} %',
+                        format: '<b>{point.name}</b>: {point.percentage:.2f} %',
                         style: {
                             color: (Highcharts.theme && Highcharts.theme.contrastTextColor) || 'black'
                         }
@@ -349,10 +357,10 @@ class RebalancePieChart(BaseHighChart):
                 }
             },
             series: [{
-                'name': 'Allocations',
-                'type': 'pie',
-                'colorByPoint': true,
-                'data': data
+                name: 'Allocations',
+                type: 'pie',
+                colorByPoint: true,
+                data: data
             }]
         });
     });
@@ -361,25 +369,4 @@ class RebalancePieChart(BaseHighChart):
 
     def get_data(self, **kwargs):
         allocs, leftover = self.userprofile.GetRebalanceInfo()
-        data = [{
-                'name': 'IE',
-                'y': 56.33
-            }, {
-                'name': 'Chrome',
-                'y': 24.03,
-                'sliced': True,
-                'selected': True
-            }, {
-                'name': 'Firefox',
-                'y': 10.38
-            }, {
-                'name': 'Safari',
-                'y': 4.77
-            }, {
-                'name': 'Opera',
-                'y': 0.91
-            }, {
-                'name': 'Other',
-                'y': 0.2
-            }]
-        return data
+        return [{'name': alloc.list_securities, 'y': float(round(alloc.current_pct, 2))} for alloc in allocs]
