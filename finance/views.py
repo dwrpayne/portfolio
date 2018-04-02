@@ -325,15 +325,15 @@ class RebalanceView(LoginRequiredMixin, HighChartMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         cashadd = int(self.request.GET.get('cashadd', 0))
-        allocs, leftover = self.get_filled_allocations(cashadd)
+        allocs = self.get_filled_allocations(cashadd)
 
         context = super().get_context_data(**kwargs)
         context['cashadd'] = cashadd
-        context.update({'allocs': allocs, 'leftover': leftover})
+        context.update({'allocs': allocs})
 
         total = sum(a.desired_pct for a in allocs)
         context['unassigned_pct'] = 100 - total
-        if total < 100 and not leftover:
+        if total < 100:
             messages.warning(self.request,
                              'Your allocation percentages only total to {}. Your numbers will be inaccurate until you fix this!'.format(
                                  total))
@@ -351,17 +351,16 @@ class RebalanceView(LoginRequiredMixin, HighChartMixin, TemplateView):
             ret_dict['new-cells']['{}-buysell'.format(id)] = obj.buysell
 
     def handle_cashadd(self, cashadd):
-        allocs, leftover = self.get_filled_allocations(cashadd)
+        allocs = self.get_filled_allocations(cashadd)
         ret_dict = {}
         for alloc in allocs:
             self.add_to_ret_dict(ret_dict, alloc.id, alloc)
-        self.add_to_ret_dict(ret_dict, "leftover", leftover)
         return JsonResponse(ret_dict)
 
     def handle_desired_pct_change(self, alloc_id, desired_pct):
         from .models import Allocation
         Allocation.objects.filter(pk=alloc_id).update(desired_pct=desired_pct)
-        allocs, leftover = self.get_filled_allocations()
+        allocs = self.get_filled_allocations()
         alloc = next(a for a in allocs if str(a.id) == alloc_id)
         ret_dict = {}
         if alloc.securities.count() == 0 and desired_pct == 0:
@@ -384,13 +383,11 @@ class RebalanceView(LoginRequiredMixin, HighChartMixin, TemplateView):
         if source_alloc.securities.count() == 0 and source_alloc.desired_pct==0:
             ret_dict['delete-id'] = source_alloc.id
             source_alloc.delete()
-        allocs, leftover = self.get_filled_allocations()
+        allocs = self.get_filled_allocations()
 
         for alloc in allocs:
             if alloc.id in [int(source_id), int(target_id)]:
                 self.add_to_ret_dict(ret_dict, alloc.id, alloc)
-        if not source_id:
-            self.add_to_ret_dict(ret_dict, "leftover", leftover)
         return JsonResponse(ret_dict)
 
 

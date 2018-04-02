@@ -143,24 +143,12 @@ class UserProfile(models.Model):
         holdings = self.GetHoldingDetails().today().select_related('account', 'security')
         total_value = sum(h.value for h in holdings) + cashadd
         allocs = self.user.allocations.all().order_by('-desired_pct').prefetch_related('securities')
-        leftover = {'desired_pct': 100, 'current_pct': 100, 'current_amt': total_value,
-                    'desired_amt': 0, 'buysell': 0,
-                    'securities': self.user.allocations.get_unallocated_securities()}
         for alloc in allocs:
             alloc.fill_allocation(cashadd,
                                   sum(h.value for h in holdings if h.security in alloc.securities.all()),
                                   total_value)
 
-            leftover['desired_pct'] -= alloc.desired_pct
-            leftover['current_pct'] -= alloc.current_pct
-            leftover['current_amt'] -= alloc.current_amt
-            leftover['desired_amt'] += alloc.desired_amt
-            leftover['buysell'] += alloc.buysell
-
-        if not leftover['securities']:
-            leftover = None
-
-        return allocs, leftover
+        return allocs
 
     def get_growth_data(self):
         """

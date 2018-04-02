@@ -5,12 +5,19 @@ from securities.models import Security
 
 
 class AllocationManager(models.Manager):
+    def for_user(self, user):
+        return self.get_queryset().filter(user=user)
+
     def get_unallocated_securities(self, user=None):
         if not user:
             user = self.instance
-        allocated = list(self.get_queryset().filter(user=user).values_list('securities', flat=True))
+        allocated = self.for_user(user).values_list('securities', flat=True).exclude(
+            securities__symbol=None)
         held = user.userprofile.GetHeldSecurities().exclude(symbol__in=allocated)
         return held
+
+    def ensure_allocated(self, security, user):
+        self.reallocate_security(security, user=user)
 
     def reallocate_security(self, security, sourceid=None, targetid=None, user=None):
         """
@@ -27,9 +34,9 @@ class AllocationManager(models.Manager):
             source = Allocation.objects.get(pk=sourceid)
             source.securities.remove(security)
         except Allocation.DoesNotExist:
-            pass
+            source = None
 
-        target, created = self.get_or_create(pk=targetid, defaults={'user':user})
+        target, created = self.get_or_create(pk=targetid, defaults={'user': user})
         target.securities.add(security)
         return source, target
 
@@ -58,10 +65,9 @@ class Allocation(models.Model):
             return 'Cash'
         return ', '.join([s.symbol for s in self.securities.all()])
 
-
     def fill_allocation(self, cashadd, holding_value, total_value):
         self.current_amt = holding_value
-        if any(s.symbol=='CAD' for s in self.securities.all()):
+        if any(s.symbol == 'CAD' for s in self.securities.all()):
             self.current_amt += cashadd
         self.current_pct = self.current_amt / total_value * 100
         self.desired_amt = self.desired_pct * total_value / 100

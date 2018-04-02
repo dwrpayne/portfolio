@@ -368,5 +368,5 @@ class RebalancePieChart(BaseHighChart):
     '''
 
     def get_data(self, **kwargs):
-        allocs, leftover = self.userprofile.GetRebalanceInfo()
+        allocs = self.userprofile.GetRebalanceInfo()
         return [{'name': alloc.list_securities, 'y': float(round(alloc.current_pct, 2))} for alloc in allocs]

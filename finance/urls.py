@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from django.views.decorators.cache import never_cache
 
 app_name = 'finance'
 urlpatterns = [
@@ -9,7 +10,7 @@ urlpatterns = [
     path('portfolio/<chart>/', views.PortfolioView.as_view(), name='portfolio1'),
     path('history/<period>/', views.HistoryDetail.as_view(), name='history'),
     path('snapshot/', views.SnapshotDetail.as_view(), name='snapshot'),
-    path('rebalance/', views.RebalanceView.as_view(), name='rebalance'),
+    path('rebalance/', never_cache(views.RebalanceView.as_view()), name='rebalance'),
     path('account/<pk>/', views.AccountDetail.as_view(), name='accountdetail'),
     path('capgains/<pk>/', views.CapGainsSecurityReport.as_view(), name='capgainssec'),
     path('capgains/', views.CapGainsReport.as_view(), name='capgains'),
