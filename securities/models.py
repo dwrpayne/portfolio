@@ -242,6 +242,12 @@ class Security(models.Model):
 
         data = get_data_from_sources(self.datasources.all(), start, end)
         if data.empty:
+            latest = self.prices.latest()
+            day = latest.day + datetime.timedelta(days=1)
+            while day <= end:
+                self.prices.update_or_create(day=day, defaults={'price': latest.price,
+                                                                'priority': 0})
+                day += datetime.timedelta(days=1)
             return
 
         with transaction.atomic():

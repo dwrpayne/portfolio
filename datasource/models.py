@@ -104,7 +104,7 @@ class AlphaVantageStockSource(DataSourceMixin):
                 return
         self.symbol = 'NO VALID LOOKUP FOR {}'.format(original_symbol)
 
-    @rate_limited(1, 4)
+    @rate_limited(1, 6)
     def _Retrieve(self, start, end):
         params = {'function': 'TIME_SERIES_DAILY', 'apikey': self.api_key,
                   'symbol': self.symbol}
