@@ -19,7 +19,12 @@ class BaseAccountQuerySet(PolymorphicQuerySet):
 
     def SyncAllActivitiesAndRegenerate(self):
         for account in self:
-            account.SyncAndRegenerate()
+            try:
+                account.SyncAndRegenerate()
+            except:
+                import traceback
+                traceback.print_exc()
+                pass
 
     def with_newest_activity(self):
         return self.annotate(newest=Max('activities__trade_date'))
