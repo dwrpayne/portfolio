@@ -17,7 +17,9 @@ class AllocationManager(models.Manager):
         return held
 
     def ensure_allocated(self, security, user):
-        self.reallocate_security(security, user=user)
+        allocs = Allocation.objects.filter(securities=security)
+        #if not allocs:
+        #    self.reallocate_security(security, user=user)
 
     def reallocate_security(self, security, sourceid=None, targetid=None, user=None):
         """

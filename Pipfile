@@ -33,6 +33,7 @@ python-highcharts = {git = "https://github.com/dwrpayne/python-highcharts.git", 
 ratelimit = "*"
 django-redis = "*"
 django-mathfilters = "*"
+more-itertools = "*"
 
 
 [dev-packages]
