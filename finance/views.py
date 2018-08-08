@@ -513,7 +513,7 @@ class HistoryDetail(LoginRequiredMixin, ListView):
 
         array = numpy.rec.array(list(vals), dtype=[('account', 'U20'), ('day', 'U10'), ('val', 'f4')])
         df = pandas.DataFrame(array)
-        table = df.pivot_table(index='day', columns='account', values='val', fill_value=0,
+        table = df.pivot_table(index='day', columns='account', values='val', fill_value=0, aggfunc=numpy.sum,
                                margins=True, margins_name='Total')
         table = table.drop('Total')
         rows = table.iloc[::-1].iterrows()
