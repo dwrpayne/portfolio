@@ -11,6 +11,7 @@ from .account import BaseAccount
 
 class HoldingManager(models.Manager):
     def add_effect(self, account, symbol, qty_delta, date):
+        qty_delta *= account.joint_share
         previous_qty = 0
         try:
             current_holding = self.get(security_id=symbol, enddate=None)
@@ -221,7 +222,7 @@ class HoldingChange:
                            qty=holding.qty, value=holding.value, price=holding.price,
                            day=holding.day, exch=holding.exch)
         hc.price_delta = holding.price - price.price
-        hc.price_percent_delta = hc.price_delta / price.price
+        hc.price_percent_delta = hc.price_delta / price.price if price.price else 0
         hc.value_delta = holding.value
         hc.value_percent_delta = 0
         hc.qty_delta = holding.qty
@@ -233,7 +234,7 @@ class HoldingChange:
                            qty=0, value=0, price=price.price,
                            day=price.day, exch=price.exch)
         hc.price_delta = price.price - holding.price
-        hc.price_percent_delta = hc.price_delta / holding.price
+        hc.price_percent_delta = hc.price_delta / holding.price if holding.price else 0
         hc.value_delta = -holding.value
         hc.value_percent_delta = -100
         hc.qty_delta = -holding.qty

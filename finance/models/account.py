@@ -37,6 +37,7 @@ class BaseAccount(ShowFieldTypeAndContent, PolymorphicModel):
     account_id = models.CharField(max_length=100)
     taxable = models.BooleanField(default=True)
     display_name = models.CharField(max_length=100, default='')
+    joint_share = models.DecimalField(default=1, decimal_places=3, max_digits=6)
     creation_date = models.DateField(default='2009-01-01')
 
     objects = PolymorphicManager.from_queryset(BaseAccountQuerySet)()
