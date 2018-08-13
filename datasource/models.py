@@ -78,7 +78,7 @@ class PandasDataSource(DataSourceMixin):
                 df = pdr.DataReader(self.symbol, self.source, start, end)
             except:
                 return pandas.Series()
-        if df.empty:
+        if df.empty or self.column not in df:
             return pandas.Series()
         return pandas.Series(df[self.column], df.index)
 
@@ -104,7 +104,7 @@ class AlphaVantageStockSource(DataSourceMixin):
                 return
         self.symbol = 'NO VALID LOOKUP FOR {}'.format(original_symbol)
 
-    @rate_limited(1, 6)
+    @rate_limited(1, 15)
     def _Retrieve(self, start, end):
         params = {'function': 'TIME_SERIES_DAILY', 'apikey': self.api_key,
                   'symbol': self.symbol}
