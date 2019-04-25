@@ -93,8 +93,8 @@ class AdminSecurity(RefreshButtonHandlerMixin, ListView):
     template_name = 'finance/admin/securities.html'
     context_object_name = 'securities'
 
-    def ajax_request(self, request, action):
-        action, symbol = action.split('-')
+    def ajax_request(self, request, actions):
+        action, symbol = actions
         if action == 'sync':
             if symbol == 'all':
                 Security.objects.Sync(False)

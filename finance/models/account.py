@@ -158,7 +158,7 @@ class AccountCsv(models.Model):
         if not hasattr(self, 'account'):
             data = str(self.csvfile.read())
             self.account = sorted(self.user.userprofile.GetAccounts(),
-                key=lambda a: data.count(a.pk))[-1]
+                key=lambda a: data.count(str(a.pk)))[-1]
             return self.account
         return None
 

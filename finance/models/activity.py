@@ -230,10 +230,10 @@ class Activity(models.Model):
     account = models.ForeignKey(BaseAccount, on_delete=models.CASCADE, related_name='activities')
     trade_date = models.DateField()
     security = models.ForeignKey(Security, on_delete=models.CASCADE,
-                                 null=True, related_name='activities')
+                                 blank=True, null=True, related_name='activities')
     description = models.CharField(max_length=1000)
     cash = models.ForeignKey(Security, on_delete=models.CASCADE,
-                             null=True, related_name='dontaccess_cash')
+                             blank=True, null=True, related_name='dontaccess_cash')
     qty = models.DecimalField(max_digits=16, decimal_places=6)
     price = models.DecimalField(max_digits=16, decimal_places=6)
     net_amount = models.DecimalField(max_digits=16, decimal_places=2)

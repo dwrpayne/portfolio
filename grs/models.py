@@ -36,10 +36,10 @@ class GrsRawActivity(BaseRawActivity):
                 priority=GrsDataSource.PRIORITY_DAILY))
 
         total_cost = self.qty * self.price
+
         Activity.objects.create_with_deposit(account=self.account, trade_date=self.day, security=security,
-                                             cash_id=security.currency,
-                                             description=self.description, qty=self.qty, raw=self,
-                                             price=self.price, net_amount=-total_cost, type=Activity.Type.Buy)
+                         cash_id=security.currency, description=self.description, qty=self.qty, raw=self,
+                         price=self.price, net_amount=-total_cost, type=Activity.Type.Buy)
 
 
 class GrsClient(models.Model):
