@@ -31,6 +31,15 @@
             </tr>
 
         </tfoot>
+    {% if error %}
+        <tbody>
+            <tr>
+                <td rowspan="*">
+                    {{ error }}
+                </td>
+            </tr>
+        </tbody>
+    {% else %}
         {% for holding_detail in holding_data %}
             <tbody>
                 <tr>
@@ -131,5 +140,6 @@
                 {% endfor %}
             </tbody>
         {% endfor %}
+    {% endif %}
     </table>
 </div>

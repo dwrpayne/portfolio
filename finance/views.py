@@ -23,6 +23,7 @@ from django.views.generic.edit import FormView, UpdateView
 
 from charts.models import GrowthChart, RebalancePieChart, SecurityChart
 from charts.views import HighChartMixin
+from securities.models import MissingPriceException
 from securities.models import Security
 from utils.misc import partition
 from .forms import FeedbackForm, AccountCsvForm, ProfileInlineFormset
@@ -301,7 +302,10 @@ class SnapshotDetail(LoginRequiredMixin, DateMixin, DayMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(GetHoldingsContext(self.request.user.userprofile, self.get_day()))
+        try:
+            context.update(GetHoldingsContext(self.request.user.userprofile, self.get_day()))
+        except MissingPriceException:
+            context['error'] = 'No stock prices found in the database for this day, please alert David.'
         context['activity_days'] = self.request.user.userprofile.GetActivities().values_list(
             'trade_date', flat=True).distinct()
         return context

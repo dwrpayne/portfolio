@@ -13,6 +13,9 @@ from datasource.services import get_data_from_sources
 from utils.db import SecurityMixinQuerySet, DayMixinQuerySet
 
 
+class MissingPriceException(Exception):
+    pass
+
 class SecurityQuerySet(models.QuerySet):
     def create(self, **kwargs):
         kwargs.setdefault('type', self.model.Type.Stock if len(kwargs['symbol']) < 20 else self.model.Type.Option)
@@ -269,11 +272,13 @@ class Security(models.Model):
 
     def GetTodaysChange(self):
         rates = self.prices.filter(
-            day__gte=datetime.date.today() - datetime.timedelta(days=1)
-        ).values_list('price', flat=True)
-        yesterday = 1 / rates[0]
-        today = 1 / rates[1]
-        return today, (today - yesterday) / yesterday
+            day__gte=datetime.date.today() - datetime.timedelta(days=7)
+        ).order_by('-day').values_list('price', flat=True)
+        if len(rates) >= 2:
+            yesterday = 1 / rates[0]
+            today = 1 / rates[1]
+            return today, (today - yesterday) / yesterday
+        return 0,0
 
 
 class Option(Security):

@@ -5,6 +5,7 @@ from django.db import models, connection
 from django.db.models import Sum
 
 import utils.dates
+from securities.models import MissingPriceException
 from securities.models import Security, SecurityPriceDetail, SecurityPriceQuerySet
 from .account import BaseAccount
 
@@ -187,9 +188,12 @@ ALTER TABLE financeview_holdingdetail OWNER TO financeuser;""")
 
     def __rsub__(self, other):
         if not other:
-            price = SecurityPriceDetail.objects.get(security_id=self.security_id,
-                                                    day=self.day + datetime.timedelta(days=1))
-            return HoldingChange.delta_to_price(self, price)
+            try:
+                price = SecurityPriceDetail.objects.get(security_id=self.security_id,
+                                                        day=self.day + datetime.timedelta(days=1))
+                return HoldingChange.delta_to_price(self, price)
+            except SecurityPriceDetail.DoesNotExist:
+                raise MissingPriceException
         return NotImplemented
 
     def __sub__(self, other):
