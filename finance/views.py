@@ -444,6 +444,7 @@ def GetHoldingsContext(userprofile, as_of_date=None):
         for account_datum in h.account_data:
             try:
                 account_datum.book_value = next(-val for a, s, val in book_value_list if account_datum.account.id==a and account_datum.security.symbol==s)
+                account_datum.book_value *= account_datum.account.joint_share
                 account_datum.total_value_gain = account_datum.value - account_datum.book_value
                 h.book_value += account_datum.book_value
             except StopIteration:
