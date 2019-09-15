@@ -100,11 +100,11 @@ class QuestradeRawActivity(BaseRawActivity):
 
         if json['action'] == 'FXT':
             if 'AS OF ' in json['description']:
-                trade_date = pendulum.parse(json['trade_date'])
+                trade_date = pendulum.parse(json['tradeDate'])
                 asof = pendulum.from_format(json['description'].split('AS OF ')[1].split(' ')[0], '%m/%d/%y')
                 if (trade_date - asof).days > 365:
                     asof = asof.add(years=1)
-                json['trade_date'] = asof.isoformat()
+                json['tradeDate'] = asof.isoformat()
 
         json['trade_date'] = str(parser.parse(json['tradeDate']).date())
         json['type'] = QuestradeActivityType.objects.GetActivityType(json['type'], json['action'])
