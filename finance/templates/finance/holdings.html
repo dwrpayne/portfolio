@@ -31,115 +31,115 @@
             </tr>
 
         </tfoot>
+    <tbody>
     {% if error %}
         <tbody>
             <tr>
-                <td rowspan="*">
+                <td colspan="42">
                     {{ error }}
                 </td>
             </tr>
         </tbody>
-    {% else %}
-        {% for holding_detail in holding_data %}
-            <tbody>
-                <tr>
-                    <td>
-                        <div data-toggle="collapse" href="#holdings-table-child-{{forloop.counter}}">
-                            <i class="fas fa-plus"></i>
-                        </div>
-                    </td>
-                    <td><img src="{% static "flags/"|add:holding_detail.security.currency|lower|add:".png" %}">
-                        <a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a>
-                    </td>
-                    <td class="text-right">{{holding_detail.price | floatformat:2}}</td>
-                    <td class="text-right">{{holding_detail.price_delta | floatformat:2 | prefix_plusminus | colorize}}
-                        {{holding_detail.price_percent_delta | percentage | parens | colorize}}
-                    </td>
-                    <td class="text-right">{{holding_detail.qty | floatformat:-2}}
-                        {% if holding_detail.qty_delta %}
-                            {{holding_detail.qty_delta | floatformat:-2 | prefix_plusminus | parens}}
+    {% endif %}
+    {% for holding_detail in holding_data %}
+        <tbody>
+            <tr>
+                <td>
+                    <div data-toggle="collapse" href="#holdings-table-child-{{forloop.counter}}">
+                        <i class="fas fa-plus"></i>
+                    </div>
+                </td>
+                <td><img src="{% static "flags/"|add:holding_detail.security.currency|lower|add:".png" %}">
+                    <a href="{% url 'finance:securitydetail' holding_detail.security %}">{{holding_detail.security}}</a>
+                </td>
+                <td class="text-right">{{holding_detail.price | floatformat:2}}</td>
+                <td class="text-right">{{holding_detail.price_delta | floatformat:2 | prefix_plusminus | colorize}}
+                    {{holding_detail.price_percent_delta | percentage | parens | colorize}}
+                </td>
+                <td class="text-right">{{holding_detail.qty | floatformat:-2}}
+                    {% if holding_detail.qty_delta %}
+                        {{holding_detail.qty_delta | floatformat:-2 | prefix_plusminus | parens}}
+                    {% endif %}
+                </td>
+                <td class="text-right">{{holding_detail.value_delta | currency | colorize}}
+                    {{holding_detail.value_percent_delta | percentage | parens | colorize}}
+                </td>
+                <td class="text-right">{{holding_detail.book_value | currency}}</td>
+                <td class="text-right">{{holding_detail.value | currency}}</td>
+                <td class="text-right">{{holding_detail.total_value_gain | currency | colorize}}</td>
+            </tr>
+        </tbody>
+        <tbody class="collapse" id="holdings-table-child-{{forloop.counter}}">
+            {% for account in holding_detail.account_data %}
+                <tr >
+                    <td></td>
+                    <td colspan="2">{{account.account}}</td>
+                    <td class="text-right"></td>
+                    <td class="text-right">{{account.qty | floatformat:-2}}
+                        {% if account.qty_delta %}
+                            {{account.qty_delta | floatformat:-2 | prefix_plusminus | parens}}
                         {% endif %}
                     </td>
-                    <td class="text-right">{{holding_detail.value_delta | currency | colorize}}
-                        {{holding_detail.value_percent_delta | percentage | parens | colorize}}
+                    <td class="text-right">{{account.value_delta | currency | colorize}}
+                        {{account.value_percent_delta | percentage | parens | colorize}}
                     </td>
-                    <td class="text-right">{{holding_detail.book_value | currency}}</td>
-                    <td class="text-right">{{holding_detail.value | currency}}</td>
-                    <td class="text-right">{{holding_detail.total_value_gain | currency | colorize}}</td>
+                    <td class="text-right">{{account.book_value | currency}}</td>
+                    <td class="text-right">{{account.value | currency}}</td>
+                    <td class="text-right">{{account.total_value_gain | currency | colorize}}</td>
                 </tr>
-            </tbody>
-            <tbody class="collapse" id="holdings-table-child-{{forloop.counter}}">
-                {% for account in holding_detail.account_data %}
-                    <tr >
-                        <td></td>
-                        <td colspan="2">{{account.account}}</td>
-                        <td class="text-right"></td>
-                        <td class="text-right">{{account.qty | floatformat:-2}}
-                            {% if account.qty_delta %}
-                                {{account.qty_delta | floatformat:-2 | prefix_plusminus | parens}}
-                            {% endif %}
+            {% endfor %}
+        </tbody>
+    {% endfor %}
+    {% for holding_detail in cash_data %}
+        <tbody>
+            <tr>
+                <td>
+                    <div data-toggle="collapse" data-target="#holdings-table-child-{{forloop.counter|add:"1000"}}" >
+                        <i class="fas fa-plus"></i>
+                    </div>
+                </td>
+                <td>
+                    <img src="{% static "flags/"|add:holding_detail.security.symbol|lower|add:".png" %}">
+                    Cash
+                </td>
+                {% if holding_detail.price != 1 %}
+                    {% with today_inv=1|div:holding_detail.price yesterday=holding_detail.price|sub:holding_detail.price_delta %}
+                    {% with yesterday_inv=1|div:yesterday %}
+                        <td class="text-right" data-toggle="tooltip"
+                             title="{{ today_inv | floatformat:6}} / {{ holding_detail.price | floatformat:6}}">
+                            {{ today_inv | floatformat:4}}
                         </td>
-                        <td class="text-right">{{account.value_delta | currency | colorize}}
-                            {{account.value_percent_delta | percentage | parens | colorize}}
+                        <td class="text-right">
+                            {{ today_inv|sub:yesterday_inv | floatformat:4 | prefix_plusminus | colorize}}
+                            {{ 0 | sub:holding_detail.price_percent_delta | percentage | parens | colorize}}
                         </td>
-                        <td class="text-right">{{account.book_value | currency}}</td>
-                        <td class="text-right">{{account.value | currency}}</td>
-                        <td class="text-right">{{account.total_value_gain | currency | colorize}}</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        {% endfor %}
-        {% for holding_detail in cash_data %}
-            <tbody>
-                <tr>
-                    <td>
-                        <div data-toggle="collapse" data-target="#holdings-table-child-{{forloop.counter|add:"1000"}}" >
-                            <i class="fas fa-plus"></i>
-                        </div>
-                    </td>
-                    <td>
-                        <img src="{% static "flags/"|add:holding_detail.security.symbol|lower|add:".png" %}">
-                        Cash
-                    </td>
-                    {% if holding_detail.price != 1 %}
-                        {% with today_inv=1|div:holding_detail.price yesterday=holding_detail.price|sub:holding_detail.price_delta %}
-                        {% with yesterday_inv=1|div:yesterday %}
-                            <td class="text-right" data-toggle="tooltip"
-                                 title="{{ today_inv | floatformat:6}} / {{ holding_detail.price | floatformat:6}}">
-                                {{ today_inv | floatformat:4}}
-                            </td>
-                            <td class="text-right">
-                                {{ today_inv|sub:yesterday_inv | floatformat:4 | prefix_plusminus | colorize}}
-                                {{ 0 | sub:holding_detail.price_percent_delta | percentage | parens | colorize}}
-                            </td>
-                        {% endwith %}
-                        {% endwith %}
+                    {% endwith %}
+                    {% endwith %}
 
-                    {% else %}
-                        <td></td>
-                        <td></td>
-                    {% endif %}
+                {% else %}
+                    <td></td>
+                    <td></td>
+                {% endif %}
+                <td class="text-right"></td>
+                <td class="text-right">{{holding_detail.value_delta | currency | colorize}}</td>
+                <td class="text-right"></td>
+                <td class="text-right">{{holding_detail.value | currency}}</td>
+                <td class="text-right"></td>
+            </tr>
+        </tbody>
+        <tbody class="collapse" id="holdings-table-child-{{forloop.counter|add:"1000"}}" >
+            {% for account in holding_detail.account_data %}
+                <tr>
+                    <td></td>
+                    <td colspan="3">{{account.account}}</td>
                     <td class="text-right"></td>
-                    <td class="text-right">{{holding_detail.value_delta | currency | colorize}}</td>
+                    <td class="text-right">{{account.value_delta | currency | colorize}}</td>
                     <td class="text-right"></td>
-                    <td class="text-right">{{holding_detail.value | currency}}</td>
+                    <td class="text-right">{{account.value | currency}}</td>
                     <td class="text-right"></td>
                 </tr>
-            </tbody>
-            <tbody class="collapse" id="holdings-table-child-{{forloop.counter|add:"1000"}}" >
-                {% for account in holding_detail.account_data %}
-                    <tr>
-                        <td></td>
-                        <td colspan="3">{{account.account}}</td>
-                        <td class="text-right"></td>
-                        <td class="text-right">{{account.value_delta | currency | colorize}}</td>
-                        <td class="text-right"></td>
-                        <td class="text-right">{{account.value | currency}}</td>
-                        <td class="text-right"></td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        {% endfor %}
-    {% endif %}
+            {% endfor %}
+        </tbody>
+    {% endfor %}
     </table>
 </div>

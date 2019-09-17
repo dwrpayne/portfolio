@@ -502,7 +502,12 @@ class PortfolioView(LoginRequiredMixin, HighChartMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(GetHoldingsContext(self.request.user.userprofile))
+        for day in reversed(pandas.date_range(datetime.date.today() - datetime.timedelta(days=7), datetime.date.today())):
+            try:
+                context.update(GetHoldingsContext(self.request.user.userprofile, day.date()))
+                break
+            except MissingPriceException:
+                context['error'] = f'Stock prices not found for today, using data as of {(day-datetime.timedelta(days=1)).date()}.'
         context['activities'] = self.request.user.userprofile.GetActivities().after(
                             datetime.date.today() - datetime.timedelta(days=90)
                         ).select_related('account')
