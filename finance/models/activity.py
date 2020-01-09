@@ -341,7 +341,7 @@ class CostBasis(Activity):
     objects = CostBasisManager.from_queryset(ActivityQuerySet)()
 
     class Meta:
-        ordering = ['security', 'trade_date']
+        ordering = ['security', 'trade_date', '-qty']
         get_latest_by = 'trade_date'
         proxy = True
 
