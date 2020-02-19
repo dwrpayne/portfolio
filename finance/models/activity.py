@@ -198,7 +198,7 @@ class ActivityQuerySet(models.query.QuerySet, SecurityMixinQuerySet, DayMixinQue
                 )
             ).values_list('trade_date', 'cum_total')
         else:
-            return self.deposits().values_list('trade_date', 'net_amount')
+            return self.deposits().values_list('trade_date', F('net_amount') * F('account__joint_share'))
 
     def newest_date(self):
         """
