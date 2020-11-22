@@ -32,6 +32,7 @@ PROJECT_APPS = [
     'datasource.apps.DatasourceConfig',
     'finance.apps.financeConfig',
     'grs.apps.grsConfig',
+    'ib.apps.IbConfig',
     'questrade.apps.QuestradeConfig',
     'rbc.apps.RbcConfig',
     'securities.apps.SecuritiesConfig',
