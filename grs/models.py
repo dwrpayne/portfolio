@@ -134,7 +134,7 @@ class GrsAccount(BaseAccount):
                 GrsRawActivity.objects.create(
                     account=self, day=parser.parse(day).date(),
                     qty=Decimal(qty), price=Decimal(price),
-                    symbol='ETP', description=desc)
+                    symbol='BJP', description=desc)
 
 
 class GrsDataSource(DataSourceMixin):
