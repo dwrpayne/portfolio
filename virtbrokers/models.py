@@ -27,7 +27,8 @@ class VirtBrokersRawActivity(BaseRawActivity):
         elif self.type == 'DIV':         self.type = Activity.Type.Dividend
         elif self.type == 'FXT':         self.type = Activity.Type.FX
         elif self.type == 'INT':         self.type = Activity.Type.Interest
-        else:                            assert False, 'Unmapped activity type in Virtual Brokers'
+        elif self.type == 'WDL':         self.type = Activity.Type.Withdrawal
+        else:                            assert False, 'Unmapped activity type in Virtual Brokers: ' + self.type
 
         if self.type == Activity.Type.Dividend:
             # We expect qty and net_amount to be valid here
