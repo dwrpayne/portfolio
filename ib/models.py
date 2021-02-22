@@ -108,7 +108,7 @@ class IbAccount(BaseAccount):
                             activity_params['type'] = Activity.Type.Withdrawal
                     if transsubtype == 'Dividends':
                         activity_params['type'] = Activity.Type.Dividend
-                elif transtype == 'TRNT' and buysell == 'BUY' and symbol == 'USD.CAD':
+                elif transtype == 'TRNT' and symbol == 'USD.CAD':
                     activity_params['type'] = Activity.Type.FX
                 elif transtype == 'TRNT' and buysell == 'BUY':
                     activity_params['type'] = Activity.Type.Buy
