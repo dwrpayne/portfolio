@@ -9,9 +9,10 @@ from securities.models import Security
 
 
 class IbRawActivity(BaseRawActivity):
+
     day = models.DateField()
     symbol = models.CharField(max_length=100, blank=True, default='')
-    trans_id = models.CharField(max_length=100, unique=True)
+    trans_id = models.CharField(max_length=100)
     description = models.CharField(max_length=1000, blank=True, default='')
     currency = models.CharField(max_length=100, blank=True, null=True)
     qty = models.DecimalField(max_digits=16, decimal_places=6, default=0)
@@ -67,7 +68,7 @@ class IbAccount(BaseAccount):
                     accountid, trans_id, date, symbol, buysell, currency, fxrate, qty, price, total_amount, commission, commissioncurrency, net_amount, desc = line
                     commission = Decimal(commission) if commission else 0
                     fxrate = Decimal(fxrate) if fxrate else 0
-                    activity_params['commission'] = commission * fxrate
+                    activity_params['commission'] = round(commission * fxrate, 2)
                     if not net_amount or Decimal(net_amount) == 0:
                         net_amount = Decimal(total_amount) + commission
 
@@ -93,17 +94,20 @@ class IbAccount(BaseAccount):
                 activity_params['currency'] = currency
                 activity_params['qty'] = Decimal(qty) if qty else 0
                 activity_params['price'] = Decimal(price) if price else 0
-                activity_params['net_amount'] = Decimal(net_amount) if net_amount else 0
+                activity_params['net_amount'] = round(Decimal(net_amount) if net_amount else 0, 2)
 
                 # Options need to be fixed for lot price
                 if len(symbol) > 10:
                     activity_params['price'] *= 100
 
-                if transtype == 'CTRN' and transsubtype == 'Deposits/Withdrawals':
-                    if activity_params['net_amount'] > 0:
-                        activity_params['type'] = Activity.Type.Deposit
-                    else:
-                        activity_params['type'] = Activity.Type.Withdrawal
+                if transtype == 'CTRN':
+                    if transsubtype == 'Deposits/Withdrawals':
+                        if activity_params['net_amount'] > 0:
+                            activity_params['type'] = Activity.Type.Deposit
+                        else:
+                            activity_params['type'] = Activity.Type.Withdrawal
+                    if transsubtype == 'Dividends':
+                        activity_params['type'] = Activity.Type.Dividend
                 elif transtype == 'TRNT' and buysell == 'BUY' and symbol == 'USD.CAD':
                     activity_params['type'] = Activity.Type.FX
                 elif transtype == 'TRNT' and buysell == 'BUY':
@@ -113,6 +117,10 @@ class IbAccount(BaseAccount):
                 elif transtype == 'TRFR':
                     activity_params['type'] = Activity.Type.Transfer
                 else:
-                    assert False, 'Unmapped activity type in Interactive Brokers: ' + str(line)
+                    assert False, 'Unmapped activity type "' + transtype + '" in Interactive Brokers: ' + str(line)
 
-                IbRawActivity.objects.get_or_create(account=self, **activity_params)
+                print("Logging IB Raw Activity", activity_params)
+
+                IbRawActivity.objects.get_or_create(account=self,
+                                                    trans_id=activity_params['trans_id'],
+                                                    defaults=activity_params)
