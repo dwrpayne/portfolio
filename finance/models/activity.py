@@ -307,7 +307,7 @@ class CostBasisManager(models.Manager):
         assert False, "Don't create a CostBasis!"
 
     def get_queryset(self):
-        return super().get_queryset().transactions().with_exchange_rates()
+        return super().get_queryset().transactions().with_exchange_rates().exclude(type=Activity.Type.Transfer)
 
     def get_activities_with_acb(self, user, security):
         """
